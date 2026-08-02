@@ -1,0 +1,10 @@
+# Resolved local config (ship config.example instead)
+/config
+
+# Real MCP config; the .example files stay tracked
+mcp.json
+.cursor/mcp.json
+
+__pycache__/
+*.pyc
+.DS_Store

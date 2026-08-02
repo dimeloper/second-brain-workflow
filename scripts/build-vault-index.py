@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""Generate practices/INDEX.md for a second-brain vault.
+
+The index is the hot path into a cold-path vault: an agent reads one file to
+learn what notes exist and roughly what each says, then opens only the notes
+that matter. Output is deterministic — re-running without vault changes
+produces a byte-identical file, so a no-op run is a zero-line diff.
+
+Usage:
+  build-vault-index.py [--vault PATH] [--check]
+
+  --check   exit 1 if the index on disk differs from what would be generated
+            (for CI or a pre-commit hook); writes nothing
+
+Vault resolution: --vault, else $DEV_STANDARDS_VAULT, else ~/vaults/second-brain
+Stdlib only, by design: this must run on a machine with nothing installed.
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lib.config import load as load_config  # noqa: E402
+
+GENERATED_BY = "scripts/build-vault-index.py"
+RULE_MAX = 140
+MATURITY_ORDER = {"enforced": 0, "trialing": 1, "idea": 2}
+
+
+def resolve_vault(explicit):
+    if explicit:
+        return Path(explicit).expanduser()
+    cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
+    return Path(cfg["DEV_STANDARDS_VAULT"]).expanduser()
+
+
+def strip_comment(value):
+    """Drop a trailing YAML comment, respecting quotes."""
+    out, quote = [], None
+    for i, ch in enumerate(value):
+        if quote:
+            out.append(ch)
+            if ch == quote:
+                quote = None
+        elif ch in "\"'":
+            quote = ch
+            out.append(ch)
+        elif ch == "#" and (i == 0 or value[i - 1].isspace()):
+            break
+        else:
+            out.append(ch)
+    return "".join(out).strip()
+
+
+def unquote(value):
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
+
+
+def parse_list(value):
+    inner = value.strip()
+    if inner.startswith("[") and inner.endswith("]"):
+        inner = inner[1:-1]
+    return [unquote(p.strip()) for p in inner.split(",") if p.strip()]
+
+
+def parse_frontmatter(text):
+    """Minimal parser for the shapes this vault actually uses.
+
+    Handles `key: value`, quoted values, inline lists and block lists. Anything
+    else is reported rather than guessed at — a silent misparse would put wrong
+    data in the index, which is worse than a warning.
+    """
+    if not text.startswith("---\n"):
+        return None, ["no frontmatter block"]
+    end = text.find("\n---", 4)
+    if end == -1:
+        return None, ["unterminated frontmatter block"]
+
+    data, warnings, key = {}, [], None
+    for raw in text[4:end].splitlines():
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        if raw.lstrip().startswith("- ") and key:
+            data.setdefault(key, [])
+            if isinstance(data[key], list):
+                data[key].append(unquote(strip_comment(raw.lstrip()[2:])))
+            continue
+        m = re.match(r"^([A-Za-z][\w-]*):(.*)$", raw)
+        if not m:
+            warnings.append(f"unparsed line: {raw.strip()[:60]}")
+            continue
+        key, value = m.group(1), strip_comment(m.group(2))
+        if value.startswith("["):
+            data[key] = parse_list(value)
+        elif value == "":
+            data[key] = []
+        else:
+            data[key] = unquote(value)
+    return data, warnings
+
+
+def first_sentence(text, limit=RULE_MAX):
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text.rfind(" ", 0, limit)
+    return text[: cut if cut > 0 else limit].rstrip(" ,;:") + "…"
+
+
+def extract_body(text):
+    """Title from the first H1, summary from the **Rule:** block.
+
+    The rule may sit on the same line as the marker or run over several lines
+    as a list, so collect until the next bold marker, heading, or a blank line
+    once something has been gathered.
+    """
+    title = ""
+    rule_parts = []
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not title and line.startswith("# "):
+            title = line[2:].strip()
+        if line.startswith("**Rule:**"):
+            head = line[len("**Rule:**"):].strip()
+            if head:
+                rule_parts.append(head)
+            for follow in lines[i + 1:]:
+                stripped = follow.strip()
+                if stripped.startswith("**") or stripped.startswith("#"):
+                    break
+                if not stripped:
+                    if rule_parts:
+                        break
+                    continue
+                rule_parts.append(re.sub(r"^(?:[-*]|\d+\.)\s+", "", stripped))
+            break
+    return title, " ".join(rule_parts).strip()
+
+
+def cell(value):
+    """Escape a value for a markdown table cell."""
+    return str(value).replace("|", "\\|").replace("\n", " ")
+
+
+def collect(vault):
+    practices = vault / "practices"
+    if not practices.is_dir():
+        sys.exit(f"No practices/ directory in {vault}")
+
+    notes, problems = [], []
+    for path in sorted(practices.rglob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        rel = path.relative_to(practices)
+        text = path.read_text(encoding="utf-8")
+        fm, warnings = parse_frontmatter(text)
+        if fm is None:
+            problems.append((str(rel), warnings[0]))
+            fm = {}
+        else:
+            for w in warnings:
+                problems.append((str(rel), w))
+
+        maturity = fm.get("maturity") or "?"
+        if maturity not in MATURITY_ORDER and maturity != "?":
+            problems.append((str(rel), f"unknown maturity: {maturity}"))
+        for required in ("domain", "maturity", "last-reviewed"):
+            if not fm.get(required):
+                problems.append((str(rel), f"missing {required}"))
+
+        title, rule = extract_body(text)
+        if not title:
+            problems.append((str(rel), "no H1 title"))
+        if not rule:
+            problems.append((str(rel), "no **Rule:** line"))
+
+        repos = fm.get("repos") or []
+        notes.append(
+            {
+                "group": rel.parts[0] if len(rel.parts) > 1 else ".",
+                "slug": path.stem,
+                "title": title or path.stem,
+                "maturity": maturity,
+                "repos": repos if isinstance(repos, list) else [repos],
+                "tags": fm.get("tags") or [],
+                "rule": first_sentence(rule) if rule else "",
+            }
+        )
+    return notes, problems
+
+
+def render(notes):
+    total = len(notes)
+    counts = {}
+    for n in notes:
+        counts[n["maturity"]] = counts.get(n["maturity"], 0) + 1
+    summary = " · ".join(
+        f"{counts[m]} {m}"
+        for m in sorted(counts, key=lambda k: MATURITY_ORDER.get(k, 9))
+    )
+
+    out = [
+        "# Practices index",
+        "",
+        f"> Generated by `{GENERATED_BY}` — do not edit by hand.",
+        f"> {total} notes · {summary}",
+        "",
+        "Read this file first. Open a note only when a row below looks relevant;",
+        "each lives at `practices/<group>/<note>.md`. `repos` is the count of",
+        "repos a practice has been observed in — it drives promotion.",
+        "",
+    ]
+
+    for group in sorted({n["group"] for n in notes}):
+        rows = [n for n in notes if n["group"] == group]
+        rows.sort(key=lambda n: (MATURITY_ORDER.get(n["maturity"], 9), n["slug"]))
+        out.append(f"## {group} ({len(rows)})")
+        out.append("")
+        out.append("| Note | Maturity | Repos | Tags | Rule |")
+        out.append("|---|---|---|---|---|")
+        for n in rows:
+            out.append(
+                "| [[{slug}]] | {maturity} | {repos} | {tags} | {rule} |".format(
+                    slug=cell(n["slug"]),
+                    maturity=cell(n["maturity"]),
+                    repos=len(n["repos"]),
+                    tags=cell(", ".join(n["tags"])),
+                    rule=cell(n["rule"]),
+                )
+            )
+        out.append("")
+
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--vault", help="vault path (default: $DEV_STANDARDS_VAULT)")
+    ap.add_argument("--check", action="store_true", help="exit 1 if the index is stale")
+    args = ap.parse_args()
+
+    vault = resolve_vault(args.vault)
+    if not vault.is_dir():
+        sys.exit(f"Vault not found: {vault}")
+
+    notes, problems = collect(vault)
+    content = render(notes)
+    index = vault / "practices" / "INDEX.md"
+
+    for rel, problem in problems:
+        print(f"warning: {rel}: {problem}", file=sys.stderr)
+
+    if args.check:
+        current = index.read_text(encoding="utf-8") if index.exists() else None
+        if current == content:
+            print(f"{index} is current ({len(notes)} notes)")
+            return 0
+        print(f"{index} is stale — run build-vault-index.py", file=sys.stderr)
+        return 1
+
+    index.write_text(content, encoding="utf-8")
+    print(f"Wrote {index} ({len(notes)} notes, {len(problems)} warning(s))")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

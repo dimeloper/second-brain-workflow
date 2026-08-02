@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "obsidian": {
+      "command": "npx",
+      "args": ["-y", "obsidian-mcp", "REPLACE_WITH_ABSOLUTE_VAULT_PATH"]
+    }
+  }
+}

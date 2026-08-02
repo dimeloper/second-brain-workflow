@@ -1,0 +1,18 @@
+# Engineering Standards
+
+Always-on conventions for AI coding agents in this repo. Keep it short and
+imperative — everything here is in context on every relevant turn.
+
+Rules that only apply to some files belong in `rules/*.md` with a `paths:`
+list, not here.
+
+## Universal
+
+- <e.g. TypeScript `strict` on, no `any`, named exports only.>
+- <e.g. Conventional Commits for every message.>
+- <e.g. Errors: fail loud in dev, structured and logged in prod.>
+
+## Deep reference
+
+<If you keep a practices vault, point at it here — see the README's cold path.
+Delete this section if you don't.>

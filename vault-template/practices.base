@@ -1,0 +1,89 @@
+filters:
+  and:
+    - 'file.inFolder("practices")'
+    - 'file.name != "INDEX"'
+
+formulas:
+  days_since_review: 'if(last-reviewed, (today() - date(last-reviewed)).days, "")'
+  repo_count: 'repos.length'
+
+properties:
+  maturity:
+    displayName: "Maturity"
+  domain:
+    displayName: "Domain"
+  last-reviewed:
+    displayName: "Reviewed"
+  applies-to:
+    displayName: "Applies to"
+  formula.days_since_review:
+    displayName: "Days since review"
+  formula.repo_count:
+    displayName: "Repos"
+
+views:
+  - type: table
+    name: "By maturity"
+    groupBy:
+      property: maturity
+      direction: ASC
+    order:
+      - file.name
+      - domain
+      - formula.repo_count
+      - last-reviewed
+    summaries:
+      formula.repo_count: Average
+
+  - type: table
+    name: "Enforced"
+    filters: 'maturity == "enforced"'
+    order:
+      - file.name
+      - domain
+      - applies-to
+      - formula.repo_count
+      - last-reviewed
+
+  # Promotion bar from promote-practices-through-maturity-stages: idea clears at
+  # 2 repos, trialing at 3. Mirrors 00-maps/promotion-candidates.md.
+  - type: table
+    name: "Promotion candidates"
+    filters:
+      or:
+        - and:
+            - 'maturity == "idea"'
+            - 'repos.length >= 2'
+        - and:
+            - 'maturity == "trialing"'
+            - 'repos.length >= 3'
+    order:
+      - file.name
+      - maturity
+      - formula.repo_count
+      - last-reviewed
+
+  # Age-only, matching 00-maps/review-queue.md — a maturity clause here would
+  # drown the age signal.
+  - type: table
+    name: "Stale (180+ days)"
+    filters: '(today() - date(last-reviewed)).days >= 180'
+    order:
+      - file.name
+      - maturity
+      - last-reviewed
+      - formula.days_since_review
+
+  - type: table
+    name: "Needs frontmatter"
+    filters:
+      or:
+        - '!maturity'
+        - '!domain'
+        - '!last-reviewed'
+        - 'maturity != "idea" && maturity != "trialing" && maturity != "enforced"'
+    order:
+      - file.name
+      - domain
+      - maturity
+      - last-reviewed

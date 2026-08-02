@@ -1,0 +1,3 @@
+[submodule "vendor/obsidian-skills"]
+	path = vendor/obsidian-skills
+	url = https://github.com/kepano/obsidian-skills

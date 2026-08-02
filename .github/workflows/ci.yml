@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true   # vendor/obsidian-skills is a pinned submodule
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Show versions
+        run: |
+          bash --version | head -1
+          python3 --version
+          shellcheck --version | sed -n 2p
+
+      - name: make check
+        run: make check
+
+  # macOS ships bash 3.2, and the work machine may not allow a newer one, so
+  # the scripts must keep running there. Ubuntu's bash 5 would hide a
+  # 3.2 incompatibility such as an associative array or `readarray`.
+  bash32:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Run tests under /bin/bash (3.2)
+        run: |
+          /bin/bash --version | head -1
+          fail=0
+          for t in tests/test-*.sh; do /bin/bash "$t" || fail=1; done
+          exit $fail

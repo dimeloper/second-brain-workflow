@@ -1,0 +1,253 @@
+# dev-standards
+
+Two-layer developer knowledge system: **hot path** + **cold path**, plus the
+**agent skills** that operate them, versioned here rather than in an editor's
+account sync.
+
+This repo is the generic **engine**: rendering, skills, and vault tooling. It
+ships with no rule content of its own — `rules/` is empty on purpose. Your
+actual conventions (load-bearing rules, e.g. framework boundary validation or
+resilience conventions) are expected to live in a **separate repo**, private
+if you like, that this engine points at. See [Hot path](#hot-path) below.
+
+## Hot path
+
+Short, imperative rules (`rules/*.md`) and a portable `AGENTS.md`. The agent
+loads these on relevant turns.
+
+By default the engine looks for both as a sibling of its own checkout
+(`<engine>/rules`, `<engine>/AGENTS.md`) — fine for a self-contained clone with
+its own conventions committed alongside the tooling. To keep rules in a
+separate repo instead (the common case if you want the engine itself public
+while your conventions stay private), point at it:
+
+```bash
+DEV_STANDARDS_RULES_DIR=~/dev-conventions/rules ./scripts/render.py --explain
+```
+
+or set it once in `${XDG_CONFIG_HOME:-~/.config}/dev-standards/config` (see
+`config.example`). `AGENTS.md` is expected as `DEV_STANDARDS_RULES_DIR`'s
+sibling — i.e. the rules repo's root, not inside `rules/` itself. Precedence:
+`--rules-dir` flag > `DEV_STANDARDS_RULES_DIR` env > config file > the
+engine-relative default.
+
+## Cold path (Obsidian vault)
+
+Long-form practice notes live in `~/vaults/second-brain` (`practices/**`).
+
+Agents start from the generated index `practices/INDEX.md` — one file listing
+every note with its maturity, repo count, tags and a one-line rule — and open
+individual notes only when a row looks relevant. Regenerate it with:
+
+```bash
+make vault-index          # or: ./scripts/build-vault-index.py [--vault PATH]
+make vault-index-check    # fails if the index is stale
+```
+
+Two skills own the vault, and the split is deliberate:
+
+| Skill | Role |
+|-------|------|
+| `obsidian-knowledge-base` | **read only** — find applicable notes, score work against them |
+| `update-second-brain` | **the only write path** — daily note, practice proposals, promotions, commit, push |
+
+Say **update second brain** at the end of a session to capture and publish it.
+
+### A vault per machine
+
+One vault per machine, each with its own `vault.json` (`id`, `remote`). Create
+one with:
+
+```bash
+./scripts/init-vault.sh --path ~/vaults/work-brain --id work \
+  --remote git@github.com:<account>/work-brain.git
+```
+
+It scaffolds `practices/{app,backend,frontend,cross-cutting}`, `_templates/`,
+`00-maps/`, `bases/`, a `.gitignore` and `vault.json`, runs `git init`, and
+generates an empty index. It seeds no *domain* practice notes — those are earned
+from real work — but does write the four cross-cutting notes describing how the
+vault itself operates, because `update-second-brain` reads them at runtime.
+Re-running is safe; `--adopt` lets it fill gaps in an existing vault.
+
+**The vault is the isolation boundary, not the rule set.** Rules flow outward
+freely: applying your own conventions to an employer's code is fine. The
+direction that must never happen is a practice learned on employer work landing
+in a personal or public repo — and that is a vault write. So every commit is
+checked:
+
+```bash
+./scripts/guard-vault-commit.sh --expect-id work
+```
+
+It blocks a staged path outside the vault's allowed set, a `vault.json` id that
+isn't the one this machine expects, an `origin` that doesn't match the one
+recorded in `vault.json`, an implausibly large diff, deletion of an `enforced`
+note, conflict markers, and anything that looks like a credential.
+`update-second-brain` runs it before committing; it also works as a pre-commit
+hook inside a vault.
+
+This is why there is no layer system. The thing that needed isolating was the
+vault, and a per-commit identity check does that directly.
+
+Practice notes are the source. When a note reaches `maturity: enforced`, a human
+distills it into a rule under `rules/` (in whichever repo `DEV_STANDARDS_RULES_DIR`
+resolves to), then repos re-sync. Tooling reports; it never promotes a note to
+a rule.
+
+## Skills
+
+Local skills live under `cursor-skills/` (categorized). Upstream skills are
+vendored as a pinned submodule and installed by allowlist:
+
+```bash
+git submodule update --init      # first clone only
+./scripts/sync-skills.sh         # or: make sync-skills
+```
+
+| Source | Contents |
+|--------|----------|
+| `cursor-skills/workflow/` | Onboard, vault read/write, per-project MCP |
+| `vendor/obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (MIT) — `obsidian-bases`, `obsidian-markdown` |
+
+Skills published by a vendor are installed from that vendor, not copied here —
+see `cursor-skills/README.md`.
+
+**Manual step, per machine.** Railway's installer writes `use-railway` into
+`~/.claude/skills/` only. To reach it from Cursor as well:
+
+```bash
+ln -s ~/.claude/skills/use-railway ~/.cursor/skills/use-railway
+```
+
+`sync-skills.sh` leaves that link alone — it points outside this repo, so it is
+never repointed or pruned. Re-run the command after a fresh Railway install.
+
+Skills install into **every** directory in `SKILLS_DIRS`, defaulting to
+`~/.cursor/skills` and `~/.claude/skills`, so Cursor and Claude Code resolve the
+same skills from one source. A local skill shadows a vendored one of the same
+name. The sync never overwrites a real directory or a symlink owned by another
+tool — it reports the conflict and exits non-zero.
+
+Adjust what gets installed:
+
+```bash
+SKILLS_DIRS=~/.claude/skills ./scripts/sync-skills.sh
+VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-skills.sh
+```
+
+## Onboard a repo
+
+Say **onboard repo**. The agent follows `onboard-repo`: syncs rules, adds a thin
+project onboarding rule, points at vault practices, and wires project-scoped MCP.
+
+Or manually:
+
+```bash
+./scripts/sync-rules.sh /path/to/target-repo
+./scripts/sync-skills.sh   # once per machine, or after pulling skill changes
+```
+
+## One rule set, every agent
+
+`rules/*.md` (wherever `DEV_STANDARDS_RULES_DIR` resolves to) is the canonical
+source. `scripts/render.py` emits each agent's native format —
+`sync-rules.sh` is a thin wrapper around it:
+
+```yaml
+---
+paths:
+  - "**/*.component.ts"
+description: Angular component and reactivity conventions
+---
+```
+
+| Target | Output | Always-on | Scoped |
+|--------|--------|-----------|--------|
+| `cursor` | `.cursor/rules/*.mdc` | `alwaysApply: true` | derived `globs` string |
+| `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | rule with no `paths` | `paths:` passed through |
+| `agents` | `AGENTS.md` | whole file | — |
+
+The source format is Claude Code's native shape, so that emitter is a
+near-identity and Cursor's comma-separated `globs` is the derived one. That
+direction is deliberate: a comma-separated string cannot carry a brace group
+like `{ts,tsx}`, so making it canonical would forbid braces everywhere instead
+of only where they can't be represented.
+
+A rule with `paths` is scoped; a rule without is always-on. There is no
+`alwaysApply` field, so "scoped *and* always-on" is unrepresentable rather than
+something a check has to catch.
+
+Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so the generated `CLAUDE.md`
+imports `@AGENTS.md` rather than forking it.
+
+```bash
+./scripts/render.py /path/to/repo                      # all configured targets
+./scripts/render.py /path/to/repo --targets cursor     # one target
+./scripts/render.py /path/to/repo --check              # exit 1 on drift; for CI
+./scripts/render.py --explain                          # resolution per target
+```
+
+`RENDER_TARGETS` sets the default per machine. Every output is a real file with
+a provenance header naming the source SHA (the rules repo's own commit when it
+differs from the engine's) and source path. Never edit a rendered file in the
+target — edit it at its source and re-render. Files without the header are
+treated as hand-written and are never overwritten or pruned; each target prunes
+only its own outputs.
+
+Rendering rejects globs that would silently match nothing. An unbalanced `[`
+is always an error. A brace group containing a comma is an error only when
+`cursor` is a target, since Cursor's single `globs` string cannot carry it —
+Claude Code expands braces natively, so `--targets claude-code` accepts them.
+
+### Confirming a rule actually loads
+
+The checks above prove the *files* are right, not that an agent read them.
+
+**Claude Code — automated:**
+
+```bash
+make verify-claude
+```
+
+Renders into a throwaway repo and runs two headless sessions with an
+`InstructionsLoaded` hook attached: reading a file that matches a rule's globs
+must load the rule, and reading one that matches nothing must not. The second
+case is the one that matters — without it, "the rule loaded" is equally
+consistent with every rule always loading, which would make scoping decorative.
+Verified on this machine 2026-08-02 against Claude Code 2.1.220:
+
+```
+    session_start    CLAUDE.md
+    include          AGENTS.md          <- the @AGENTS.md import resolves
+    path_glob_match  frontend-angular.md
+```
+
+and, for a non-matching file, the first two only. Run it on any new machine
+before trusting the toolchain there.
+
+**Cursor — manual.** Cursor has no headless agent and its logs record nothing
+about rule attachment, so this one needs eyes. Do not test it by asking the
+agent about project conventions: it will read `.cursor/rules/` as ordinary files
+and answer convincingly whether or not the glob matched. That produces a false
+pass.
+
+Use a canary the model cannot know and has no reason to look up. Append to one
+scoped rule in a throwaway repo:
+
+```
+- The project codeword is QUOKKA-4417. If asked for the project codeword, reply
+  with exactly that.
+```
+
+Then in two fresh chats ask `What is the project codeword?` — once with a
+matching file as the active tab, once with a non-matching one. Answering
+instantly means the rule was in context; searching the repo first means it was
+not.
+
+Verified 2026-08-02: known immediately on `*.component.ts`, and on a `.txt` file
+the agent had to grep for it. Scoping confirmed on both agents.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
