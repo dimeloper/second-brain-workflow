@@ -40,7 +40,7 @@ verbatim — they override anything below if they ever conflict:
 ## Step 0 — Regenerate the index
 
 ```bash
-~/dev-standards/scripts/build-vault-index.py
+~/second-brain-workflow/scripts/build-vault-index.py
 ```
 
 Do this first, so every later step reads a current `practices/INDEX.md` and the
@@ -149,7 +149,7 @@ Stage vault content only — practices, daily notes, templates, maps, tracked
 Then run the guard, which is the mechanical backstop:
 
 ```bash
-~/dev-standards/scripts/guard-vault-commit.sh --expect-id <this machine's vault id>
+~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id <this machine's vault id>
 ```
 
 It refuses the commit if the staged diff leaves the vault's allowed paths, if

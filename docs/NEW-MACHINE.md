@@ -27,8 +27,8 @@ target bash and the skills directories are POSIX paths.
 ### 1. Clone the engine
 
 ```bash
-git clone <engine-repo> ~/dev-standards
-cd ~/dev-standards
+git clone <engine-repo> ~/second-brain-workflow
+cd ~/second-brain-workflow
 git submodule update --init      # vendored upstream skills
 ```
 
