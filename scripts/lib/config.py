@@ -2,7 +2,7 @@
 
     from lib.config import load
     cfg = load()
-    cfg["DEV_STANDARDS_VAULT"]
+    cfg["SBW_VAULT"]
 
 Precedence: existing environment wins over the config file, which wins over
 defaults. CLI flags are the caller's job — apply them on top of load().
@@ -13,21 +13,21 @@ import os
 from pathlib import Path
 
 DEFAULTS = {
-    "DEV_STANDARDS_VAULT": "~/vaults/second-brain",
+    "SBW_VAULT": "~/vaults/second-brain",
     "RENDER_TARGETS": "cursor,claude-code,agents",
     "SKILLS_DIRS": "~/.cursor/skills:~/.claude/skills",
     "VENDOR_SKILLS": "obsidian-bases obsidian-markdown",
     # Empty means "not overridden" — render.py falls back to ENGINE/rules.
-    "DEV_STANDARDS_RULES_DIR": "",
+    "SBW_RULES_DIR": "",
 }
 
 
 def config_path():
-    override = os.environ.get("DS_CONFIG_FILE")
+    override = os.environ.get("SBW_CONFIG_FILE")
     if override:
         return Path(override)
     base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "dev-standards" / "config"
+    return Path(base) / "second-brain-workflow" / "config"
 
 
 def _expand(value):

@@ -20,7 +20,7 @@ worth keeping, hand it over rather than writing it yourself.
 
 ## Vault
 
-- Path: `$DEV_STANDARDS_VAULT` if set, else `~/vaults/second-brain`
+- Path: `$SBW_VAULT` if set, else `~/vaults/second-brain`
 - **Index: `practices/INDEX.md`**
 - Practices: `practices/{frontend,backend,app,cross-cutting}/`
 - Daily notes: vault root, `YYYY-MM-DD.md` (local date)
@@ -39,7 +39,7 @@ back to `grep` over `practices/**` only when the index shows nothing plausible a
 you have reason to think a note exists anyway.
 
 If `INDEX.md` is missing or looks stale, regenerate it with
-`dev-standards/scripts/build-vault-index.py` (or `make vault-index`) rather than
+`second-brain-workflow/scripts/build-vault-index.py` (or `make vault-index`) rather than
 working around it.
 
 ## Frontmatter you will read

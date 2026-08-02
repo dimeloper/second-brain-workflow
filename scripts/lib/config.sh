@@ -3,17 +3,17 @@
 #
 #   . "$(dirname "$0")/lib/config.sh"
 #   ds_config_load
-#   echo "$DEV_STANDARDS_VAULT"
+#   echo "$SBW_VAULT"
 #
 # Precedence: existing environment wins over the config file, which wins over
 # defaults. CLI flags are the caller's job — parse them after loading.
 # Keep in step with lib/config.py; both implement the same five keys.
 
-DS_CONFIG_KEYS="DEV_STANDARDS_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS DEV_STANDARDS_RULES_DIR"
+SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR"
 
 ds_config_path() {
   local base="${XDG_CONFIG_HOME:-$HOME/.config}"
-  echo "${DS_CONFIG_FILE:-$base/dev-standards/config}"
+  echo "${SBW_CONFIG_FILE:-$base/second-brain-workflow/config}"
 }
 
 # Expand a leading ~ only. Deliberately not eval: a config file should not be
@@ -43,7 +43,7 @@ ds_config_load() {
       key="$(echo "$key" | tr -d '[:space:]')"
       value="${value%"${value##*[![:space:]]}"}"  # rstrip
       value="${value#"${value%%[![:space:]]*}"}"  # lstrip
-      case " $DS_CONFIG_KEYS " in
+      case " $SBW_CONFIG_KEYS " in
         *" $key "*) ;;
         *) echo "warning: $file: unknown key '$key'" >&2; continue ;;
       esac
@@ -57,10 +57,10 @@ ds_config_load() {
   fi
 
   # Defaults, applied only when a key is genuinely unset.
-  [ -n "${DEV_STANDARDS_VAULT+set}" ] || DEV_STANDARDS_VAULT="$HOME/vaults/second-brain"
+  [ -n "${SBW_VAULT+set}" ] || SBW_VAULT="$HOME/vaults/second-brain"
   [ -n "${RENDER_TARGETS+set}" ]      || RENDER_TARGETS="cursor,claude-code,agents"
   [ -n "${SKILLS_DIRS+set}" ]         || SKILLS_DIRS="$HOME/.cursor/skills:$HOME/.claude/skills"
   [ -n "${VENDOR_SKILLS+set}" ]       || VENDOR_SKILLS="obsidian-bases obsidian-markdown"
-  [ -n "${DEV_STANDARDS_RULES_DIR+set}" ] || DEV_STANDARDS_RULES_DIR=""
-  export DEV_STANDARDS_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS DEV_STANDARDS_RULES_DIR
+  [ -n "${SBW_RULES_DIR+set}" ] || SBW_RULES_DIR=""
+  export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR
 }

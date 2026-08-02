@@ -16,9 +16,9 @@ TESTS_FAILED=0
 SANDBOX=""
 
 setup_sandbox() {
-  SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/dev-standards-test.XXXXXX")"
+  SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/second-brain-workflow-test.XXXXXX")"
   # Never resolve real user config during a test run.
-  export DS_CONFIG_FILE="${SANDBOX}/no-such-config"
+  export SBW_CONFIG_FILE="${SANDBOX}/no-such-config"
   trap 'teardown_sandbox' EXIT INT TERM
 }
 

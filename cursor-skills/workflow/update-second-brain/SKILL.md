@@ -22,7 +22,7 @@ practices *during* work. It does not write.
 
 ## Paths
 
-- Vault: `$DEV_STANDARDS_VAULT` if set, else `~/vaults/second-brain`
+- Vault: `$SBW_VAULT` if set, else `~/vaults/second-brain`
 - Practices: `practices/{frontend,backend,app,cross-cutting}/`
 - Daily notes: vault root, `YYYY-MM-DD.md` (local date)
 - Templates: `_templates/{practice-note,daily-note}.md`
@@ -177,7 +177,7 @@ If there is nothing to publish, say so and stop — no empty commits.
 git push -u origin HEAD
 ```
 
-Never `--force`, never a rewriting refspec. Never commit or push `dev-standards`
+Never `--force`, never a rewriting refspec. Never commit or push `second-brain-workflow`
 or the product repo as part of this skill.
 
 ## Step 8 — Report

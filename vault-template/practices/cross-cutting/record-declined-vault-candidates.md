@@ -13,7 +13,7 @@ tags: [obsidian, daily-notes, review]
 **Why:** The approve trail already exists. Without a matching decline trail, a rejected idea has nothing stopping it being re-proposed as if new in a later session, and a deliberate non-decision looks indistinguishable from an oversight.
 **Example:** n/a — process rule; see `_templates/daily-note.md`.
 
-**Observed in:** This vault's operating rules, seeded by `dev-standards/scripts/init-vault.sh`. Enforced by preference, not by the 3-repo bar.
+**Observed in:** This vault's operating rules, seeded by `second-brain-workflow/scripts/init-vault.sh`. Enforced by preference, not by the 3-repo bar.
 
 ## Related
 - [[propose-then-approve-vault-writes]]

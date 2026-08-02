@@ -13,7 +13,7 @@ tags: [maturity, review]
 **Why:** Without a stated bar, `maturity` gets set ad hoc and `enforced` stops meaning "safe to lint for", coming to mean only "written a while ago".
 **Example:** n/a — process rule. `length(repos)` makes the bar machine-countable; see `00-maps/promotion-candidates.md`.
 
-**Observed in:** This vault's operating rules, seeded by `dev-standards/scripts/init-vault.sh`. Enforced by preference, not by the 3-repo bar — a process rule cannot satisfy its own criterion.
+**Observed in:** This vault's operating rules, seeded by `second-brain-workflow/scripts/init-vault.sh`. Enforced by preference, not by the 3-repo bar — a process rule cannot satisfy its own criterion.
 
 ## Related
 - [[propose-then-approve-vault-writes]]

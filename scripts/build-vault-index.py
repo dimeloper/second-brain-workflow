@@ -12,7 +12,7 @@ Usage:
   --check   exit 1 if the index on disk differs from what would be generated
             (for CI or a pre-commit hook); writes nothing
 
-Vault resolution: --vault, else $DEV_STANDARDS_VAULT, else ~/vaults/second-brain
+Vault resolution: --vault, else $SBW_VAULT, else ~/vaults/second-brain
 Stdlib only, by design: this must run on a machine with nothing installed.
 """
 
@@ -33,7 +33,7 @@ def resolve_vault(explicit):
     if explicit:
         return Path(explicit).expanduser()
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
-    return Path(cfg["DEV_STANDARDS_VAULT"]).expanduser()
+    return Path(cfg["SBW_VAULT"]).expanduser()
 
 
 def strip_comment(value):
@@ -239,7 +239,7 @@ def render(notes):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--vault", help="vault path (default: $DEV_STANDARDS_VAULT)")
+    ap.add_argument("--vault", help="vault path (default: $SBW_VAULT)")
     ap.add_argument("--check", action="store_true", help="exit 1 if the index is stale")
     args = ap.parse_args()
 

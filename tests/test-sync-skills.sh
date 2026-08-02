@@ -72,7 +72,7 @@ rm -f "${A}/foreign-skill"
 # --- config -----------------------------------------------------------------
 D="${SANDBOX}/skills-d"
 printf 'SKILLS_DIRS=%s\n' "${D}" > "${SANDBOX}/config"
-env -u SKILLS_DIRS DS_CONFIG_FILE="${SANDBOX}/config" "${SYNC}" >/dev/null 2>&1
+env -u SKILLS_DIRS SBW_CONFIG_FILE="${SANDBOX}/config" "${SYNC}" >/dev/null 2>&1
 assert_symlink "${D}/update-second-brain" "config file sets SKILLS_DIRS"
 
 finish

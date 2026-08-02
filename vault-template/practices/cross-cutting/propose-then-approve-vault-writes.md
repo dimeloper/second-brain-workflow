@@ -13,7 +13,7 @@ tags: [obsidian, vault, agents]
 **Why:** Daily notes are a running journal — wrong entries are cheap and self-correcting. Practice notes are curated standards that feed rules and tooling, so speculative agent edits there compound.
 **Example:** n/a — process rule. `update-second-brain` implements it: step 3 writes the daily note immediately, step 4 proposes and waits.
 
-**Observed in:** This vault's operating rules, seeded by `dev-standards/scripts/init-vault.sh`. Enforced by preference, not by the 3-repo bar — do not flag it for demotion over an empty `repos:`.
+**Observed in:** This vault's operating rules, seeded by `second-brain-workflow/scripts/init-vault.sh`. Enforced by preference, not by the 3-repo bar — do not flag it for demotion over an empty `repos:`.
 
 ## Related
 - [[keep-one-header-per-section-in-daily-notes]]

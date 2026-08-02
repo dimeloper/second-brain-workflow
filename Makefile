@@ -1,6 +1,6 @@
 .PHONY: help lint test vault-index vault-index-check sync-skills explain guard verify-claude check
 
-VAULT ?= $(if $(DEV_STANDARDS_VAULT),$(DEV_STANDARDS_VAULT),$(HOME)/vaults/second-brain)
+VAULT ?= $(if $(SBW_VAULT),$(SBW_VAULT),$(HOME)/vaults/second-brain)
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
                  scripts/guard-vault-commit.sh scripts/verify-claude-load.sh scripts/lib/config.sh \
                  tests/lib.sh $(wildcard tests/test-*.sh)
@@ -27,7 +27,7 @@ lint:
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
-# repo, vault, ~/.cursor or ~/.claude — DS_CONFIG_FILE is redirected too, so a
+# repo, vault, ~/.cursor or ~/.claude — SBW_CONFIG_FILE is redirected too, so a
 # developer's own config cannot change the result.
 test:
 	@fail=0; for t in tests/test-*.sh; do "$$t" || fail=1; done; exit $$fail

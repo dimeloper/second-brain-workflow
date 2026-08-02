@@ -74,8 +74,8 @@ EOF
 assert_contains "${VAULT}/practices/INDEX.md" 'new-note' "picks up a new note"
 
 # Config resolution, and a missing vault fails with a message not a traceback.
-printf 'DEV_STANDARDS_VAULT=%s\n' "${VAULT}" > "${SANDBOX}/config"
-DS_CONFIG_FILE="${SANDBOX}/config" "${INDEX}" --check >/dev/null 2>&1
+printf 'SBW_VAULT=%s\n' "${VAULT}" > "${SANDBOX}/config"
+SBW_CONFIG_FILE="${SANDBOX}/config" "${INDEX}" --check >/dev/null 2>&1
 assert_exit 0 $? "resolves vault from config file"
 
 out="$("${INDEX}" --vault "${SANDBOX}/nope" 2>&1)"

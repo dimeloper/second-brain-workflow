@@ -246,8 +246,8 @@ cat <<EOF
 Next:
   1. Open ${VAULT} in Obsidian (enable Dataview for 00-maps/).
   2. Point this machine at it:
-       DEV_STANDARDS_VAULT=${VAULT}
-     in \${XDG_CONFIG_HOME:-~/.config}/dev-standards/config
+       SBW_VAULT=${VAULT}
+     in \${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config
   3. Create the remote yourself — **private** — then push.
   4. Capture a session: say "update second brain".
 

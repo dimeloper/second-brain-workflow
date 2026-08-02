@@ -86,14 +86,14 @@ reads them at runtime.
 ### 5. Configure this machine
 
 ```bash
-$EDITOR ${XDG_CONFIG_HOME:-~/.config}/dev-standards/config
+$EDITOR ${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config
 ```
 
 ```
-DEV_STANDARDS_VAULT=~/vaults/<name>
+SBW_VAULT=~/vaults/<name>
 RENDER_TARGETS=claude-code,agents     # or cursor,agents — or all three
 SKILLS_DIRS=~/.claude/skills          # narrow it if only one agent is installed
-DEV_STANDARDS_RULES_DIR=~/dev-conventions/rules   # only if rules live in a separate repo
+SBW_RULES_DIR=~/dev-conventions/rules   # only if rules live in a separate repo
 ```
 
 See `config.example` for every key. Precedence is CLI flag > environment > this
@@ -129,7 +129,7 @@ actually did — do not scaffold them.
 Same as above, but skip the "point at your rules" decision if you're using the
 self-contained layout: your `rules/*.md` and `AGENTS.md` come with the clone.
 If you keep rules in a separate repo, clone that too and set
-`DEV_STANDARDS_RULES_DIR` the same as on the first machine. Set
+`SBW_RULES_DIR` the same as on the first machine. Set
 `RENDER_TARGETS` for whichever agents this machine runs, and give the vault a
 different `--id` from the other machine's.
 
@@ -160,7 +160,7 @@ remotes, or copy notes across.
 ## Deliberate omissions
 
 - No layer system. One engine, one rule set, one vault per machine.
-  `DEV_STANDARDS_RULES_DIR` relocates *where* that one rule set lives — a
+  `SBW_RULES_DIR` relocates *where* that one rule set lives — a
   separate repo instead of a subdirectory — it does not let two rule sets
   merge on the same machine. If you need that, that is the point at which to
   build layers — not before.

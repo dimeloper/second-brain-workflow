@@ -1,4 +1,4 @@
-# dev-standards
+# second-brain-workflow
 
 Two-layer developer knowledge system: **hot path** + **cold path**, plus the
 **agent skills** that operate them, versioned here rather than in an editor's
@@ -22,13 +22,13 @@ separate repo instead (the common case if you want the engine itself public
 while your conventions stay private), point at it:
 
 ```bash
-DEV_STANDARDS_RULES_DIR=~/dev-conventions/rules ./scripts/render.py --explain
+SBW_RULES_DIR=~/dev-conventions/rules ./scripts/render.py --explain
 ```
 
-or set it once in `${XDG_CONFIG_HOME:-~/.config}/dev-standards/config` (see
-`config.example`). `AGENTS.md` is expected as `DEV_STANDARDS_RULES_DIR`'s
+or set it once in `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config` (see
+`config.example`). `AGENTS.md` is expected as `SBW_RULES_DIR`'s
 sibling — i.e. the rules repo's root, not inside `rules/` itself. Precedence:
-`--rules-dir` flag > `DEV_STANDARDS_RULES_DIR` env > config file > the
+`--rules-dir` flag > `SBW_RULES_DIR` env > config file > the
 engine-relative default.
 
 ## Cold path (Obsidian vault)
@@ -91,7 +91,7 @@ This is why there is no layer system. The thing that needed isolating was the
 vault, and a per-commit identity check does that directly.
 
 Practice notes are the source. When a note reaches `maturity: enforced`, a human
-distills it into a rule under `rules/` (in whichever repo `DEV_STANDARDS_RULES_DIR`
+distills it into a rule under `rules/` (in whichever repo `SBW_RULES_DIR`
 resolves to), then repos re-sync. Tooling reports; it never promotes a note to
 a rule.
 
@@ -150,7 +150,7 @@ Or manually:
 
 ## One rule set, every agent
 
-`rules/*.md` (wherever `DEV_STANDARDS_RULES_DIR` resolves to) is the canonical
+`rules/*.md` (wherever `SBW_RULES_DIR` resolves to) is the canonical
 source. `scripts/render.py` emits each agent's native format —
 `sync-rules.sh` is a thin wrapper around it:
 

@@ -22,7 +22,7 @@ ds_config_load
 
 MAX_FILES="${GUARD_MAX_FILES:-20}"
 MAX_LINES="${GUARD_MAX_LINES:-2000}"
-VAULT="${DEV_STANDARDS_VAULT}"
+VAULT="${SBW_VAULT}"
 EXPECT_ID=""
 
 while [ $# -gt 0 ]; do
