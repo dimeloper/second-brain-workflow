@@ -1,14 +1,53 @@
 # second-brain-workflow
 
-Two-layer developer knowledge system: **hot path** + **cold path**, plus the
-**agent skills** that operate them, versioned here rather than in an editor's
-account sync.
+Turn your coding sessions into a growing, queryable knowledge base — instead
+of insights evaporating at the end of a chat, or piling up in one rules file
+no one re-reads.
 
-This repo is the generic **engine**: rendering, skills, and vault tooling. It
-ships with no rule content of its own — `rules/` is empty on purpose. Your
-actual conventions (load-bearing rules, e.g. framework boundary validation or
-resilience conventions) are expected to live in a **separate repo**, private
-if you like, that this engine points at. See [Hot path](#hot-path) below.
+Say **"update second brain"** at the end of a session and an agent skill
+mines what happened — a bug fixed, a design decision made, a pattern that
+worked — into individual, versioned practice notes in an Obsidian vault.
+Notes start as `idea`s and only mature to `enforced` once you've actually
+re-applied them across a few repos, so the knowledge base tracks what's
+proven, not just what was written once.
+
+This repo is the generic **engine** that runs that loop: the agent skills,
+rule rendering, and vault tooling, versioned here rather than trapped in an
+editor's account sync. It ships with none of your own content — `rules/` is
+empty and there's no vault bundled — your actual conventions and vault are
+expected to live in your own repo(s), private if you like, that this engine
+points at.
+
+## What you get
+
+- **`update-second-brain`** — the only write path into the vault: captures a
+  session into a daily note, proposes new practice notes, promotes existing
+  ones by evidence, then commits and pushes. See [Cold path](#cold-path-obsidian-vault).
+- **`obsidian-knowledge-base`** — read-only: finds and scores notes against
+  the work at hand, so the agent applies what you've already learned instead
+  of re-deriving it every session.
+- **One rule set, every agent** — write short imperative rules once
+  (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
+  `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
+  drift-checking for CI. See [One rule set, every agent](#one-rule-set-every-agent).
+- **A vault per machine, safely isolated** — a per-commit guard blocks a
+  practice learned on employer work from ever landing in a personal or
+  public repo. See [A vault per machine](#a-vault-per-machine).
+
+## Quickstart
+
+```bash
+git clone --recurse-submodules git@github.com:dimeloper/second-brain-workflow.git
+cd second-brain-workflow
+./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
+  --remote git@github.com:<you>/second-brain.git
+./scripts/sync-skills.sh
+```
+
+Then just work. Say **"onboard repo"** in a project to wire up rules, and
+**"update second brain"** at the end of a session to capture it. See
+[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) for the full walkthrough,
+including how to point at a separate private rules repo.
 
 ## Hot path
 
