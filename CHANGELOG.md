@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-03
+
 ### Added
 
 - `docs/vault-ci/audit.yml` and `docs/vault-ci/README.md`: a workflow
@@ -92,5 +94,6 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dimeloper/second-brain-workflow/releases/tag/v0.1.0

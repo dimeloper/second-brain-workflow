@@ -27,12 +27,12 @@ target bash and the skills directories are POSIX paths.
 ### 1. Clone the engine
 
 ```bash
-git clone --recurse-submodules --branch v0.1.0 \
+git clone --recurse-submodules --branch v0.2.0 \
   git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
 cd ~/second-brain-workflow
 ```
 
-That pins a tagged release — the stable option. Drop `--branch v0.1.0` to
+That pins a tagged release — the stable option. Drop `--branch v0.2.0` to
 track `main` instead; see the README's [Versioning](../README.md#versioning)
 section for the bump policy and how to roll back.
 
@@ -40,7 +40,7 @@ No SSH key set up yet (or a work machine you don't want to add one to)?
 Clone over HTTPS instead — read-only, no auth needed for a public repo:
 
 ```bash
-git clone --recurse-submodules --branch v0.1.0 \
+git clone --recurse-submodules --branch v0.2.0 \
   https://github.com/dimeloper/second-brain-workflow.git ~/second-brain-workflow
 ```
 

@@ -50,7 +50,7 @@ points at.
 ## Quickstart
 
 ```bash
-git clone --recurse-submodules --branch v0.1.0 \
+git clone --recurse-submodules --branch v0.2.0 \
   git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
 cd second-brain-workflow
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
@@ -58,7 +58,7 @@ cd second-brain-workflow
 ./scripts/sync-skills.sh
 ```
 
-Drop `--branch v0.1.0` to track `main` instead — see [Versioning](#versioning)
+Drop `--branch v0.2.0` to track `main` instead — see [Versioning](#versioning)
 for the bump policy and rollback. `--remote` is only recorded, not pushed
 to — create that repo yourself, private, first.
 
@@ -523,7 +523,7 @@ hand-edit it.
 **Pin, or track `main`:**
 
 ```bash
-git clone --recurse-submodules --branch v0.1.0 \
+git clone --recurse-submodules --branch v0.2.0 \
   git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
 git clone --recurse-submodules \
   git@github.com:dimeloper/second-brain-workflow.git   # tracking: whatever main has
