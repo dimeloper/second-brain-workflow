@@ -202,6 +202,16 @@ agent](../README.md#one-rule-set-every-agent) section for why Claude Code's
 shape is canonical and Cursor's `globs` is derived, plus the full targets
 table and CI/verification commands.
 
+### 8. Set up the weekly audit (optional, per vault)
+
+`make audit` (lineage + rule budget) is easy to forget once it's not part of
+any workflow you already run. Copy `docs/vault-ci/audit.yml` into
+`.github/workflows/audit.yml` **in the vault repo**, not here — this engine
+checkout has no vault, so its own CI can never run this. See
+`docs/vault-ci/README.md` for the rules-directory setup (this step is not
+optional; both scripts hard-require one) and what does or doesn't fail the
+run.
+
 ---
 
 ## Carry your rules

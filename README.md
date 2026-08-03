@@ -305,6 +305,15 @@ Like `guard` and `vault-index-check`, `make audit` needs a real vault and
 rules directory, so it isn't part of `make check` — CI runs both scripts'
 own tests against fixtures instead.
 
+A target you have to remember to run is a target that quietly stops getting
+run — the failure mode `update-second-brain` doesn't have, since it's
+automated. The engine's own CI can't close that gap (no vault), but a vault
+repo has one by definition: `docs/vault-ci/audit.yml` is a workflow template
+a vault repo can copy in to get this running weekly, opening or updating one
+tracking issue with the findings rather than a red X for anything short of
+an orphaned rule. See `docs/vault-ci/README.md` for setup, including the
+honest version of what a private rules repo means for CI access.
+
 ## Skills
 
 Local skills live under `skills/` (categorized). Upstream skills are

@@ -1,0 +1,164 @@
+name: second-brain-workflow audit
+
+# Copy this file to .github/workflows/audit.yml in your VAULT repo (not the
+# engine repo — CI here has no vault, so it can't run this itself; see
+# docs/vault-ci/README.md for the full setup and what to edit before this
+# runs cleanly).
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"   # every Monday, 13:00 UTC — adjust to your own preference
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  # Same pin discipline as any other rollback (see the engine README's
+  # Versioning section) — bump this deliberately, don't track a moving
+  # branch here.
+  ENGINE_REPO: dimeloper/second-brain-workflow
+  ENGINE_REF: v0.1.0
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this vault
+        uses: actions/checkout@v4
+        with:
+          path: vault
+
+      - name: Check out the engine
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ENGINE_REPO }}
+          ref: ${{ env.ENGINE_REF }}
+          path: engine
+
+      # Rules usually live in a THIRD repo, separate from both the vault and
+      # the engine (see the engine README's "point at your rules" step) —
+      # and both scripts below hard-require a rules directory to run AT ALL;
+      # neither has a partial/degraded mode without one. If your setup is
+      # self-contained instead (rules/*.md and AGENTS.md committed directly
+      # in your engine fork), delete this step and the `if:` guards below,
+      # and point --rules-dir at engine/rules directly.
+      #
+      # Needs read access to a private repo from Actions, which the default
+      # GITHUB_TOKEN cannot grant across repos. Set the RULES_REPO variable
+      # below (Settings > Secrets and variables > Actions > Variables) and
+      # give this workflow access via ONE of:
+      #   (a) Deploy key (recommended — single-repo, read-only):
+      #       ssh-keygen -t ed25519 -N '' -f rules-deploy-key
+      #       add rules-deploy-key.pub as a read-only Deploy key on the
+      #       rules repo; add the private half as this repo's
+      #       RULES_DEPLOY_KEY secret.
+      #   (b) Fine-grained PAT scoped to just the rules repo,
+      #       Contents: Read-only, stored as the RULES_REPO_TOKEN secret.
+      # actions/checkout uses ssh-key when it's set and falls back to
+      # token otherwise, so setting only one of the two secrets is enough —
+      # no need to remove the other input.
+      - name: Check out the rules repo
+        if: vars.RULES_REPO != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.RULES_REPO }}
+          ssh-key: ${{ secrets.RULES_DEPLOY_KEY }}
+          token: ${{ secrets.RULES_REPO_TOKEN || github.token }}
+          path: rules
+
+      - name: Rules directory not configured
+        if: vars.RULES_REPO == ''
+        run: |
+          echo "::error::vars.RULES_REPO is not set. check-lineage.py and rule-budget.py both require a rules directory and cannot run at all without one — see docs/vault-ci/README.md."
+          exit 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      # Only check-lineage.py's own exit code decides whether this job fails
+      # (1 = an orphaned rule, the one finding that means a rule is actively
+      # citing evidence that no longer exists) — matching the script's own
+      # exit semantics, not `make audit`'s local behavior, which also fails
+      # on a rule-budget overage. Everything else from both scripts,
+      # including an over-budget rule set, is a backlog item surfaced in the
+      # tracking issue below, not a build break.
+      - name: Run the audit
+        id: audit
+        run: |
+          set +e
+          lineage="$(python3 engine/scripts/check-lineage.py \
+            --vault "${GITHUB_WORKSPACE}/vault" \
+            --rules-dir "${GITHUB_WORKSPACE}/rules/rules" 2>&1)"
+          lineage_rc=$?
+          budget="$(python3 engine/scripts/rule-budget.py \
+            --rules-dir "${GITHUB_WORKSPACE}/rules/rules" 2>&1)"
+          delim="EOF_$(uuidgen)"
+          {
+            echo "report<<${delim}"
+            echo "${lineage}"
+            echo
+            echo "${budget}"
+            echo "${delim}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "${lineage}"
+          echo
+          echo "${budget}"
+          exit "${lineage_rc}"
+
+      # Always runs, even when the audit step above failed on an orphaned
+      # rule — the point is a running backlog, not a report that only
+      # appears when everything is already fine.
+      - name: Open or update the tracking issue
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "second-brain-workflow audit";
+            const body = `${{ steps.audit.outputs.report }}\n\n_Last run: ${new Date().toISOString()} — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}_`;
+
+            // The REST API 404s on issues.create if the label doesn't exist
+            // yet — it does not auto-create labels the way it auto-creates,
+            // say, a milestone reference. Create it once, ignore "already
+            // exists" (422) on every run after.
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: "audit",
+                color: "0e8a16",
+                description: "Findings from the second-brain-workflow audit",
+              });
+            } catch (e) {
+              if (e.status !== 422) throw e;
+            }
+
+            // Filtering listForRepo by a label is safe even before the
+            // label existed (an empty match, not an error) — but at this
+            // point it always exists, from the block above.
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: ["audit"],
+            });
+            const existing = issues.find((i) => i.title === title);
+            if (existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["audit"],
+              });
+            }
