@@ -1,0 +1,12 @@
+# Ceiling for the always-on rule set's estimated token cost, checked by
+# scripts/rule-budget.py (make audit). A plain integer, nothing else.
+#
+# Copy to `.rule-budget` next to wherever rules/ actually resolves to — the
+# rules repo's root for a separate SBW_RULES_DIR, or here for a
+# self-contained checkout. Same idea as AGENTS.md sitting alongside rules/.
+#
+# 2000 is a starting point, not a measured one — this engine ships no rules
+# of its own to calibrate against. Run `make audit` once you have a real
+# rule set and adjust to what's actually there plus headroom, not the other
+# way around.
+2000

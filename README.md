@@ -265,11 +265,33 @@ below `enforced`), a **stale claim** (`enforced`, unreviewed past
 for a different purpose), and **thin evidence** (`enforced` with fewer repos
 than the vault's own idea→trialing→enforced bar, read from
 `00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
-number). Exits 1 only for orphaned rules — that's the one finding that means
-a rule is actively citing evidence that no longer exists; everything else is
-a visible backlog, not a block. Like `guard` and `vault-index-check`, `make
-audit` needs a real vault and rules directory, so it isn't part of `make
-check` — CI runs `check-lineage.py`'s own tests against fixtures instead.
+number — exempting a note whose `**Observed in:**` line says "enforced by
+preference," this vault's own way of marking a personal default that was
+never meant to clear that bar). Exits 1 only for orphaned rules — that's the
+one finding that means a rule is actively citing evidence that no longer
+exists; everything else is a visible backlog, not a block.
+
+`make audit` also runs `rule-budget.py`, estimating the always-on rule set's
+per-turn cost — a rule with no `paths:` loads on every turn, for every agent,
+whether or not it's relevant:
+
+```bash
+./scripts/rule-budget.py --targets cursor,claude-code
+```
+
+Measures the *rendered* output per target (frontmatter and provenance
+comment included, not just the source file), since that's what actually
+reaches an agent's context. Fails above a ceiling read from `.rule-budget` —
+a plain integer, sibling of wherever `rules/` resolves to, same as
+`AGENTS.md` — defaulting to 2000 if that file doesn't exist. This engine
+ships no rules of its own, so there's nothing here to calibrate the starting
+number against; run `make audit` once you have a real rule set and adjust
+from what's actually there, not the other way around. See
+`.rule-budget.example`.
+
+Like `guard` and `vault-index-check`, `make audit` needs a real vault and
+rules directory, so it isn't part of `make check` — CI runs both scripts'
+own tests against fixtures instead.
 
 ## Skills
 

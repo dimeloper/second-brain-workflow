@@ -14,7 +14,7 @@ help:
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make doctor              report gaps: missing commit-guard hook, etc."
-	@echo "make audit               lineage: unpromoted/orphaned/stale/thin-evidence rules"
+	@echo "make audit               lineage + always-on rule token budget"
 	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
 	@echo ""
@@ -26,7 +26,7 @@ lint:
 	  echo "shellcheck not installed — brew install shellcheck"; exit 1; }
 	@shellcheck -x $(SHELL_SOURCES) && echo "shellcheck clean"
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
-	  scripts/lib/config.py scripts/lib/frontmatter.py \
+	  scripts/rule-budget.py scripts/lib/config.py scripts/lib/frontmatter.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -48,10 +48,16 @@ doctor:
 
 # Not part of `make check`: needs a real vault AND a real rules directory —
 # an even stronger dependency than doctor/vault-index-check, so the same
-# reasoning applies twice over. check-lineage.py's own tests (which run
-# against fixtures, like everything else in `make test`) are what CI verifies.
+# reasoning applies twice over. Both scripts' own tests (which run against
+# fixtures, like everything else in `make test`) are what CI verifies.
+# Runs both regardless of whether the first fails, so a lineage problem
+# doesn't hide a budget one or vice versa.
 audit:
-	@./scripts/check-lineage.py --vault "$(VAULT)"
+	@fail=0; \
+	./scripts/check-lineage.py --vault "$(VAULT)" || fail=1; \
+	echo; \
+	./scripts/rule-budget.py || fail=1; \
+	exit $$fail
 
 # Not part of `make check`: costs model calls and needs network. Run it once per
 # machine, and after any change to how rules are rendered.
