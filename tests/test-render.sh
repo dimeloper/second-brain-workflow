@@ -174,4 +174,33 @@ else
   fail "says how to fix it" "${out}"
 fi
 
+# --- engine version stamping -------------------------------------------------
+# Own fixture repo, fully isolated from the idempotency/drift flow above.
+V="$(cat "${ENGINE}/VERSION")"
+REPO5="${SANDBOX}/repo5"
+make_target_repo "${REPO5}"
+render "${REPO5}" >/dev/null 2>&1
+
+assert_contains "${REPO5}/.cursor/rules/frontend-angular.mdc" "(v${V})" \
+  "rendered file carries the engine version"
+assert_file "${REPO5}/.sbw-version" "writes .sbw-version"
+assert_contains "${REPO5}/.sbw-version" "${V}" ".sbw-version carries the engine version"
+
+echo "0.0.0-stale" > "${REPO5}/.sbw-version"
+out="$(render "${REPO5}" --check 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "--check flags a stale .sbw-version as drift"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"DRIFT: .sbw-version"*) pass "names .sbw-version specifically" ;;
+  *) fail "names .sbw-version specifically" "${out}" ;;
+esac
+
+render "${REPO5}" >/dev/null 2>&1
+assert_contains "${REPO5}/.sbw-version" "${V}" "re-render fixes .sbw-version"
+
+echo "0.0.0-stale" > "${REPO5}/.sbw-version"
+render "${REPO5}" --dry-run >/dev/null 2>&1
+assert_contains "${REPO5}/.sbw-version" "0.0.0-stale" "--dry-run does not touch .sbw-version"
+
 finish

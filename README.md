@@ -46,15 +46,17 @@ points at.
 ## Quickstart
 
 ```bash
-git clone --recurse-submodules git@github.com:dimeloper/second-brain-workflow.git
+git clone --recurse-submodules --branch v0.1.0 \
+  git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
 cd second-brain-workflow
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
   --remote git@github.com:<account>/second-brain.git
 ./scripts/sync-skills.sh
 ```
 
-`--remote` is only recorded, not pushed to — create that repo yourself,
-private, first.
+Drop `--branch v0.1.0` to track `main` instead — see [Versioning](#versioning)
+for the bump policy and rollback. `--remote` is only recorded, not pushed
+to — create that repo yourself, private, first.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
@@ -449,6 +451,40 @@ not.
 
 Verified 2026-08-02: known immediately on `*.component.ts`, and on a `.txt` file
 the agent had to grep for it. Scoping confirmed on both agents.
+
+## Versioning
+
+`VERSION` at the repo root — [releases](https://github.com/dimeloper/second-brain-workflow/releases)
+are tagged `v<VERSION>`. Bump policy:
+
+- **Patch** — docs, wording, anything that doesn't change behavior.
+- **Minor** — a new rule field, a new emitter, or new-but-additive behavior;
+  existing rules and already-onboarded repos keep working unchanged.
+- **Major** — anything that requires action in an already-onboarded repo to
+  keep working (a changed rendered format, a removed field, a renamed
+  config key).
+
+Every rendered file's provenance comment names both the commit and the
+engine version it came from, and a plain `.sbw-version` file is written at
+the target repo's root alongside the rendered output — nothing else in the
+target carried this before, so this is the one new file `render.py` writes
+outside `.cursor/rules`, `.claude/rules`, `AGENTS.md` and `CLAUDE.md`. Like
+any other rendered file, `--check` reports a stale `.sbw-version` as drift —
+visible as "this repo hasn't re-rendered since the engine moved on."
+
+**Pin, or track `main`:**
+
+```bash
+git clone --recurse-submodules --branch v0.1.0 \
+  git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
+git clone --recurse-submodules \
+  git@github.com:dimeloper/second-brain-workflow.git   # tracking: whatever main has
+```
+
+**Rollback:** `git checkout v<VERSION>` in the engine checkout, then
+re-render each onboarded repo (`./scripts/render.py <repo>`). Rules and vault
+content are untouched by checking out a different engine version — only the
+tooling that renders/audits them moves.
 
 ## License
 

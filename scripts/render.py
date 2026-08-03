@@ -79,6 +79,21 @@ def engine_sha():
     return repo_sha(ENGINE)
 
 
+def engine_version():
+    """The engine's own release version, from VERSION at its repo root.
+
+    Distinct from engine_sha()/content_sha in main(): a version is a stable,
+    human-meaningful pin an adopter can clone at (`git checkout v0.1.0`); a
+    sha is precise but says nothing about whether anything changed since the
+    last release. Falls back rather than raising — an engine checkout that
+    somehow lost VERSION should still render, just without a version stamp.
+    """
+    path = ENGINE / "VERSION"
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    return "0.0.0-unversioned"
+
+
 def unquote(value):
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
         return value[1:-1]
@@ -180,7 +195,7 @@ def check_scoping(rules):
 
 def header(rel, sha):
     return (
-        f"<!-- {MARKER}{sha} from {rel} — do not edit here; "
+        f"<!-- {MARKER}{sha} (v{engine_version()}) from {rel} — do not edit here; "
         f"edit {rel} at its source and re-render -->"
     )
 
@@ -337,7 +352,7 @@ def main():
     content_sha = repo_sha(RULES_SRC) if split else sha
 
     if args.explain:
-        print(f"engine {ENGINE} @ {sha}")
+        print(f"engine {ENGINE} @ {sha} (v{engine_version()})")
         if split:
             print(f"rules  {RULES_SRC.parent} @ {content_sha}")
         print(f"targets: {', '.join(targets)}\n")
@@ -368,7 +383,7 @@ def main():
     rendered = plan(rules, targets, content_sha,
                     warn=lambda m: print(f"warning: {m}", file=sys.stderr))
     mode = "check" if args.check else ("dry-run" if args.dry_run else "write")
-    print(f"Engine: {ENGINE} @ {sha}")
+    print(f"Engine: {ENGINE} @ {sha} (v{engine_version()})")
     if split:
         print(f"Rules:  {RULES_SRC.parent} @ {content_sha}")
     print(f"Target: {repo}  [{mode}] -> {', '.join(targets)}")
@@ -403,6 +418,25 @@ def main():
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(content, encoding="utf-8")
             print(f"  wrote: {rel}")
+            changed += 1
+
+    # A simple stamp of which engine version last rendered here — nothing in
+    # the target repo carried this before, so this is the one new file this
+    # writes outside .cursor/rules, .claude/rules, AGENTS.md and CLAUDE.md.
+    # Treated like any other rendered file: reported as drift in --check, so
+    # "the engine moved on and this repo hasn't re-rendered since" is visible
+    # rather than silently stale.
+    version_content = engine_version() + "\n"
+    version_dest = repo / ".sbw-version"
+    if not version_dest.exists() or version_dest.read_text(encoding="utf-8") != version_content:
+        if mode == "check":
+            print("  DRIFT: .sbw-version")
+            drift = 1
+        elif mode == "dry-run":
+            print("  would write: .sbw-version")
+        else:
+            version_dest.write_text(version_content, encoding="utf-8")
+            print("  wrote: .sbw-version")
             changed += 1
 
     # Prune per target, so a repo rendered for one agent does not accumulate
