@@ -6,7 +6,7 @@ Turn your coding sessions into a growing, queryable knowledge base — instead
 of insights evaporating at the end of a chat, or piling up in one rules file
 no one re-reads.
 
-![A sample knowledge graph: practice notes start sparse and mostly ideas after one session, then grow denser and more connected as they mature from idea to trialing to enforced over months of real work — the same shape as an Obsidian graph view.](docs/impact.svg)
+![A sample knowledge graph for a fullstack developer: practice notes start sparse and mostly ideas after one session, then grow denser and more connected as they mature from idea to trialing to enforced over months of real work — the same shape as an Obsidian graph view. Sample note titles are listed under each phase, with one note shown maturing from idea to enforced across all three.](docs/impact.svg)
 
 Say **"update second brain"** at the end of a session and an agent skill
 mines what happened — a bug fixed, a design decision made, a pattern that
