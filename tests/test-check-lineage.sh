@@ -57,6 +57,26 @@ case "${out}" in
   *) fail "flags thin evidence against the real promotion-candidates.md threshold" "${out}" ;;
 esac
 
+# A note whose Observed in: line contains "preference" but not the exact
+# exemption phrase must still land in thin evidence (no free pass for a
+# near-miss) AND be called out separately so a typo doesn't silently cost a
+# note its exemption without anyone noticing.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"near-miss (1 repo(s))"*) pass "a near-miss preference marker still counts as thin evidence" ;;
+  *) fail "a near-miss preference marker still counts as thin evidence" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"near-miss preference marker"*"1"*) pass "near-miss preference marker count is reported" ;;
+  *) fail "near-miss preference marker count is reported" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"- near-miss"*) pass "the near-miss note is named in that section" ;;
+  *) fail "the near-miss note is named in that section" "${out}" ;;
+esac
+
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
   *"stale-source (last-reviewed 2025-10-01)"*) pass "flags a stale enforced claim" ;;
@@ -109,15 +129,65 @@ cp "${LRULES}/covering.md" "${CLEAN_R}/"
 "${CHECK}" --vault "${CLEAN_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" >/dev/null 2>&1
 assert_exit 0 $? "an all-clean vault+rules pair exits 0"
 
-# --- missing promotion-candidates.md: thin-evidence is skipped, not guessed -
+# --- an unparseable vault-derived threshold is a loud, distinct failure —
+# never a silent skip that lets the run stay green (see REVIEW-ROUND-2 item 1)
+
+# missing promotion-candidates.md entirely
 NOMAP_V="${SANDBOX}/no-map-vault"
 mkdir -p "${NOMAP_V}/practices/cross-cutting"
 cp "${LVAULT}/practices/cross-cutting/covered.md" "${NOMAP_V}/practices/cross-cutting/"
-out_nomap="$("${CHECK}" --vault "${NOMAP_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>/dev/null)"
+out_nomap="$("${CHECK}" --vault "${NOMAP_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+rc_nomap=$?
+assert_exit 1 "${rc_nomap}" "missing promotion-candidates.md fails loudly, not silently"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nomap}" in
-  *"Thin evidence: skipped"*) pass "no promotion-candidates.md: thin evidence is skipped, not guessed" ;;
-  *) fail "no promotion-candidates.md: thin evidence is skipped, not guessed" "${out_nomap}" ;;
+  *"promotion-candidates.md: not found"*) pass "missing promotion-candidates.md names the file" ;;
+  *) fail "missing promotion-candidates.md names the file" "${out_nomap}" ;;
+esac
+
+# promotion-candidates.md present but reworded past recognition
+NOPARSE_V="${SANDBOX}/no-parse-vault"
+mkdir -p "${NOPARSE_V}/practices/cross-cutting" "${NOPARSE_V}/00-maps"
+cp "${LVAULT}/practices/cross-cutting/covered.md" "${NOPARSE_V}/practices/cross-cutting/"
+cat > "${NOPARSE_V}/00-maps/promotion-candidates.md" <<'EOF'
+# Promotion candidates
+
+This note got reworded and no longer says how many repos it takes to move
+from trialing to enforced.
+EOF
+out_noparse="$("${CHECK}" --vault "${NOPARSE_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+rc_noparse=$?
+assert_exit 1 "${rc_noparse}" "a reworded promotion-candidates.md fails loudly, not silently"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_noparse}" in
+  *"could not find the trialing->enforced threshold"*) pass "a reworded promotion-candidates.md names what was expected" ;;
+  *) fail "a reworded promotion-candidates.md names what was expected" "${out_noparse}" ;;
+esac
+
+# promotion-candidates.md with two conflicting thresholds is ambiguous, not
+# "pick the first one"
+AMBIG_V="${SANDBOX}/ambiguous-vault"
+mkdir -p "${AMBIG_V}/practices/cross-cutting" "${AMBIG_V}/00-maps"
+cp "${LVAULT}/practices/cross-cutting/covered.md" "${AMBIG_V}/practices/cross-cutting/"
+cat > "${AMBIG_V}/00-maps/promotion-candidates.md" <<'EOF'
+# Promotion candidates
+
+- `trialing` -> `enforced`: observed in **3+** repos
+
+```dataview
+TABLE maturity, length(repos) AS "repos", last-reviewed
+FROM "practices"
+WHERE (maturity = "trialing" AND length(repos) >= 3)
+   OR (maturity = "trialing" AND length(repos) >= 5)
+```
+EOF
+out_ambig="$("${CHECK}" --vault "${AMBIG_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+rc_ambig=$?
+assert_exit 1 "${rc_ambig}" "conflicting thresholds in promotion-candidates.md fail loudly"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_ambig}" in
+  *"conflicting trialing->enforced thresholds"*) pass "conflicting thresholds are named, not silently resolved to the first match" ;;
+  *) fail "conflicting thresholds are named, not silently resolved to the first match" "${out_ambig}" ;;
 esac
 
 finish

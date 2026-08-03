@@ -271,11 +271,17 @@ below `enforced`), a **stale claim** (`enforced`, unreviewed past
 for a different purpose), and **thin evidence** (`enforced` with fewer repos
 than the vault's own idea→trialing→enforced bar, read from
 `00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
-number — exempting a note whose `**Observed in:**` line says "enforced by
-preference," this vault's own way of marking a personal default that was
-never meant to clear that bar). Exits 1 only for orphaned rules — that's the
-one finding that means a rule is actively citing evidence that no longer
-exists; everything else is a visible backlog, not a block.
+number — exempting a note whose `**Observed in:**` line says exactly
+"enforced by preference," this vault's own way of marking a personal default
+that was never meant to clear that bar; a note that's close but doesn't
+match exactly is still counted as thin evidence *and* named separately as a
+near-miss, so a typo can't silently cost a note its exemption). If that
+threshold can't be read unambiguously — the file is missing, reworded past
+recognition, or states two different numbers — the script exits with a
+named, specific error rather than silently skipping the check. Otherwise
+exits 1 only for orphaned rules — that's the one finding that means a rule
+is actively citing evidence that no longer exists; everything else is a
+visible backlog, not a block.
 
 `make audit` also runs `rule-budget.py`, estimating the always-on rule set's
 per-turn cost — a rule with no `paths:` loads on every turn, for every agent,

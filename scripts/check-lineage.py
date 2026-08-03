@@ -17,10 +17,12 @@ This reports four things, none of which anything else currently checks:
                     enforced threshold, read from the vault's own
                     00-maps/promotion-candidates.md rather than a second
                     hardcoded copy of the number. Exempt: a note whose
-                    **Observed in:** line says "enforced by preference" is
-                    enforced by the user's own standing default, not by
-                    clearing the repo-count bar — that phrase is this
-                    vault's own established way of saying so, not a gap.
+                    **Observed in:** line says exactly "enforced by
+                    preference" — enforced by the user's own standing
+                    default, not by clearing the repo-count bar. A note
+                    that's close but doesn't match exactly (e.g. a typo) is
+                    reported as a near-miss rather than silently losing the
+                    exemption.
 
 Rules trace back to a note via a `source:` frontmatter field naming the
 note's slug (its filename, no extension — the same identifier every
@@ -34,6 +36,12 @@ Usage:
 Exit status: 1 if any rule is orphaned, else 0 — orphaned rules are the one
 finding that means a rule is actively claiming evidence that no longer
 exists. Everything else is a backlog to notice, not a reason to block.
+
+If the idea->trialing->enforced threshold can't be read unambiguously from
+promotion-candidates.md (file missing, pattern not found, or more than one
+conflicting number), that's a hard error, same as a missing vault or rules
+directory — never a silent skip. A check that quietly stops checking is
+worse than one that isn't there, because the green result is misleading.
 
 Read-only. Never writes to the vault or the rules directory. Stdlib only.
 """
@@ -85,6 +93,7 @@ def load_notes(vault):
             problems.extend((str(rel), w) for w in warnings)
 
         repos = fm.get("repos") or []
+        observed_in = extract_observed_in(text)
         notes.append(
             {
                 "slug": path.stem,
@@ -97,10 +106,26 @@ def load_notes(vault):
                 # an established, self-documented exception in this vault's
                 # own convention (its **Observed in:** line says so in
                 # exactly these words), not a gap "thin evidence" should flag.
-                "preference_enforced": "enforced by preference" in text.lower(),
+                "preference_enforced": observed_in is not None
+                and "enforced by preference" in observed_in.lower(),
+                # Close but not exact (typo, reordered words, ...) — still
+                # not exempt, but worth a human's attention rather than
+                # silently falling into "thin evidence" with no explanation.
+                "preference_near_miss": observed_in is not None
+                and "enforced by preference" not in observed_in.lower()
+                and "preference" in observed_in.lower(),
             }
         )
     return notes, problems
+
+
+OBSERVED_IN_RE = re.compile(r'^\*\*Observed in:\*\*\s*(.*)', re.MULTILINE)
+
+
+def extract_observed_in(text):
+    """The content of a note's **Observed in:** line, or None if it has none."""
+    m = OBSERVED_IN_RE.search(text)
+    return m.group(1).strip() if m else None
 
 
 def load_rules(rules_dir):
@@ -119,21 +144,36 @@ def load_rules(rules_dir):
     return rules, problems
 
 
+THRESHOLD_RE = re.compile(r'maturity\s*=\s*"trialing"\s+AND\s+length\(repos\)\s*>=\s*(\d+)')
+
+
 def enforced_threshold(vault):
     """Read the trialing->enforced repo-count bar from the vault's own
     00-maps/promotion-candidates.md rather than hardcoding a second copy of
     it — the number this script checks against must be the number the
     update-second-brain skill actually promotes on, or "thin evidence" would
     just be a second, driftable opinion about what the bar is.
+
+    A prose source that can't be parsed unambiguously is a hard error, not a
+    fallback or a silently skipped check: a green "thin evidence: 0" result
+    that actually means "couldn't tell" would be worse than no check at all.
     """
     path = vault / "00-maps" / "promotion-candidates.md"
     if not path.is_file():
-        return None, f"{path} not found — cannot determine the enforced threshold"
+        sys.exit(f"{path}: not found — cannot determine the trialing->enforced threshold")
     text = path.read_text(encoding="utf-8")
-    m = re.search(r'maturity\s*=\s*"trialing"\s+AND\s+length\(repos\)\s*>=\s*(\d+)', text)
-    if not m:
-        return None, f"{path}: could not find the trialing->enforced threshold pattern"
-    return int(m.group(1)), None
+    matches = {int(n) for n in THRESHOLD_RE.findall(text)}
+    if not matches:
+        sys.exit(
+            f"{path}: could not find the trialing->enforced threshold — "
+            f'expected wording like `trialing" AND length(repos) >= N`'
+        )
+    if len(matches) > 1:
+        sys.exit(
+            f"{path}: found conflicting trialing->enforced thresholds {sorted(matches)} — "
+            "ambiguous, fix the wording so exactly one number matches"
+        )
+    return matches.pop()
 
 
 def parse_date(value):
@@ -176,15 +216,14 @@ def audit(vault, rules_dir, stale_months, as_of):
         if (as_of - reviewed).days > stale_cutoff_days:
             stale.append(n)
 
-    threshold, threshold_error = enforced_threshold(vault)
-    thin = []
-    if threshold is not None:
-        thin = [
-            n for n in notes
-            if n["maturity"] == "enforced"
-            and len(n["repos"]) < threshold
-            and not n["preference_enforced"]
-        ]
+    threshold = enforced_threshold(vault)  # exits on an unparseable vault source
+    thin = [
+        n for n in notes
+        if n["maturity"] == "enforced"
+        and len(n["repos"]) < threshold
+        and not n["preference_enforced"]
+    ]
+    near_miss = [n for n in thin if n["preference_near_miss"]]
 
     return {
         "unpromoted": unpromoted,
@@ -192,8 +231,8 @@ def audit(vault, rules_dir, stale_months, as_of):
         "no_source": no_source,
         "stale": stale,
         "thin": thin,
+        "near_miss": near_miss,
         "threshold": threshold,
-        "threshold_error": threshold_error,
         "note_problems": note_problems,
         "rule_problems": rule_problems,
     }
@@ -217,15 +256,20 @@ def report(result, vault, rules_dir, stale_months):
         lines.append(f"  - {r['file']}")
     lines.append("")
 
-    if result["threshold_error"]:
-        lines.append(f"Thin evidence: skipped — {result['threshold_error']}")
-    else:
-        lines.append(
-            f"Thin evidence (enforced, fewer than {result['threshold']} repos): "
-            f"{len(result['thin'])}"
-        )
-        for n in result["thin"]:
-            lines.append(f"  - {n['slug']} ({len(n['repos'])} repo(s))")
+    lines.append(
+        f"Thin evidence (enforced, fewer than {result['threshold']} repos): "
+        f"{len(result['thin'])}"
+    )
+    for n in result["thin"]:
+        lines.append(f"  - {n['slug']} ({len(n['repos'])} repo(s))")
+    lines.append("")
+
+    lines.append(
+        f"Thin evidence with a near-miss preference marker "
+        f"(check for a typo — not exempted as-is): {len(result['near_miss'])}"
+    )
+    for n in result["near_miss"]:
+        lines.append(f"  - {n['slug']}")
     lines.append("")
 
     lines.append(f"Stale claims (enforced, last-reviewed > {stale_months} months ago): "
