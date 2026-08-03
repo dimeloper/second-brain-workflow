@@ -125,12 +125,17 @@ else
 fi
 
 # --- 2. staged paths ---------------------------------------------------------
+# .github/workflows/*: infrastructure (docs/vault-ci/{audit,guard}.yml,
+# copied in once by a human, not written by update-second-brain), not
+# capture content — but it's still vault-repo content only this allowlist
+# protects, so it belongs here rather than working around the guard.
 while IFS= read -r f; do
   [ -n "${f}" ] || continue
   case "${f}" in
     practices/*|bases/*|00-maps/*|_templates/*) ;;
     vault.json|.gitignore) ;;
     .obsidian/*) ;;
+    .github/workflows/*.yml|.github/workflows/*.yaml) ;;
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md) ;;
     *) fail "staged path outside the vault's allowed set: ${f}" ;;
   esac

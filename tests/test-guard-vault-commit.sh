@@ -95,6 +95,17 @@ assert_exit 1 $? "blocks a staged path outside the allowed set"
 git -C "${VAULT}" rm -q --cached "somewhere/file.md" >/dev/null 2>&1
 rm -rf "${VAULT}/somewhere"
 
+# --- .github/workflows/*.yml: allowed (docs/vault-ci templates) ------------
+# Left staged, not committed here — the next block's "notes" commit already
+# finalizes whatever's staged at that point, and committing early would eat
+# the still-staged note/daily-note content the size-cap tests below depend
+# on being present.
+mkdir -p "${VAULT}/.github/workflows"
+printf 'on: push\njobs: {}\n' > "${VAULT}/.github/workflows/guard.yml"
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "allows a .github/workflows/*.yml file"
+
 # --- size caps --------------------------------------------------------------
 GUARD_MAX_LINES=2 "${GUARD}" --vault "${VAULT}" >/dev/null 2>&1
 assert_exit 1 $? "blocks an oversized diff by line count"

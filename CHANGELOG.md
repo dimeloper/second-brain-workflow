@@ -33,6 +33,10 @@ write release notes, not two to keep in sync by hand.
 - `make doctor` now also reports a skill installed in one configured skills
   directory but missing from another, and a vendored submodule left at the
   wrong commit or never initialized after a tag switch.
+- `guard-vault-commit.sh`'s path allowlist now permits `.github/workflows/*.yml`
+  (and `.yaml`) — needed to commit the `docs/vault-ci/` templates into a
+  vault repo at all, since it's still vault-repo-only content the allowlist
+  exists to scope.
 
 ### Changed
 
