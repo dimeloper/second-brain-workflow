@@ -9,7 +9,13 @@ GUARD="${ENGINE}/scripts/guard-vault-commit.sh"
 INIT="${ENGINE}/scripts/init-vault.sh"
 VAULT="${SANDBOX}/vault"
 
-"${INIT}" --path "${VAULT}" --id work --remote "git@example.com:me/work-brain.git" >/dev/null 2>&1
+# --no-hook: this file tests guard-vault-commit.sh directly via explicit
+# invocations below. The hook itself (installed by default) is covered in
+# test-init-vault.sh and test-doctor.sh — without --no-hook here, the raw
+# `git commit` calls in this file's own fixture setup would themselves be
+# intercepted by the hook and fail closed, for a reason unrelated to whatever
+# each test below is actually checking.
+"${INIT}" --path "${VAULT}" --id work --remote "git@example.com:me/work-brain.git" --no-hook >/dev/null 2>&1
 git -C "${VAULT}" add -A >/dev/null 2>&1
 git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "init" >/dev/null 2>&1
 

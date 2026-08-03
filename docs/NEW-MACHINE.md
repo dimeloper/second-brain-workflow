@@ -88,6 +88,11 @@ telling this machine what to expect — so make it meaningful (`personal`,
 `work`). The remote is recorded but **not** pushed to — create the repo
 yourself, private, first.
 
+This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook,
+so a hand-run `git commit` here is guarded even with no agent involved —
+`--no-hook` opts out. `make doctor` (VAULT=~/vaults/<name>) reports a vault
+whose hook is missing or isn't ours.
+
 The vault starts with no domain practice notes. It does get four cross-cutting
 notes describing how the vault itself operates, because `update-second-brain`
 reads them at runtime.

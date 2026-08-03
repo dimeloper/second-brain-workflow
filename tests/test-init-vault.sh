@@ -25,6 +25,15 @@ assert_file "${V}/00-maps/promotion-candidates.md" "writes the promotion query"
 assert_file "${V}/practices/INDEX.md"              "generates the index"
 assert_contains "${V}/vault.json" '"id": "work"'   "records the vault id"
 
+# --- pre-commit hook installed by default ------------------------------------
+assert_file "${V}/.git/hooks/pre-commit" "installs a pre-commit hook by default"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -x "${V}/.git/hooks/pre-commit" ]; then pass "hook is executable"; else fail "hook is executable"; fi
+assert_contains "${V}/.git/hooks/pre-commit" "second-brain-workflow: vault-commit guard" \
+  "hook is recognizably ours"
+assert_contains "${V}/.git/hooks/pre-commit" "guard-vault-commit.sh" \
+  "hook calls the guard script"
+
 # The four notes update-second-brain reads at runtime. Without them the capture
 # workflow runs with its own instructions missing.
 for n in propose-then-approve-vault-writes keep-one-header-per-section-in-daily-notes \
@@ -120,6 +129,57 @@ assert_no_file "${REMOTED}/_templates/daily-note.md" "aborted adopt (remote mism
 FRESH="${SANDBOX}/fresh"
 "${INIT}" --path "${FRESH}" --id anything >/dev/null 2>&1
 assert_exit 0 $? "a fresh vault (no vault.json yet) is unaffected by the identity check"
+
+# --- pre-commit hook: actually blocks a hand-run git commit ------------------
+# The point of the hook is that it works with no agent and no explicit guard
+# invocation involved — just plain `git commit`.
+HOOKED="${SANDBOX}/hooked"
+"${INIT}" --path "${HOOKED}" --id hooked >/dev/null 2>&1
+git -C "${HOOKED}" add -A >/dev/null 2>&1
+SBW_EXPECTED_VAULT_ID=hooked git -C "${HOOKED}" -c user.email=t@t -c user.name=t commit -qm "init" >/dev/null 2>&1
+
+mkdir -p "${HOOKED}/somewhere"
+echo "stray" > "${HOOKED}/somewhere/file.md"
+git -C "${HOOKED}" add -A >/dev/null 2>&1
+SBW_EXPECTED_VAULT_ID=hooked git -C "${HOOKED}" -c user.email=t@t -c user.name=t commit -qm "bad" >/dev/null 2>&1
+assert_exit 1 $? "hand-run git commit is blocked by the hook, no agent involved"
+TESTS_RUN=$((TESTS_RUN + 1))
+if git -C "${HOOKED}" log --oneline | grep -q "bad"; then
+  fail "the blocked commit did not actually land"
+else
+  pass "the blocked commit did not actually land"
+fi
+
+# --- pre-commit hook: idempotent across two init-vault.sh runs --------------
+before_sum="$(shasum "${HOOKED}/.git/hooks/pre-commit" | awk '{print $1}')"
+"${INIT}" --path "${HOOKED}" --id hooked --adopt >/dev/null 2>&1
+after_sum="$(shasum "${HOOKED}/.git/hooks/pre-commit" | awk '{print $1}')"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${before_sum}" = "${after_sum}" ]; then
+  pass "hook is byte-identical after a second init-vault.sh run"
+else
+  fail "hook is byte-identical after a second init-vault.sh run" "hook changed"
+fi
+
+# --- pre-commit hook: a foreign hook is preserved and reported --------------
+FOREIGN="${SANDBOX}/foreign-hook"
+mkdir -p "${FOREIGN}"
+git -C "${FOREIGN}" init -q
+printf '#!/bin/sh\necho "someone else was here"\n' > "${FOREIGN}/.git/hooks/pre-commit"
+chmod +x "${FOREIGN}/.git/hooks/pre-commit"
+out="$("${INIT}" --path "${FOREIGN}" --id foreign --adopt 2>&1)"
+assert_contains "${FOREIGN}/.git/hooks/pre-commit" "someone else was here" \
+  "a foreign pre-commit hook is left untouched"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"already exists and is not ours"*) pass "a foreign pre-commit hook is reported" ;;
+  *) fail "a foreign pre-commit hook is reported" "${out}" ;;
+esac
+
+# --- --no-hook opts out -------------------------------------------------------
+NOHOOK="${SANDBOX}/no-hook"
+"${INIT}" --path "${NOHOOK}" --id nohook --no-hook >/dev/null 2>&1
+assert_no_file "${NOHOOK}/.git/hooks/pre-commit" "--no-hook skips installing the hook"
 
 # --- guardrails --------------------------------------------------------------
 NE="${SANDBOX}/nonempty"

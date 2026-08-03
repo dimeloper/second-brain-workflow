@@ -2,15 +2,22 @@
 # Create a second-brain vault with the structure the tooling expects.
 #
 # Usage:
-#   ./init-vault.sh --path <dir> --id <id> [--remote <url>] [--adopt]
+#   ./init-vault.sh --path <dir> --id <id> [--remote <url>] [--adopt] [--no-hook]
 #
-#   --path    where the vault goes, e.g. ~/vaults/work-brain
-#   --id      short identifier, e.g. work — recorded in vault.json and checked
-#             by guard-vault-commit.sh before every commit
-#   --remote  git remote to add (not pushed; create the repo yourself, private)
-#   --adopt   allow a non-empty directory (adds only what is missing)
+#   --path     where the vault goes, e.g. ~/vaults/work-brain
+#   --id       short identifier, e.g. work — recorded in vault.json and checked
+#              by guard-vault-commit.sh before every commit
+#   --remote   git remote to add (not pushed; create the repo yourself, private)
+#   --adopt    allow a non-empty directory (adds only what is missing)
+#   --no-hook  skip installing the pre-commit hook (see below)
 #
 # Idempotent: re-running adds missing pieces and leaves existing files alone.
+#
+# Installs guard-vault-commit.sh as this vault's pre-commit hook by default —
+# the backstop that makes the identity check an invariant of committing here
+# at all, rather than something that only runs when update-second-brain
+# remembers to invoke it. Both run the exact same script; neither replaces
+# the other. `make doctor` reports a vault whose hook is missing or foreign.
 #
 # Writes no *domain* practice notes — a vault's content is earned, not
 # scaffolded. It does seed the four cross-cutting notes that describe how the
@@ -21,14 +28,15 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/vault-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
 
-PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0
+PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --path)   PATH_ARG="${2:?--path needs a value}"; shift 2 ;;
-    --id)     ID="${2:?--id needs a value}"; shift 2 ;;
-    --remote) REMOTE="${2:?--remote needs a value}"; shift 2 ;;
-    --adopt)  ADOPT=1; shift ;;
-    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --path)     PATH_ARG="${2:?--path needs a value}"; shift 2 ;;
+    --id)       ID="${2:?--id needs a value}"; shift 2 ;;
+    --remote)   REMOTE="${2:?--remote needs a value}"; shift 2 ;;
+    --adopt)    ADOPT=1; shift ;;
+    --no-hook)  NO_HOOK=1; shift ;;
+    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -250,6 +258,36 @@ fi
 if [ -n "${REMOTE}" ] && ! git -C "${VAULT}" remote get-url origin >/dev/null 2>&1; then
   git -C "${VAULT}" remote add origin "${REMOTE}"
   note "remote origin -> ${REMOTE}"
+fi
+
+# The hook is the backstop: committing here is guarded regardless of whether
+# a skill remembered to invoke guard-vault-commit.sh first. It calls that
+# same script with no --expect-id of its own — it has nothing trustworthy to
+# derive one from (git hands a pre-commit hook no useful context), so it
+# relies entirely on SBW_EXPECTED_VAULT_ID / --expect-id resolving on this
+# machine, same as any other invocation.
+HOOK_MARKER="# second-brain-workflow: vault-commit guard"
+if [ "${NO_HOOK}" -eq 0 ]; then
+  hook="${VAULT}/.git/hooks/pre-commit"
+  if [ -e "${hook}" ]; then
+    if grep -qF "${HOOK_MARKER}" "${hook}" 2>/dev/null; then
+      : # already ours — left alone, like every other write_if_absent file
+    else
+      echo "  pre-commit hook already exists and is not ours — left untouched." >&2
+      echo "    Add the guard yourself: exec ${STANDARDS_DIR}/scripts/guard-vault-commit.sh --vault \"\$(git rev-parse --show-toplevel)\"" >&2
+    fi
+  else
+    cat > "${hook}" <<EOF
+#!/usr/bin/env bash
+${HOOK_MARKER} — installed by init-vault.sh.
+# Do not edit by hand; re-run init-vault.sh --adopt after an engine update.
+set -euo pipefail
+exec "${STANDARDS_DIR}/scripts/guard-vault-commit.sh" --vault "\$(git rev-parse --show-toplevel)"
+EOF
+    chmod +x "${hook}"
+    note "installed pre-commit hook"
+    created=$((created+1))
+  fi
 fi
 
 "${STANDARDS_DIR}/scripts/build-vault-index.py" --vault "${VAULT}" >/dev/null

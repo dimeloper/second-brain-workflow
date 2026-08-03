@@ -212,8 +212,21 @@ It blocks a staged path outside the vault's allowed set, a `vault.json` id that
 isn't the one this machine expects, an `origin` that doesn't match the one
 recorded in `vault.json`, an implausibly large diff, deletion of an `enforced`
 note, conflict markers, and anything that looks like a credential.
-`update-second-brain` runs it before committing; it also works as a pre-commit
-hook inside a vault.
+
+Two things run this exact script, and neither is a substitute for the other:
+
+- **The fast path.** `update-second-brain` runs it before every commit it
+  makes — the common case, since that skill is the only write path for
+  content.
+- **The backstop.** `init-vault.sh` installs it as this vault's `pre-commit`
+  hook by default, so a hand-run `git commit` inside the vault — no skill,
+  no agent, nobody remembering to invoke anything — is guarded too. It's
+  idempotent (`--no-hook` opts out; re-running never clobbers an existing
+  hook, ours or not) and derives its `--expect-id` the same way any other
+  invocation does, since a git hook has nothing vault-specific it could
+  trustworthily derive one from itself. `make doctor` reports a vault whose
+  hook is missing or isn't ours, so an unguarded machine is visible rather
+  than silently exposed.
 
 **Trust model:** the expected id is a property of the *machine*, resolved from
 `--expect-id` > `SBW_EXPECTED_VAULT_ID` env > the machine config file — never

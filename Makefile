@@ -1,9 +1,9 @@
-.PHONY: help lint test vault-index vault-index-check sync-skills explain guard verify-claude check
+.PHONY: help lint test vault-index vault-index-check sync-skills explain guard doctor verify-claude check
 
 VAULT ?= $(if $(SBW_VAULT),$(SBW_VAULT),$(HOME)/vaults/second-brain)
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
-                 scripts/guard-vault-commit.sh scripts/verify-claude-load.sh scripts/lib/config.sh \
-                 scripts/lib/vault-identity.sh tests/lib.sh $(wildcard tests/test-*.sh)
+                 scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
+                 scripts/lib/config.sh scripts/lib/vault-identity.sh tests/lib.sh $(wildcard tests/test-*.sh)
 
 help:
 	@echo "make lint                shellcheck every shell script"
@@ -13,6 +13,7 @@ help:
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make guard               run the vault commit guard against VAULT"
+	@echo "make doctor              report gaps: missing commit-guard hook, etc."
 	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
 	@echo ""
@@ -37,6 +38,11 @@ explain:
 
 guard:
 	@./scripts/guard-vault-commit.sh --vault "$(VAULT)"
+
+# Not part of `make check`: needs a real vault, same reasoning as
+# vault-index-check below — CI has none.
+doctor:
+	@./scripts/doctor.sh --vault "$(VAULT)"
 
 # Not part of `make check`: costs model calls and needs network. Run it once per
 # machine, and after any change to how rules are rendered.
