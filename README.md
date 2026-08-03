@@ -483,7 +483,11 @@ the target repo's root alongside the rendered output — nothing else in the
 target carried this before, so this is the one new file `render.py` writes
 outside `.cursor/rules`, `.claude/rules`, `AGENTS.md` and `CLAUDE.md`. Like
 any other rendered file, `--check` reports a stale `.sbw-version` as drift —
-visible as "this repo hasn't re-rendered since the engine moved on."
+visible as "this repo hasn't re-rendered since the engine moved on." Unlike
+every other rendered file, it can't carry the usual provenance comment (it's
+a bare version string, not markdown), so it's the one file `render.py`
+always overwrites rather than checking for a hand-written override — don't
+hand-edit it.
 
 **Pin, or track `main`:**
 
