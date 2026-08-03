@@ -8,6 +8,10 @@ no one re-reads.
 
 ![Knowledge graph showing practice notes growing sparse-to-dense across three phases — Session 1, a few sessions later, and months in — as they mature from idea to trialing to enforced, Obsidian graph-view style.](docs/impact.svg)
 
+*Illustrative, not the actual interface. The agent never browses a graph —
+it reads the generated `practices/INDEX.md`, one row per note. Graph-view
+browsing like this is for you, in Obsidian, over the same vault.*
+
 Say **"update second brain"** at the end of a session and an agent skill
 mines what happened — a bug fixed, a design decision made, a pattern that
 worked — into individual, versioned practice notes in an Obsidian vault.
@@ -321,7 +325,10 @@ ln -s ~/.claude/skills/use-railway ~/.cursor/skills/use-railway
 ```
 
 `sync-skills.sh` leaves that link alone — it points outside this repo, so it is
-never repointed or pruned. Re-run the command after a fresh Railway install.
+never repointed or pruned. Re-run the command after a fresh Railway install,
+or run `make doctor`, which detects a skill present in one configured skills
+directory but missing from another — ours or not — and prints the exact
+`ln -s` to fix it. Detection only; it never links anything itself.
 
 Skills install into **every** directory in `SKILLS_DIRS`, defaulting to
 `~/.cursor/skills` and `~/.claude/skills`, so Cursor and Claude Code resolve the

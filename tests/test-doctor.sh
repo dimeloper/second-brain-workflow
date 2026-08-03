@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 # doctor.sh: reports gaps that nothing else surfaces on its own. Item 2 covers
-# only the pre-commit-hook check; Item 6 extends this same script.
+# only the pre-commit-hook check; Item 6 extends this same script with
+# check_skills().
 # shellcheck source=tests/lib.sh
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 setup_sandbox
 
 INIT="${ENGINE}/scripts/init-vault.sh"
 DOCTOR="${ENGINE}/scripts/doctor.sh"
+
+# check_skills() reads SKILLS_DIRS, which — like every other config key —
+# falls back to the real ~/.cursor/skills:~/.claude/skills when unset. Every
+# call below must set it explicitly, or this file would silently scan the
+# real machine instead of fixtures. Two always-empty sandbox dirs by
+# default; tests that actually exercise check_skills() override this.
+EMPTY1="${SANDBOX}/skills-empty-1"
+EMPTY2="${SANDBOX}/skills-empty-2"
+mkdir -p "${EMPTY1}" "${EMPTY2}"
+export SKILLS_DIRS="${EMPTY1}:${EMPTY2}"
 
 echo "doctor.sh"
 
@@ -56,8 +67,67 @@ assert_exit 1 "${rc}" "exits 1 when the vault isn't a git repo yet"
 # absent to install — this is checking config resolution, not hook state.
 rm -f "${V}/.git/hooks/pre-commit"
 "${INIT}" --path "${V}" --id work --adopt >/dev/null 2>&1
-printf 'SBW_VAULT=%s\n' "${V}" > "${SANDBOX}/config"
+printf 'SBW_VAULT=%s\nSKILLS_DIRS=%s:%s\n' "${V}" "${EMPTY1}" "${EMPTY2}" > "${SANDBOX}/config"
 SBW_CONFIG_FILE="${SANDBOX}/config" "${DOCTOR}" >/dev/null 2>&1
 assert_exit 0 $? "resolves vault from config file"
+
+# --- check_skills(): only one skills dir configured -------------------------
+out="$(SKILLS_DIRS="${EMPTY1}" "${DOCTOR}" --vault "${V}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"only one skills directory configured"*) pass "a single configured skills dir is a no-op, not a false gap" ;;
+  *) fail "a single configured skills dir is a no-op, not a false gap" "${out}" ;;
+esac
+
+# --- check_skills(): nothing installed anywhere -----------------------------
+out="$("${DOCTOR}" --vault "${V}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no skills installed anywhere yet"*) pass "no skills installed anywhere is reported plainly" ;;
+  *) fail "no skills installed anywhere is reported plainly" "${out}" ;;
+esac
+
+# --- check_skills(): consistent skill in both dirs --------------------------
+mkdir -p "${EMPTY1}/consistent-skill" "${EMPTY2}/consistent-skill"
+out="$("${DOCTOR}" --vault "${V}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"consistent-skill"*) fail "a skill present in every dir produces no finding" "unexpectedly listed" ;;
+  *"every installed skill is present in all configured skills directories"*) pass "a skill present in every dir produces no finding" ;;
+  *) fail "a skill present in every dir produces no finding" "${out}" ;;
+esac
+rm -rf "${EMPTY1}/consistent-skill" "${EMPTY2}/consistent-skill"
+
+# --- check_skills(): a foreign install missing from one dir -----------------
+# Simulates Railway's use-railway: a real directory (someone else's install),
+# not one of ours, present in only one configured skills dir.
+mkdir -p "${EMPTY1}/foreign-tool"
+echo "not ours" > "${EMPTY1}/foreign-tool/SKILL.md"
+out="$("${DOCTOR}" --vault "${V}" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "exits 1 when a foreign skill is missing from one dir"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"foreign-tool: in ${EMPTY1} but not ${EMPTY2} — fix: ln -s ${EMPTY1}/foreign-tool ${EMPTY2}/foreign-tool"*)
+    pass "prints the exact ln -s fix for a foreign skill" ;;
+  *) fail "prints the exact ln -s fix for a foreign skill" "${out}" ;;
+esac
+rm -rf "${EMPTY1}/foreign-tool"
+
+# --- check_skills(): one of ours, missing from one dir ----------------------
+# A symlink into this engine's own skills/ tree — the fix is sync-skills.sh,
+# not a manual ln -s, since that command alone would propagate it everywhere.
+OURS="${ENGINE}/skills/workflow/mcp-per-project"
+ln -s "${OURS}" "${EMPTY1}/mcp-per-project"
+out="$("${DOCTOR}" --vault "${V}" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "exits 1 when one of our own skills is missing from one dir"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"mcp-per-project: not installed in every configured skills dir — run ./scripts/sync-skills.sh"*)
+    pass "recommends sync-skills.sh for one of our own skills, not a manual ln -s" ;;
+  *) fail "recommends sync-skills.sh for one of our own skills, not a manual ln -s" "${out}" ;;
+esac
+rm -f "${EMPTY1}/mcp-per-project"
 
 finish
