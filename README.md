@@ -498,10 +498,21 @@ git clone --recurse-submodules \
   git@github.com:dimeloper/second-brain-workflow.git   # tracking: whatever main has
 ```
 
-**Rollback:** `git checkout v<VERSION>` in the engine checkout, then
-re-render each onboarded repo (`./scripts/render.py <repo>`). Rules and vault
-content are untouched by checking out a different engine version — only the
-tooling that renders/audits them moves.
+**Rollback:** in the engine checkout,
+
+```bash
+git checkout v<VERSION>
+git submodule update --init --recursive   # vendor/obsidian-skills is pinned per-commit, not per-tag
+./scripts/sync-skills.sh                  # installed skills are symlinks into that submodule
+```
+
+then re-render each onboarded repo (`./scripts/render.py <repo>`). Checking
+out a tag alone does not move `vendor/obsidian-skills` to the commit that tag
+pinned — skipping the submodule step leaves vendored skills at whatever they
+were before the rollback, which defeats the point of pinning. `make doctor`
+reports a submodule left at the wrong commit, so a switch-and-forget doesn't
+go unnoticed. Rules and vault content are untouched by any of this — only the
+tooling that renders/audits/installs them moves.
 
 ## License
 

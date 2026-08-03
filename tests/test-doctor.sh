@@ -130,4 +130,69 @@ case "${out}" in
 esac
 rm -f "${EMPTY1}/mcp-per-project"
 
+# --- check_submodules(): drift after a tag switch ---------------------------
+# STANDARDS_DIR is derived from doctor.sh's own script path, so exercising
+# this against a real `git submodule status` (not a mock) means building a
+# throwaway "engine" — its own git repo, its own real submodule — and
+# copying doctor.sh + its one lib dependency into it, rather than mutating
+# the real second-brain-workflow checkout's own vendor/obsidian-skills.
+SUBMOD_UPSTREAM="${SANDBOX}/submod-upstream"
+mkdir -p "${SUBMOD_UPSTREAM}"
+git -C "${SUBMOD_UPSTREAM}" init -q
+printf 'v1\n' > "${SUBMOD_UPSTREAM}/file.txt"
+git -C "${SUBMOD_UPSTREAM}" add file.txt
+git -c user.email=t@t.com -c user.name=t -C "${SUBMOD_UPSTREAM}" commit -q -m v1
+SUBMOD_V1="$(git -C "${SUBMOD_UPSTREAM}" rev-parse HEAD)"
+printf 'v2\n' > "${SUBMOD_UPSTREAM}/file.txt"
+git -C "${SUBMOD_UPSTREAM}" add file.txt
+git -c user.email=t@t.com -c user.name=t -C "${SUBMOD_UPSTREAM}" commit -q -m v2
+
+FAKE_ENGINE="${SANDBOX}/fake-engine"
+mkdir -p "${FAKE_ENGINE}/scripts/lib"
+cp "${ENGINE}/scripts/doctor.sh" "${FAKE_ENGINE}/scripts/doctor.sh"
+cp "${ENGINE}/scripts/lib/config.sh" "${FAKE_ENGINE}/scripts/lib/config.sh"
+git -C "${FAKE_ENGINE}" init -q
+git -c protocol.file.allow=always -C "${FAKE_ENGINE}" \
+  submodule add -q "file://${SUBMOD_UPSTREAM}" vendor/thing >/dev/null 2>&1
+git -c user.email=t@t.com -c user.name=t -C "${FAKE_ENGINE}" commit -q -m init
+
+FAKE_DOCTOR="${FAKE_ENGINE}/scripts/doctor.sh"
+FAKE_VAULT="${SANDBOX}/fake-vault-for-submodule-test"
+mkdir -p "${FAKE_VAULT}"
+fake_doctor() { SKILLS_DIRS="${EMPTY1}:${EMPTY2}" "${FAKE_DOCTOR}" --vault "${FAKE_VAULT}" 2>&1; }
+
+out="$(fake_doctor)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"vendored submodule(s) match the commit this checkout pins"*)
+    pass "submodule at the pinned commit: reported clean" ;;
+  *) fail "submodule at the pinned commit: reported clean" "${out}" ;;
+esac
+
+# Move the submodule's checked-out commit without touching the superproject's
+# index — exactly what a plain `git checkout v<VERSION>` in the engine
+# leaves vendor/obsidian-skills in (see REVIEW-ROUND-2 item 3).
+git -C "${FAKE_ENGINE}/vendor/thing" checkout -q "${SUBMOD_V1}"
+out="$(fake_doctor)"
+rc=$?
+assert_exit 1 "${rc}" "exits 1 when the submodule is out of sync with the pinned commit"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"submodule out of sync with the pinned commit"*"vendor/thing"*)
+    pass "names the drifted submodule and its path" ;;
+  *) fail "names the drifted submodule and its path" "${out}" ;;
+esac
+
+# --- check_submodules(): never initialized ----------------------------------
+git -C "${FAKE_ENGINE}" submodule deinit -f vendor/thing >/dev/null 2>&1
+out="$(fake_doctor)"
+rc=$?
+assert_exit 1 "${rc}" "exits 1 when the submodule was never initialized"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"submodule not initialized"*"vendor/thing"*)
+    pass "names the uninitialized submodule" ;;
+  *) fail "names the uninitialized submodule" "${out}" ;;
+esac
+
 finish

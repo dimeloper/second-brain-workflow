@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Machine health check: reports gaps that nothing else surfaces on its own —
 # a vault whose commit guard isn't wired in as a pre-commit hook, a skill
-# installed for one agent but not another, and so on. Read-only; changes
-# nothing. Exits non-zero if anything is worth a look, so it composes with CI
-# or a cron job, but it is not part of `make check` — like `make guard` and
+# installed for one agent but not another, a vendored submodule left at the
+# wrong commit after a tag switch, and so on. Read-only; changes nothing.
+# Exits non-zero if anything is worth a look, so it composes with CI or a
+# cron job, but it is not part of `make check` — like `make guard` and
 # `make vault-index-check`, it needs a real vault, and CI has none.
 #
 #   ./doctor.sh [--vault PATH]
@@ -110,9 +111,45 @@ check_skills() {
   [ "${clean}" -eq 1 ] && ok "every installed skill is present in all configured skills directories"
 }
 
+# Not vault-specific — vendor/obsidian-skills is pinned in this engine
+# checkout, not the vault. `git submodule status` prefixes each line with
+# ' ' (in sync), '+' (checked out commit doesn't match what the superproject
+# pins — the "switched tags/branches and forgot to update" state that
+# checking out a tag alone can't fix on its own) or '-' (never initialized).
+# Nothing else surfaces this: a stale submodule renders/links fine, it's
+# just silently not the commit the current tag actually pins.
+check_submodules() {
+  if [ ! -d "${STANDARDS_DIR}/.git" ]; then
+    ok "engine checkout is not a git repo — nothing to check for submodule drift"
+    return
+  fi
+  local status
+  status="$(git -C "${STANDARDS_DIR}" submodule status 2>/dev/null)"
+  if [ -z "${status}" ]; then
+    ok "no submodules configured"
+    return
+  fi
+  local clean=1 line
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    case "${line}" in
+      "+"*)
+        clean=0
+        warn "submodule out of sync with the pinned commit (${line#?}) — run: git submodule update --init --recursive"
+        ;;
+      "-"*)
+        clean=0
+        warn "submodule not initialized (${line#?}) — run: git submodule update --init --recursive"
+        ;;
+    esac
+  done <<< "${status}"
+  [ "${clean}" -eq 1 ] && ok "vendored submodule(s) match the commit this checkout pins"
+}
+
 echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
 check_skills
+check_submodules
 
 echo
 if [ "${problems}" -eq 0 ]; then
