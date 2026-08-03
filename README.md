@@ -499,6 +499,15 @@ are tagged `v<VERSION>`. Bump policy:
   keep working (a changed rendered format, a removed field, a renamed
   config key).
 
+**Cutting a release:** move [`CHANGELOG.md`](CHANGELOG.md)'s `[Unreleased]`
+entries under a new `## [X.Y.Z] - YYYY-MM-DD` heading (add the two
+comparison links at the file's bottom), bump `VERSION` to match, tag
+`v<VERSION>`, and point the GitHub Release's notes at that changelog section
+rather than writing them by hand — one place to describe what changed, not
+two that can say different things. A **Major** entry in the changelog always
+names the specific action required, since that's the part a commit log
+can't supply on its own.
+
 Every rendered file's provenance comment names both the commit and the
 engine version it came from, and a plain `.sbw-version` file is written at
 the target repo's root alongside the rendered output — nothing else in the

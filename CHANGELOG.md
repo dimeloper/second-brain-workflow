@@ -1,0 +1,92 @@
+# Changelog
+
+All notable changes to this project are documented here. Format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
+follow the bump policy in the README's [Versioning](README.md#versioning)
+section.
+
+A **Major** entry always names the specific action required to keep an
+already-onboarded repo working (a changed rendered format, a removed field,
+a renamed config key) — that's the whole point of calling it out separately
+from Added/Changed/Fixed; an adopter reading this file needs to know what to
+*do*, not just that something changed.
+
+GitHub [Releases](https://github.com/dimeloper/second-brain-workflow/releases)
+link to the matching section here rather than duplicating it — one place to
+write release notes, not two to keep in sync by hand.
+
+## [Unreleased]
+
+### Added
+
+- `docs/vault-ci/audit.yml` and `docs/vault-ci/README.md`: a workflow
+  template a vault repo can copy into `.github/workflows/` for a weekly
+  `check-lineage.py` + `rule-budget.py` audit, opening or updating a single
+  tracking issue with the findings.
+- `docs/vault-ci/guard.yml`: a workflow template running the vault commit
+  guard on every push — the one enforcement layer a local `--no-verify`
+  can't skip.
+- `guard-vault-commit.sh --range BASE..HEAD` / `--rev REV`: run the same
+  five checks (identity, path allowlist, size caps, enforced-note deletion,
+  conflict markers/secrets) against a commit diff instead of the staged
+  index, for use in CI where there's no staging area.
+- `make doctor` now also reports a skill installed in one configured skills
+  directory but missing from another, and a vendored submodule left at the
+  wrong commit or never initialized after a tag switch.
+
+### Changed
+
+- `check-lineage.py`'s "enforced by preference" thin-evidence exemption now
+  matches only the note's actual `**Observed in:**` line, not any mention of
+  that phrase anywhere in the note body.
+- The README's rollback instructions now also run
+  `git submodule update --init --recursive` and re-run `sync-skills.sh`,
+  since checking out a tag alone doesn't move a pinned submodule.
+- `.sbw-version`'s exemption from the usual provenance-marker check is now
+  named via a constant read by the code that relies on it, instead of an
+  implicit bare-string exception — no behavior change.
+
+### Fixed
+
+- `check-lineage.py` no longer silently skips the thin-evidence check (while
+  still exiting 0) when `promotion-candidates.md` is missing, reworded past
+  recognition, or states conflicting thresholds — now a loud, named error,
+  matching how every other missing-input case in this script already
+  behaves.
+
+## [0.1.0] - 2026-08-03
+
+Initial tagged release.
+
+### Added
+
+- `render.py`: renders one canonical `rules/*.md` + `AGENTS.md` source into
+  Cursor (`.cursor/rules/*.mdc`), Claude Code (`.claude/rules/*.md` +
+  `CLAUDE.md`), and plain `AGENTS.md` targets, with a provenance comment
+  naming the source commit and engine version, `--check`/`--dry-run` modes,
+  and a `.sbw-version` stamp so a target repo's own drift from the engine
+  is visible.
+- Second-brain vault scaffolding (`init-vault.sh`) and the
+  `update-second-brain`, `obsidian-knowledge-base`, `onboard-repo`, and
+  `check-follow-ups` skills — the capture and review loop the rest of the
+  engine is built around.
+- `guard-vault-commit.sh`: blocks a vault commit that writes outside the
+  allowed path set, deletes an `enforced` practice note, exceeds a size
+  cap, contains a conflict marker or a secret-shaped string, or targets a
+  vault whose identity doesn't match what the machine expects. Installed as
+  the vault's `pre-commit` hook by default, so a hand-run `git commit` is
+  guarded even with no agent involved.
+- `check-lineage.py`: cross-references rules against the practice notes
+  they were distilled from, reporting an unpromoted note, an orphaned rule,
+  a stale claim, or thin evidence against the vault's own promotion
+  threshold.
+- `rule-budget.py`: estimates the always-on rule set's per-turn token cost
+  per target, against a configurable ceiling.
+- `make doctor`: reports a vault whose commit-guard hook is missing or
+  isn't ours.
+- `VERSION` at the repo root, tagged releases (`v<VERSION>`), and the bump
+  policy and rollback instructions documented in this README's Versioning
+  section.
+
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dimeloper/second-brain-workflow/releases/tag/v0.1.0
