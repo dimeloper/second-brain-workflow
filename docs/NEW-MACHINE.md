@@ -27,9 +27,17 @@ target bash and the skills directories are POSIX paths.
 ### 1. Clone the engine
 
 ```bash
-git clone <engine-repo> ~/second-brain-workflow
+git clone --recurse-submodules \
+  git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
 cd ~/second-brain-workflow
-git submodule update --init      # vendored upstream skills
+```
+
+No SSH key set up yet (or a work machine you don't want to add one to)?
+Clone over HTTPS instead — read-only, no auth needed for a public repo:
+
+```bash
+git clone --recurse-submodules \
+  https://github.com/dimeloper/second-brain-workflow.git ~/second-brain-workflow
 ```
 
 If you are cloning someone else's engine onto a work machine, use a **read-only
