@@ -1,18 +1,28 @@
-# Weekly audit for a vault repo
+# CI for a vault repo
+
+Two independent templates, two different jobs. Neither runs anywhere until
+you copy it into your vault repo — the engine's own CI can't run either one
+itself, since CI here has no vault.
+
+- **`audit.yml`** — the review side (`check-lineage.py` + `rule-budget.py`),
+  weekly, reporting to a tracking issue. See [Audit](#audit-audityml) below.
+- **`guard.yml`** — the same checks `guard-vault-commit.sh` runs locally
+  before every commit, run again against every push — the one layer a local
+  `--no-verify` cannot skip. See [Guard](#guard-guardyml) below.
+
+Copy whichever (or both) you want into `.github/workflows/` in your vault
+repo, and adjust there — not here.
+
+## Audit (`audit.yml`)
 
 `check-lineage.py` and `rule-budget.py` are the review side of this system:
 does an `enforced` note actually have a rule, is that rule's evidence still
 real, is the always-on rule set still within budget. Both are read-only and
 both run fine locally — but a target you have to remember to run is a target
 that quietly stops getting run, which is exactly the problem the capture side
-(`update-second-brain`) doesn't have, since it's automated. The engine's own
-CI can't close that gap: CI here has no vault. A vault repo does, by
-definition — that's where this belongs.
+(`update-second-brain`) doesn't have, since it's automated.
 
-`audit.yml` is a template, not something this engine runs for you. Copy it
-into the vault repo you want audited and adjust it there.
-
-## Setup
+### Setup
 
 1. Copy `audit.yml` to `.github/workflows/audit.yml` in your vault repo.
 
@@ -76,7 +86,7 @@ into the vault repo you want audited and adjust it there.
    for the weekly schedule, so a configuration mistake shows up immediately
    instead of a week later.
 
-## What it does, and doesn't, fail the run for
+### What it does, and doesn't, fail the run for
 
 Only `check-lineage.py`'s own exit code decides whether the job goes red: `1`
 means an orphaned rule was found — a rule actively citing evidence that no
@@ -100,8 +110,65 @@ silently into the backlog would be exactly the kind of "green but
 misleading" result this script is built to avoid — see `check-lineage.py`'s
 own docstring for the reasoning.
 
-## Never automated
+### Never automated
 
 The human gate from `enforced` note to distilled rule stays human. This
 workflow reports and blocks (on orphaned rules only); it never creates,
 edits, or promotes a rule or a practice note on its own.
+
+## Guard (`guard.yml`)
+
+`guard-vault-commit.sh` is what `update-second-brain` and the vault's own
+`pre-commit` hook both run before a commit — the checks documented in the
+main README's "A vault per machine" section (path allowlist, size caps, no
+deleting an `enforced` note, conflict markers, secret-shaped strings, and
+the vault-identity check). Both of those run *before* a commit is made,
+which means both are skippable: `git commit --no-verify` skips the hook,
+and there is no equivalent to opt out of skipping — including for an agent
+that decides a failing check is a reasonable thing to route around.
+
+`guard.yml` runs the identical script — same flags, same checks — against
+the pushed commit range instead of a staged index, since there's no staging
+area once a push has already happened. This is the layer that can't be
+`--no-verify`'d away.
+
+### Setup
+
+1. Copy `guard.yml` to `.github/workflows/guard.yml` in your vault repo, and
+   set `ENGINE_REF` the same way as in `audit.yml`.
+
+2. Set the `EXPECTED_VAULT_ID` repository variable (Settings > Secrets and
+   variables > Actions > Variables) to this vault's id (whatever `--id` was
+   passed to `init-vault.sh`). **This must be a repository variable, not
+   read from `vault.json`** — the same non-circular trust model the local
+   guard uses: `vault.json` says what the vault *claims* to be, this
+   variable says what's *expected*, and the check only means something if
+   the two are independent. If you skip this, the guard does not silently
+   pass — `guard-vault-commit.sh` fails closed on an unconfigured
+   expectation, in CI exactly as it does locally.
+
+3. Run it once by pushing a trivial, allowed change (or use `git commit
+   --allow-empty`) to confirm it goes green before relying on it.
+
+Unlike `audit.yml`, `guard.yml` needs no rules directory and no third repo —
+every check it runs is vault-content-only.
+
+### Be honest about what this does and doesn't fix
+
+CI catches a bypass *after* the push, not before. For a private vault,
+that's containment, not prevention: by the time this workflow runs, whatever
+got committed already left the machine. If a real violation lands (a
+misdirected note, a leaked-looking credential), the fix is `git revert` at
+minimum, and — if the leak is real, not just a false-positive pattern match
+— rewriting history to actually remove it from every clone and rotating
+whatever credential was exposed. A green run before the push means the
+violation never happened; a red run after means it's caught, not undone.
+
+### Layering, end to end
+
+Three enforcement points, in increasing order of how hard they are to skip:
+the skill invocation (`update-second-brain` runs the guard before every
+commit it makes) is the fast path; the local `pre-commit` hook is the
+backstop for a hand-run `git commit`; `guard.yml` is push-time CI, the one
+that survives `--no-verify`. See the main README's "A vault per machine"
+section for the same three-layer summary in context.

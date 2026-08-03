@@ -219,20 +219,33 @@ isn't the one this machine expects, an `origin` that doesn't match the one
 recorded in `vault.json`, an implausibly large diff, deletion of an `enforced`
 note, conflict markers, and anything that looks like a credential.
 
-Two things run this exact script, and neither is a substitute for the other:
+Three things run this exact script, in increasing order of how hard they are
+to skip, and none is a substitute for another:
 
 - **The fast path.** `update-second-brain` runs it before every commit it
   makes — the common case, since that skill is the only write path for
   content.
-- **The backstop.** `init-vault.sh` installs it as this vault's `pre-commit`
-  hook by default, so a hand-run `git commit` inside the vault — no skill,
-  no agent, nobody remembering to invoke anything — is guarded too. It's
-  idempotent (`--no-hook` opts out; re-running never clobbers an existing
-  hook, ours or not) and derives its `--expect-id` the same way any other
-  invocation does, since a git hook has nothing vault-specific it could
+- **The local backstop.** `init-vault.sh` installs it as this vault's
+  `pre-commit` hook by default, so a hand-run `git commit` inside the vault —
+  no skill, no agent, nobody remembering to invoke anything — is guarded too.
+  It's idempotent (`--no-hook` opts out; re-running never clobbers an
+  existing hook, ours or not) and derives its `--expect-id` the same way any
+  other invocation does, since a git hook has nothing vault-specific it could
   trustworthily derive one from itself. `make doctor` reports a vault whose
   hook is missing or isn't ours, so an unguarded machine is visible rather
   than silently exposed.
+- **The one that can't be skipped.** `git commit --no-verify` skips the
+  pre-commit hook — including by an agent that decides a failing check is a
+  reasonable thing to route around — and GitHub offers no pre-receive hook
+  outside Enterprise. `--range`/`--rev` let this same script check a pushed
+  commit range instead of a staged index (there's no staging area once a
+  push has already happened), so `docs/vault-ci/guard.yml` can run it in CI
+  on every push. **Be honest about what this does and doesn't fix:** CI
+  catches a bypass *after* the push, not before — for a private vault that's
+  containment, not prevention. The fix at that point is `git revert`, plus
+  history rewriting and a rotated credential if whatever leaked was real, not
+  an assumption that a red X means nothing happened. See
+  `docs/vault-ci/README.md` for setup and this same caveat in more detail.
 
 **Trust model:** the expected id is a property of the *machine*, resolved from
 `--expect-id` > `SBW_EXPECTED_VAULT_ID` env > the machine config file — never

@@ -152,4 +152,133 @@ else
   fail "missing vault.json is reported" "${out}"
 fi
 
+# --- --range/--rev: same checks, no staging area ----------------------------
+# A separate, fresh vault: the tests above interleave staged/committed state
+# in ways that don't map cleanly onto "diff this commit against that one," so
+# this fixture builds its own linear commit history instead.
+RVAULT="${SANDBOX}/range-vault"
+"${INIT}" --path "${RVAULT}" --id work --remote "git@example.com:me/work-brain.git" --no-hook >/dev/null 2>&1
+git -C "${RVAULT}" add -A >/dev/null 2>&1
+git -C "${RVAULT}" -c user.email=t@t -c user.name=t commit -qm "init" >/dev/null 2>&1
+C0="$(git -C "${RVAULT}" rev-parse HEAD)"
+
+commit_in() {
+  git -C "${RVAULT}" add -A >/dev/null 2>&1
+  git -C "${RVAULT}" -c user.email=t@t -c user.name=t commit -qm "$1" >/dev/null 2>&1
+  git -C "${RVAULT}" rev-parse HEAD
+}
+
+# A normal, allowed note — should pass both --range and --rev.
+cat > "${RVAULT}/practices/backend/a-practice.md" <<'EOF'
+---
+domain: backend
+applies-to: ""
+maturity: idea
+last-reviewed: 2026-08-02
+repos: ["fixture"]
+tags: [x]
+---
+
+# A practice
+
+**Rule:** Something reusable.
+EOF
+C1="$(commit_in "a note")"
+
+"${GUARD}" --vault "${RVAULT}" --expect-id work --range "${C0}..${C1}" >/dev/null 2>&1
+assert_exit 0 $? "--range passes a normal note commit"
+"${GUARD}" --vault "${RVAULT}" --expect-id work --rev "${C1}" >/dev/null 2>&1
+assert_exit 0 $? "--rev passes a normal note commit"
+
+# A commit with a path outside the allowlist.
+mkdir -p "${RVAULT}/somewhere"
+echo "stray" > "${RVAULT}/somewhere/file.md"
+C2="$(commit_in "stray file")"
+
+out="$("${GUARD}" --vault "${RVAULT}" --expect-id work --range "${C1}..${C2}" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "--range blocks a path outside the allowed set"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"path outside the vault's allowed set"*"somewhere/file.md"*) pass "--range names the offending path" ;;
+  *) fail "--range names the offending path" "${out}" ;;
+esac
+"${GUARD}" --vault "${RVAULT}" --expect-id work --rev "${C2}" >/dev/null 2>&1
+assert_exit 1 $? "--rev blocks the same commit checked on its own"
+
+# Undo the stray file so later range/rev tests aren't tripped by it.
+git -C "${RVAULT}" rm -rq "somewhere" >/dev/null 2>&1
+commit_in "remove stray file" >/dev/null
+
+# Deleting an enforced note, checked as a range and as a single rev — PRE_REF
+# must resolve to the commit *before* the deletion (the range's BASE / the
+# rev's parent), not to the tip, or the note's own last content would never
+# be seen as "was enforced."
+cat > "${RVAULT}/practices/backend/enforced-note.md" <<'EOF'
+---
+domain: backend
+applies-to: "**/*.ts"
+maturity: enforced
+last-reviewed: 2026-08-02
+repos: ["a", "b", "c"]
+tags: [x]
+---
+
+# An enforced note
+
+**Rule:** Load-bearing.
+EOF
+C3="$(commit_in "add enforced note")"
+git -C "${RVAULT}" rm -q "practices/backend/enforced-note.md" >/dev/null 2>&1
+C4="$(commit_in "delete enforced note")"
+
+out="$("${GUARD}" --vault "${RVAULT}" --expect-id work --range "${C3}..${C4}" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "--range blocks deleting an enforced note"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"deleting an enforced practice note"*) pass "--range names the deleted enforced note" ;;
+  *) fail "--range names the deleted enforced note" "${out}" ;;
+esac
+"${GUARD}" --vault "${RVAULT}" --expect-id work --rev "${C4}" >/dev/null 2>&1
+assert_exit 1 $? "--rev blocks the same single-commit deletion"
+
+# --- --range/--rev: argument handling ---------------------------------------
+"${GUARD}" --vault "${RVAULT}" --range "${C0}" --rev "${C1}" >/dev/null 2>&1
+assert_exit 1 $? "--range and --rev together is rejected"
+
+out="$("${GUARD}" --vault "${RVAULT}" --range "not-a-range" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "a --range with no '..' is rejected"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"--range needs BASE..HEAD"*) pass "names the malformed --range value" ;;
+  *) fail "names the malformed --range value" "${out}" ;;
+esac
+
+out="$("${GUARD}" --vault "${RVAULT}" --range "${C0}..not-a-real-rev" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "a --range with an unresolvable rev is rejected"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"not a commit or tree in"*"not-a-real-rev"*) pass "names the unresolvable rev" ;;
+  *) fail "names the unresolvable rev" "${out}" ;;
+esac
+
+# The empty tree as BASE — a vault repo's first push, where there is no
+# prior commit at all (see docs/vault-ci/guard.yml's handling of
+# github.event.before == the all-zero SHA).
+EMPTY_TREE="$(git -C "${RVAULT}" hash-object -t tree /dev/null)"
+"${GUARD}" --vault "${RVAULT}" --expect-id work --range "${EMPTY_TREE}..${C1}" >/dev/null 2>&1
+assert_exit 0 $? "the empty tree works as BASE for a first-push range"
+
+out="$("${GUARD}" --vault "${RVAULT}" --expect-id work --range "${C0}..${C0}" 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "--range with no actual changes exits 0"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no changes in"*) pass "names it as no changes in range, not nothing staged" ;;
+  *) fail "names it as no changes in range, not nothing staged" "${out}" ;;
+esac
+
 finish

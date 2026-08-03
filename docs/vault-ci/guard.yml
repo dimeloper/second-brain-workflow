@@ -1,0 +1,76 @@
+name: second-brain-workflow vault guard
+
+# Copy this file to .github/workflows/guard.yml in your VAULT repo (not the
+# engine repo). Runs the exact same checks as the local pre-commit hook
+# (guard-vault-commit.sh), against the pushed commit range instead of a
+# staged index — there is no staging area to inspect once a push has
+# already happened. This is the one enforcement point a `--no-verify`
+# commit cannot skip, including one an agent chose deliberately because a
+# local check was in its way. See docs/vault-ci/README.md for how this,
+# audit.yml, and the local hook fit together, and the residual gap even
+# this doesn't close.
+#
+# Unlike audit.yml, this fails the run on ANY violation — a guard
+# violation is a real problem to stop on, not a backlog item.
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+env:
+  ENGINE_REPO: dimeloper/second-brain-workflow
+  ENGINE_REF: v0.1.0
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this vault
+        uses: actions/checkout@v4
+        with:
+          path: vault
+          fetch-depth: 0   # need the pre-push commit, not just the new tip
+
+      - name: Check out the engine
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ENGINE_REPO }}
+          ref: ${{ env.ENGINE_REF }}
+          path: engine
+
+      # github.event.before is the all-zero SHA on a branch's first push, and
+      # can point at a commit this checkout no longer has after a
+      # history-rewriting force-push. Either way there's no real "before" to
+      # diff against, so diff from the empty tree instead of guessing at a
+      # substitute — same as everything in the new range being newly added,
+      # which is the correct read for "first contact with this content."
+      - name: Resolve the pushed range
+        id: range
+        run: |
+          before="${{ github.event.before }}"
+          if [ "${before}" = "0000000000000000000000000000000000000000" ] \
+             || ! git -C vault cat-file -e "${before}^{commit}" 2>/dev/null; then
+            base="$(git -C vault hash-object -t tree /dev/null)"
+          else
+            base="${before}"
+          fi
+          echo "base=${base}" >> "${GITHUB_OUTPUT}"
+
+      # The expected vault id comes from THIS repo's variable, never from
+      # vault.json — the same non-circular trust model as the local guard
+      # (see guard-vault-commit.sh's own comment on EXPECT_ID, and the
+      # engine README's "A vault per machine" section: a repointed or
+      # freshly cloned vault must not be able to bring its own "correct"
+      # answer along with it). Configure once: Settings > Secrets and
+      # variables > Actions > Variables > EXPECTED_VAULT_ID. Leaving it
+      # unset does not disable the check — guard-vault-commit.sh fails
+      # closed on an unconfigured expectation, here exactly as it does
+      # locally.
+      - name: Run the guard
+        run: |
+          engine/scripts/guard-vault-commit.sh \
+            --vault vault \
+            --expect-id "${{ vars.EXPECTED_VAULT_ID }}" \
+            --range "${{ steps.range.outputs.base }}..${{ github.sha }}"

@@ -2,10 +2,18 @@
 # Refuse a vault commit that looks like it is going to the wrong place.
 #
 #   ./guard-vault-commit.sh [--vault PATH] [--expect-id ID]
+#   ./guard-vault-commit.sh [--vault PATH] [--expect-id ID] --range BASE..HEAD
+#   ./guard-vault-commit.sh [--vault PATH] [--expect-id ID] --rev REV
 #
-# Run against a vault with changes staged; exits non-zero with a reason if any
-# check fails. `update-second-brain` runs it before committing, and it works as
-# a pre-commit hook inside a vault.
+# Default mode checks the staged index; run against a vault with changes
+# staged, exits non-zero with a reason if any check fails. `update-second-brain`
+# runs it before committing, and it works as a pre-commit hook inside a vault.
+#
+# --range/--rev check a commit diff instead — there is no staging area to
+# inspect once a push has already happened, which is exactly the case a
+# `--no-verify` past the pre-commit hook leaves CI to catch. --range takes two
+# revs (`git diff BASE..HEAD`); --rev checks a single commit against its
+# parent (`REV^..REV`). Same checks either way, just a different diff source.
 #
 # The boundary between a personal and a work second brain is the *vault*, not
 # the rule set. Rules flow outward freely — your own conventions applied to an
@@ -29,23 +37,65 @@ VAULT="${SBW_VAULT}"
 # config (both already resolved by ds_config_load) > empty. Never the vault
 # under inspection itself — see the trust-model note in README.md.
 EXPECT_ID="${SBW_EXPECTED_VAULT_ID}"
+RANGE=""
+REV=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --vault) VAULT="${2:?--vault needs a value}"; shift 2 ;;
     --expect-id) EXPECT_ID="${2:?--expect-id needs a value}"; shift 2 ;;
-    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --range) RANGE="${2:?--range needs a BASE..HEAD value}"; shift 2 ;;
+    --rev) REV="${2:?--rev needs a value}"; shift 2 ;;
+    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
 fail() { echo "guard: $1" >&2; exit 1; }
 
+[ -z "${RANGE}" ] || [ -z "${REV}" ] || fail "--range and --rev are mutually exclusive"
+
 [ -d "${VAULT}" ] || fail "vault not found: ${VAULT}"
 [ -d "${VAULT}/.git" ] || fail "not a git repo: ${VAULT}"
 
-staged="$(git -C "${VAULT}" diff --cached --name-only)"
-[ -n "${staged}" ] || { echo "guard: nothing staged — nothing to check."; exit 0; }
+# --- diff source: the staged index, or a commit range/single rev -----------
+# Every check below reads through diff_paths()/diff_body()/PRE_REF rather than
+# calling `git diff --cached` directly, so the same five checks run
+# unchanged regardless of where the diff comes from.
+if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
+  if [ -n "${REV}" ]; then
+    BASE="${REV}^"
+    NEW="${REV}"
+  else
+    case "${RANGE}" in
+      *..*) BASE="${RANGE%%..*}"; NEW="${RANGE#*..}" ;;
+      *) fail "--range needs BASE..HEAD, got: ${RANGE}" ;;
+    esac
+  fi
+  # ^{tree}, not ^{commit}: BASE in particular is legitimately the empty
+  # tree (4b825dc6...) rather than a real commit on a vault repo's first
+  # push, where there is no prior commit to diff against — `git diff` and
+  # `git show <ref>:<path>` both work the same against a bare tree as
+  # against a commit, so accepting either here is not a weaker check.
+  git -C "${VAULT}" rev-parse --verify --quiet "${BASE}^{tree}" >/dev/null \
+    || fail "--range/--rev: not a commit or tree in ${VAULT}: ${BASE}"
+  git -C "${VAULT}" rev-parse --verify --quiet "${NEW}^{tree}" >/dev/null \
+    || fail "--range/--rev: not a commit or tree in ${VAULT}: ${NEW}"
+  PRE_REF="${BASE}"
+  diff_paths() { git -C "${VAULT}" diff "${BASE}" "${NEW}" --name-only "$@"; }
+  diff_numstat() { git -C "${VAULT}" diff "${BASE}" "${NEW}" --numstat; }
+  diff_body() { git -C "${VAULT}" diff "${BASE}" "${NEW}"; }
+  nothing_msg="no changes in ${BASE}..${NEW} — nothing to check."
+else
+  PRE_REF="HEAD"
+  diff_paths() { git -C "${VAULT}" diff --cached --name-only "$@"; }
+  diff_numstat() { git -C "${VAULT}" diff --cached --numstat; }
+  diff_body() { git -C "${VAULT}" diff --cached; }
+  nothing_msg="nothing staged — nothing to check."
+fi
+
+staged="$(diff_paths)"
+[ -n "${staged}" ] || { echo "guard: ${nothing_msg}"; exit 0; }
 
 # --- 1. vault identity -------------------------------------------------------
 # Catches the case that matters: a session configured for one vault committing
@@ -90,17 +140,21 @@ EOF
 
 # --- 3. size caps ------------------------------------------------------------
 n_files="$(printf '%s\n' "${staged}" | grep -c . || true)"
-n_lines="$(git -C "${VAULT}" diff --cached --numstat | awk '{a+=$1; d+=$2} END {print a+d+0}')"
+n_lines="$(diff_numstat | awk '{a+=$1; d+=$2} END {print a+d+0}')"
 [ "${n_files}" -le "${MAX_FILES}" ] || \
   fail "${n_files} files staged, cap is ${MAX_FILES} (GUARD_MAX_FILES to override)"
 [ "${n_lines}" -le "${MAX_LINES}" ] || \
   fail "${n_lines} changed lines staged, cap is ${MAX_LINES} (GUARD_MAX_LINES to override)"
 
 # --- 4. no enforced note deleted --------------------------------------------
-deleted="$(git -C "${VAULT}" diff --cached --diff-filter=D --name-only -- 'practices/*')"
+# PRE_REF is HEAD in staged mode (the last commit, before the staged
+# deletion) or the range's BASE in --range/--rev mode (the state before the
+# range's changes) — same question either way: did this diff delete a note
+# that was enforced right before it.
+deleted="$(diff_paths --diff-filter=D -- 'practices/*')"
 while IFS= read -r f; do
   [ -n "${f}" ] || continue
-  if git -C "${VAULT}" show "HEAD:${f}" 2>/dev/null | grep -q '^maturity: enforced'; then
+  if git -C "${VAULT}" show "${PRE_REF}:${f}" 2>/dev/null | grep -q '^maturity: enforced'; then
     fail "deleting an enforced practice note: ${f}
        Demote it to trialing with a recorded counterexample instead."
   fi
@@ -109,12 +163,12 @@ ${deleted}
 EOF
 
 # --- 5. conflict markers and secrets ----------------------------------------
-diff_body="$(git -C "${VAULT}" diff --cached)"
-if printf '%s' "${diff_body}" | grep -qE '^\+(<<<<<<< |>>>>>>> |=======$)'; then
-  fail "conflict markers in the staged diff"
+body="$(diff_body)"
+if printf '%s' "${body}" | grep -qE '^\+(<<<<<<< |>>>>>>> |=======$)'; then
+  fail "conflict markers in the diff"
 fi
-if printf '%s' "${diff_body}" | grep -qE '^\+.*(ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY)'; then
-  fail "the staged diff looks like it contains a credential"
+if printf '%s' "${body}" | grep -qE '^\+.*(ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY)'; then
+  fail "the diff looks like it contains a credential"
 fi
 
 echo "guard: ok — ${n_files} file(s), ${n_lines} line(s), vault '${vid:-unchecked}'"
