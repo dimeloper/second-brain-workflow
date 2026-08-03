@@ -20,7 +20,7 @@ clearly owns.
 - Standards (source of truth): `~/second-brain-workflow`
 - Rules sync: `~/second-brain-workflow/scripts/sync-rules.sh`
 - Skills sync: `~/second-brain-workflow/scripts/sync-skills.sh`
-- Skills source: `~/second-brain-workflow/cursor-skills/{workflow,...}/`
+- Skills source: `~/second-brain-workflow/skills/{workflow,...}/`
 - Vault practices: `$SBW_VAULT/practices/` (default `~/vaults/second-brain`)
 - Knowledge skill (after sync): the `obsidian-knowledge-base` skill
 - MCP skill (after sync): the `mcp-per-project` skill

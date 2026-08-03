@@ -14,7 +14,7 @@
 set -euo pipefail
 
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_SRC="${STANDARDS_DIR}/cursor-skills"
+SKILLS_SRC="${STANDARDS_DIR}/skills"
 
 # shellcheck source=scripts/lib/config.sh
 . "${STANDARDS_DIR}/scripts/lib/config.sh"

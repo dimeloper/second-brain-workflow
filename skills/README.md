@@ -29,7 +29,7 @@ Add a category only when a clear domain appears. Prefer extending `workflow/`.
 ## Layout
 
 ```
-cursor-skills/
+skills/
   <category>/
     <skill-name>/
       SKILL.md          # required

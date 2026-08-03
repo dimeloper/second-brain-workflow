@@ -212,7 +212,7 @@ a rule.
 
 ## Skills
 
-Local skills live under `cursor-skills/` (categorized). Upstream skills are
+Local skills live under `skills/` (categorized). Upstream skills are
 vendored as a pinned submodule and installed by allowlist:
 
 ```bash
@@ -222,11 +222,11 @@ git submodule update --init      # first clone only
 
 | Source | Contents |
 |--------|----------|
-| `cursor-skills/workflow/` | Onboard, vault read/write, follow-up review, per-project MCP |
+| `skills/workflow/` | Onboard, vault read/write, follow-up review, per-project MCP |
 | `vendor/obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (MIT) — `obsidian-bases`, `obsidian-markdown` |
 
 Skills published by a vendor are installed from that vendor, not copied here —
-see `cursor-skills/README.md`.
+see `skills/README.md`.
 
 **Manual step, per machine.** Railway's installer writes `use-railway` into
 `~/.claude/skills/` only. To reach it from Cursor as well:

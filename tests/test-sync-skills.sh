@@ -63,7 +63,7 @@ fi
 
 # --- pruning ----------------------------------------------------------------
 # Only links back into this repo that no longer resolve to a skill.
-ln -sfn "${ENGINE}/cursor-skills/workflow/removed-skill" "${A}/removed-skill"
+ln -sfn "${ENGINE}/skills/workflow/removed-skill" "${A}/removed-skill"
 "${SYNC}" >/dev/null 2>&1
 assert_no_file "${A}/removed-skill" "prunes our own dangling link"
 assert_symlink "${A}/foreign-skill" "never prunes a foreign link"
