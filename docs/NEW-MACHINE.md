@@ -83,9 +83,10 @@ or a symlink owned by another tool; it reports those and exits non-zero.
   --remote git@github.com:<account>/<repo>.git
 ```
 
-`--id` is checked on every commit by the guard, so make it meaningful
-(`personal`, `work`). The remote is recorded but **not** pushed to — create the
-repo yourself, private, first.
+`--id` is what the guard checks *against* on every commit — see step 5 for
+telling this machine what to expect — so make it meaningful (`personal`,
+`work`). The remote is recorded but **not** pushed to — create the repo
+yourself, private, first.
 
 The vault starts with no domain practice notes. It does get four cross-cutting
 notes describing how the vault itself operates, because `update-second-brain`
@@ -102,10 +103,17 @@ SBW_VAULT=~/vaults/<name>
 RENDER_TARGETS=claude-code,agents     # or cursor,agents — or all three
 SKILLS_DIRS=~/.claude/skills          # narrow it if only one agent is installed
 SBW_RULES_DIR=~/dev-conventions/rules   # only if rules live in a separate repo
+SBW_EXPECTED_VAULT_ID=<id>              # must match --id from step 4
 ```
 
 See `config.example` for every key. Precedence is CLI flag > environment > this
 file > defaults.
+
+`SBW_EXPECTED_VAULT_ID` is what makes the commit guard non-circular: it's read
+from *this machine's* config, never from the vault's own `vault.json` — so a
+repointed or freshly cloned vault can't bring its own "correct" answer along
+with it. Without it (and without `--expect-id`), the guard now fails closed
+rather than silently skipping the check.
 
 ### 6. Prove it works here
 

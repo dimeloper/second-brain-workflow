@@ -6,7 +6,7 @@
 
 Precedence: existing environment wins over the config file, which wins over
 defaults. CLI flags are the caller's job — apply them on top of load().
-Keep in step with lib/config.sh; both implement the same five keys.
+Keep in step with lib/config.sh; both implement the same six keys.
 """
 
 import os
@@ -19,6 +19,10 @@ DEFAULTS = {
     "VENDOR_SKILLS": "obsidian-bases obsidian-markdown",
     # Empty means "not overridden" — render.py falls back to ENGINE/rules.
     "SBW_RULES_DIR": "",
+    # Empty by design, not a fallback — no shell consumer reads this key yet
+    # (guard-vault-commit.sh / init-vault.sh are bash), but it's tracked here
+    # too so the two config implementations never define different key sets.
+    "SBW_EXPECTED_VAULT_ID": "",
 }
 
 

@@ -201,12 +201,30 @@ checked:
 ./scripts/guard-vault-commit.sh --expect-id work
 ```
 
+or, so it doesn't need the flag every time, set once per machine in
+`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config`:
+
+```
+SBW_EXPECTED_VAULT_ID=work
+```
+
 It blocks a staged path outside the vault's allowed set, a `vault.json` id that
 isn't the one this machine expects, an `origin` that doesn't match the one
 recorded in `vault.json`, an implausibly large diff, deletion of an `enforced`
 note, conflict markers, and anything that looks like a credential.
 `update-second-brain` runs it before committing; it also works as a pre-commit
 hook inside a vault.
+
+**Trust model:** the expected id is a property of the *machine*, resolved from
+`--expect-id` > `SBW_EXPECTED_VAULT_ID` env > the machine config file — never
+from `vault.json` in the vault being checked. If it came from the vault
+itself, a repointed or freshly cloned vault would bring its own "correct"
+answer along with it, and the check would prove nothing. `vault.json` says
+what the vault *claims* to be; the machine config says what this machine
+*expects*; the guard's job is only to confirm the two agree. An adopter
+wiring this up must set `SBW_EXPECTED_VAULT_ID` (or pass `--expect-id`)
+independently of anything in the vault directory itself — if neither
+resolves, the guard fails closed rather than silently skipping the check.
 
 This is why there is no layer system. The thing that needed isolating was the
 vault, and a per-commit identity check does that directly.

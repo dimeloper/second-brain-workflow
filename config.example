@@ -37,3 +37,13 @@ VENDOR_SKILLS=obsidian-bases obsidian-markdown
 # engine checkout.
 # Default: <this engine checkout>/rules
 SBW_RULES_DIR=
+
+# The vault.json id this machine expects to find when guard-vault-commit.sh
+# runs. This is what makes the guard's identity check non-circular: the
+# expectation lives here, on the machine, not in vault.json itself — a
+# repointed or freshly cloned vault brings its own vault.json along with it,
+# so trusting that file to also say what's "correct" would prove nothing.
+# No default — guard-vault-commit.sh fails closed (refuses to commit) if this
+# is unset and neither --expect-id nor this key resolves to a value. Set it
+# once per vault this machine writes to, e.g. "personal" or "work".
+SBW_EXPECTED_VAULT_ID=

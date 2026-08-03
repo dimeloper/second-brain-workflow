@@ -7,9 +7,9 @@
 #
 # Precedence: existing environment wins over the config file, which wins over
 # defaults. CLI flags are the caller's job — parse them after loading.
-# Keep in step with lib/config.py; both implement the same five keys.
+# Keep in step with lib/config.py; both implement the same six keys.
 
-SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR"
+SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID"
 
 ds_config_path() {
   local base="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -62,5 +62,9 @@ ds_config_load() {
   [ -n "${SKILLS_DIRS+set}" ]         || SKILLS_DIRS="$HOME/.cursor/skills:$HOME/.claude/skills"
   [ -n "${VENDOR_SKILLS+set}" ]       || VENDOR_SKILLS="obsidian-bases obsidian-markdown"
   [ -n "${SBW_RULES_DIR+set}" ] || SBW_RULES_DIR=""
-  export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR
+  # Empty by design — there is no sensible default "expected id". A guard
+  # that fell back to something here would defeat the point of it; unset
+  # means "not configured yet," and callers that care must fail closed on it.
+  [ -n "${SBW_EXPECTED_VAULT_ID+set}" ] || SBW_EXPECTED_VAULT_ID=""
+  export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID
 }

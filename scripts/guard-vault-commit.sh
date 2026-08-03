@@ -25,7 +25,10 @@ ds_config_load
 MAX_FILES="${GUARD_MAX_FILES:-20}"
 MAX_LINES="${GUARD_MAX_LINES:-2000}"
 VAULT="${SBW_VAULT}"
-EXPECT_ID=""
+# Precedence: --expect-id flag (below) > SBW_EXPECTED_VAULT_ID env > machine
+# config (both already resolved by ds_config_load) > empty. Never the vault
+# under inspection itself — see the trust-model note in README.md.
+EXPECT_ID="${SBW_EXPECTED_VAULT_ID}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,6 +52,18 @@ staged="$(git -C "${VAULT}" diff --cached --name-only)"
 # into another, or a clone repointed at someone else's remote. Shared with
 # init-vault.sh's --adopt check via scripts/lib/vault-identity.sh — one
 # implementation of "does this vault match what was expected."
+#
+# An unconfigured expectation is not "nothing to check" — it is exactly the
+# state that would make the check circular if we let vault.json's own id
+# stand in for it. Fail closed instead: a vault.json to check against, with
+# no configured expectation to check it against, blocks the commit.
+if [ -f "${VAULT}/vault.json" ] && [ -z "${EXPECT_ID}" ]; then
+  fail "no expected vault id configured for this machine.
+       Set SBW_EXPECTED_VAULT_ID in \$XDG_CONFIG_HOME/second-brain-workflow/config
+       (see config.example), or pass --expect-id explicitly. Refusing to
+       guess which vault this machine expects."
+fi
+
 if vault_identity_check "${VAULT}" "${EXPECT_ID}"; then
   vid="${VI_ID}"
 else
