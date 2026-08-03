@@ -1,8 +1,12 @@
 # second-brain-workflow
 
+**Second brain workflow for developers.**
+
 Turn your coding sessions into a growing, queryable knowledge base — instead
 of insights evaporating at the end of a chat, or piling up in one rules file
 no one re-reads.
+
+![Without a second brain, each session's insight is forgotten and mistakes repeat. With second-brain-workflow, sessions produce practice notes that mature from idea to trialing to enforced and compound over time.](docs/impact.svg)
 
 Say **"update second brain"** at the end of a session and an agent skill
 mines what happened — a bug fixed, a design decision made, a pattern that

@@ -1,0 +1,67 @@
+<svg viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Without capture, each session's insight is forgotten and mistakes repeat. With second-brain-workflow, sessions produce practice notes that mature from idea to trialing to enforced and compound over time.</title>
+
+  <rect x="1" y="1" width="898" height="458" rx="16" fill="#f6f8fa" stroke="#d0d7de" stroke-width="2"/>
+
+  <defs>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#a4262c"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a7f37"/>
+    </marker>
+  </defs>
+
+  <!-- divider -->
+  <line x1="450" y1="44" x2="450" y2="424" stroke="#d0d7de" stroke-width="1" stroke-dasharray="5,5"/>
+
+  <!-- headers -->
+  <text x="225" y="38" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.5" fill="#a4262c">WITHOUT A SECOND BRAIN</text>
+  <text x="675" y="38" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="0.5" fill="#1a7f37">WITH SECOND-BRAIN-WORKFLOW</text>
+
+  <!-- row 1 -->
+  <rect x="40" y="80" width="112" height="42" rx="8" fill="#ffffff" stroke="#a4262c" stroke-width="1.5"/>
+  <text x="96" y="106" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Session 1</text>
+  <line x1="156" y1="101" x2="222" y2="101" stroke="#a4262c" stroke-width="2" marker-end="url(#arrow-red)"/>
+  <circle cx="238" cy="101" r="9" fill="none" stroke="#a4262c" stroke-width="2"/>
+  <text x="238" y="106" text-anchor="middle" font-size="11" fill="#a4262c">✕</text>
+  <text x="256" y="106" font-size="13" fill="#a4262c">forgotten</text>
+
+  <rect x="490" y="80" width="112" height="42" rx="8" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5"/>
+  <text x="546" y="106" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Session 1</text>
+  <line x1="606" y1="101" x2="672" y2="101" stroke="#1a7f37" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <circle cx="690" cy="101" r="5" fill="#8c8c8c"/>
+  <text x="702" y="106" font-size="13" fill="#1a7f37">3 practice notes (idea)</text>
+
+  <!-- row 2 -->
+  <rect x="40" y="200" width="112" height="42" rx="8" fill="#ffffff" stroke="#a4262c" stroke-width="1.5"/>
+  <text x="96" y="226" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Session 2</text>
+  <line x1="156" y1="221" x2="222" y2="221" stroke="#a4262c" stroke-width="2" marker-end="url(#arrow-red)"/>
+  <circle cx="238" cy="221" r="9" fill="none" stroke="#a4262c" stroke-width="2"/>
+  <text x="238" y="226" text-anchor="middle" font-size="11" fill="#a4262c">✕</text>
+  <text x="256" y="226" font-size="13" fill="#a4262c">forgotten</text>
+
+  <rect x="490" y="200" width="112" height="42" rx="8" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5"/>
+  <text x="546" y="226" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Session 2</text>
+  <line x1="606" y1="221" x2="672" y2="221" stroke="#1a7f37" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <circle cx="690" cy="221" r="5" fill="#b08800"/>
+  <text x="702" y="226" font-size="13" fill="#1a7f37">reads notes, adds 2 more</text>
+
+  <!-- row 3 -->
+  <rect x="40" y="320" width="112" height="42" rx="8" fill="#ffffff" stroke="#a4262c" stroke-width="1.5"/>
+  <text x="96" y="346" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Session 3</text>
+  <line x1="156" y1="341" x2="222" y2="341" stroke="#a4262c" stroke-width="2" marker-end="url(#arrow-red)"/>
+  <circle cx="238" cy="341" r="9" fill="none" stroke="#a4262c" stroke-width="2"/>
+  <text x="238" y="346" text-anchor="middle" font-size="11" fill="#a4262c">✕</text>
+  <text x="256" y="346" font-size="13" fill="#a4262c">same bug again</text>
+
+  <rect x="490" y="320" width="112" height="42" rx="8" fill="#ffffff" stroke="#1a7f37" stroke-width="1.5"/>
+  <text x="546" y="346" text-anchor="middle" font-size="14" font-weight="600" fill="#24292f">Session 3</text>
+  <line x1="606" y1="341" x2="672" y2="341" stroke="#1a7f37" stroke-width="2" marker-end="url(#arrow-green)"/>
+  <circle cx="690" cy="341" r="5" fill="#1a7f37"/>
+  <text x="702" y="346" font-size="13" fill="#1a7f37">promotes 1 to enforced</text>
+
+  <!-- captions -->
+  <text x="225" y="404" text-anchor="middle" font-size="13" font-style="italic" fill="#57606a">...repeats forever</text>
+  <text x="675" y="404" text-anchor="middle" font-size="13" font-style="italic" fill="#1a7f37">...knowledge compounds</text>
+</svg>
