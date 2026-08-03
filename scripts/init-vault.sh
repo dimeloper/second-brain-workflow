@@ -124,6 +124,12 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
      Everything below stays ONE section for the whole day — append to it,
      don't repeat the header. -->
 
+## Follow-ups
+- [ ]
+
+<!-- Open items you'd otherwise forget by next week. `- [ ]` pending,
+     `- [x]` done — check-follow-ups reads these, nothing else. -->
+
 ## Practices followed
 -
 

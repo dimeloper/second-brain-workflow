@@ -26,6 +26,9 @@ points at.
 - **`obsidian-knowledge-base`** — read-only: finds and scores notes against
   the work at hand, so the agent applies what you've already learned instead
   of re-deriving it every session.
+- **`check-follow-ups`** — read-only: scans recent daily notes' `Follow-ups`
+  sections and reports what's still open, looking back far enough to bridge
+  a weekend gap.
 - **One rule set, every agent** — write short imperative rules once
   (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
   `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
@@ -146,7 +149,7 @@ git submodule update --init      # first clone only
 
 | Source | Contents |
 |--------|----------|
-| `cursor-skills/workflow/` | Onboard, vault read/write, per-project MCP |
+| `cursor-skills/workflow/` | Onboard, vault read/write, follow-up review, per-project MCP |
 | `vendor/obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (MIT) — `obsidian-bases`, `obsidian-markdown` |
 
 Skills published by a vendor are installed from that vendor, not copied here —
