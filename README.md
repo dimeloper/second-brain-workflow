@@ -247,6 +247,30 @@ distills it into a rule under `rules/` (in whichever repo `SBW_RULES_DIR`
 resolves to), then repos re-sync. Tooling reports; it never promotes a note to
 a rule.
 
+Record that lineage: add `source: <note-slug>` to the rule's frontmatter,
+naming the note it was distilled from (the same slug every `[[wikilink]]` in
+the vault already uses). Nothing renders it — `source:` never reaches
+`.mdc`/`.claude/rules/*.md` output — it exists purely so the capture side
+(automated) and the review side (otherwise entirely manual) can be
+cross-checked:
+
+```bash
+./scripts/check-lineage.py --vault ~/vaults/second-brain   # or: make audit
+```
+
+Reports, read-only, never writes: an **unpromoted note** (`enforced`, no rule
+traces back to it), an **orphaned rule** (its source note is gone or demoted
+below `enforced`), a **stale claim** (`enforced`, unreviewed past
+`--stale-months`, default 6 — the same 180-day window `review-queue.md` uses
+for a different purpose), and **thin evidence** (`enforced` with fewer repos
+than the vault's own idea→trialing→enforced bar, read from
+`00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
+number). Exits 1 only for orphaned rules — that's the one finding that means
+a rule is actively citing evidence that no longer exists; everything else is
+a visible backlog, not a block. Like `guard` and `vault-index-check`, `make
+audit` needs a real vault and rules directory, so it isn't part of `make
+check` — CI runs `check-lineage.py`'s own tests against fixtures instead.
+
 ## Skills
 
 Local skills live under `skills/` (categorized). Upstream skills are

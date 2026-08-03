@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
+from lib.frontmatter import parse_frontmatter  # noqa: E402
 
 GENERATED_BY = "scripts/build-vault-index.py"
 RULE_MAX = 140
@@ -34,73 +35,6 @@ def resolve_vault(explicit):
         return Path(explicit).expanduser()
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
     return Path(cfg["SBW_VAULT"]).expanduser()
-
-
-def strip_comment(value):
-    """Drop a trailing YAML comment, respecting quotes."""
-    out, quote = [], None
-    for i, ch in enumerate(value):
-        if quote:
-            out.append(ch)
-            if ch == quote:
-                quote = None
-        elif ch in "\"'":
-            quote = ch
-            out.append(ch)
-        elif ch == "#" and (i == 0 or value[i - 1].isspace()):
-            break
-        else:
-            out.append(ch)
-    return "".join(out).strip()
-
-
-def unquote(value):
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-        return value[1:-1]
-    return value
-
-
-def parse_list(value):
-    inner = value.strip()
-    if inner.startswith("[") and inner.endswith("]"):
-        inner = inner[1:-1]
-    return [unquote(p.strip()) for p in inner.split(",") if p.strip()]
-
-
-def parse_frontmatter(text):
-    """Minimal parser for the shapes this vault actually uses.
-
-    Handles `key: value`, quoted values, inline lists and block lists. Anything
-    else is reported rather than guessed at — a silent misparse would put wrong
-    data in the index, which is worse than a warning.
-    """
-    if not text.startswith("---\n"):
-        return None, ["no frontmatter block"]
-    end = text.find("\n---", 4)
-    if end == -1:
-        return None, ["unterminated frontmatter block"]
-
-    data, warnings, key = {}, [], None
-    for raw in text[4:end].splitlines():
-        if not raw.strip() or raw.lstrip().startswith("#"):
-            continue
-        if raw.lstrip().startswith("- ") and key:
-            data.setdefault(key, [])
-            if isinstance(data[key], list):
-                data[key].append(unquote(strip_comment(raw.lstrip()[2:])))
-            continue
-        m = re.match(r"^([A-Za-z][\w-]*):(.*)$", raw)
-        if not m:
-            warnings.append(f"unparsed line: {raw.strip()[:60]}")
-            continue
-        key, value = m.group(1), strip_comment(m.group(2))
-        if value.startswith("["):
-            data[key] = parse_list(value)
-        elif value == "":
-            data[key] = []
-        else:
-            data[key] = unquote(value)
-    return data, warnings
 
 
 def first_sentence(text, limit=RULE_MAX):

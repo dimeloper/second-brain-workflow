@@ -1,4 +1,4 @@
-.PHONY: help lint test vault-index vault-index-check sync-skills explain guard doctor verify-claude check
+.PHONY: help lint test vault-index vault-index-check sync-skills explain guard doctor audit verify-claude check
 
 VAULT ?= $(if $(SBW_VAULT),$(SBW_VAULT),$(HOME)/vaults/second-brain)
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
@@ -14,6 +14,7 @@ help:
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make doctor              report gaps: missing commit-guard hook, etc."
+	@echo "make audit               lineage: unpromoted/orphaned/stale/thin-evidence rules"
 	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
 	@echo ""
@@ -24,7 +25,8 @@ lint:
 	@command -v shellcheck >/dev/null || { \
 	  echo "shellcheck not installed — brew install shellcheck"; exit 1; }
 	@shellcheck -x $(SHELL_SOURCES) && echo "shellcheck clean"
-	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/lib/config.py \
+	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
+	  scripts/lib/config.py scripts/lib/frontmatter.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -43,6 +45,13 @@ guard:
 # vault-index-check below — CI has none.
 doctor:
 	@./scripts/doctor.sh --vault "$(VAULT)"
+
+# Not part of `make check`: needs a real vault AND a real rules directory —
+# an even stronger dependency than doctor/vault-index-check, so the same
+# reasoning applies twice over. check-lineage.py's own tests (which run
+# against fixtures, like everything else in `make test`) are what CI verifies.
+audit:
+	@./scripts/check-lineage.py --vault "$(VAULT)"
 
 # Not part of `make check`: costs model calls and needs network. Run it once per
 # machine, and after any change to how rules are rendered.
