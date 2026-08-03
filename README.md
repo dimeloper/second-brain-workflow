@@ -6,7 +6,7 @@ Turn your coding sessions into a growing, queryable knowledge base — instead
 of insights evaporating at the end of a chat, or piling up in one rules file
 no one re-reads.
 
-![A sample knowledge graph for a fullstack developer: practice notes start sparse and mostly ideas after one session, then grow denser and more connected as they mature from idea to trialing to enforced over months of real work — the same shape as an Obsidian graph view. Sample note titles are listed under each phase, with one note shown maturing from idea to enforced across all three.](docs/impact.svg)
+![Knowledge graph showing practice notes growing sparse-to-dense across three phases — Session 1, a few sessions later, and months in — as they mature from idea to trialing to enforced, Obsidian graph-view style.](docs/impact.svg)
 
 Say **"update second brain"** at the end of a session and an agent skill
 mines what happened — a bug fixed, a design decision made, a pattern that
@@ -24,16 +24,17 @@ points at.
 
 ## What you get
 
-- **`update-second-brain`** — the only write path into the vault: captures a
-  session into a daily note, proposes new practice notes, promotes existing
-  ones by evidence, then commits and pushes. See [Cold path](#cold-path-obsidian-vault).
-- **`obsidian-knowledge-base`** — read-only: finds and scores notes against
-  the work at hand, so the agent applies what you've already learned instead
-  of re-deriving it every session.
-- **`check-follow-ups`** — read-only: scans recent daily notes' `Follow-ups`
-  sections and reports what's still open, walking back to the last notes that
-  actually exist rather than a fixed number of calendar days — so it survives
-  a weekend, a holiday, or a vacation gap the same way.
+- **Capture what you learn** — `update-second-brain` is the only write path
+  into the vault: captures a session into a daily note, proposes new practice
+  notes, promotes existing ones by evidence, then commits and pushes. See
+  [Cold path](#cold-path-obsidian-vault).
+- **Apply what you already know** — `obsidian-knowledge-base` finds and
+  scores notes against the work at hand, read-only, so the agent applies what
+  you've already learned instead of re-deriving it every session.
+- **Never lose a follow-up** — `check-follow-ups` scans recent daily notes'
+  `Follow-ups` sections and reports what's still open, walking back to the
+  last notes that actually exist rather than a fixed number of calendar days
+  — so it survives a weekend, a holiday, or a vacation gap the same way.
 - **One rule set, every agent** — write short imperative rules once
   (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
   `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
@@ -48,9 +49,12 @@ points at.
 git clone --recurse-submodules git@github.com:dimeloper/second-brain-workflow.git
 cd second-brain-workflow
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
-  --remote git@github.com:<you>/second-brain.git
+  --remote git@github.com:<account>/second-brain.git
 ./scripts/sync-skills.sh
 ```
+
+`--remote` is only recorded, not pushed to — create that repo yourself,
+private, first.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
@@ -78,6 +82,10 @@ sibling — i.e. the rules repo's root, not inside `rules/` itself. Precedence:
 `--rules-dir` flag > `SBW_RULES_DIR` env > config file > the
 engine-relative default.
 
+This is about *where* rules live. For exactly how one rule file becomes
+Cursor's, Claude Code's, and `AGENTS.md`'s native formats, see [One rule set,
+every agent](#one-rule-set-every-agent).
+
 ## Cold path (Obsidian vault)
 
 Long-form practice notes live in `~/vaults/second-brain` (`practices/**`).
@@ -102,7 +110,7 @@ Three skills own the vault, and the read/write split is deliberate:
 Say **update second brain** at the end of a session to capture and publish it,
 or **check my tasks** any morning to see what's still open.
 
-### Worked example (vault)
+### Worked example
 
 A daily note (`2026-08-03.md`) and a practice note it might produce, in full:
 
@@ -275,57 +283,9 @@ description: Angular component and reactivity conventions
 | `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | rule with no `paths` | `paths:` passed through |
 | `agents` | `AGENTS.md` | whole file | — |
 
-### Worked example (rules)
-
-`rules/frontend-angular.md`, from the YAML block above plus a body:
-
-```markdown
----
-paths:
-  - "**/*.component.ts"
-  - "**/*.directive.ts"
-description: Angular component and reactivity conventions
----
-
-- Use `OnPush` change detection on every component.
-- Prefer signals over `BehaviorSubject` for local component state.
-```
-
-`./scripts/render.py /path/to/repo` turns that one file into:
-
-```mdc
----
-description: Angular component and reactivity conventions
-globs: "**/*.component.ts, **/*.directive.ts"
-alwaysApply: false
----
-
-<!-- generated by second-brain-workflow@ea34c5a from rules/frontend-angular.md -->
-
-- Use `OnPush` change detection on every component.
-- Prefer signals over `BehaviorSubject` for local component state.
-```
-
-as `.cursor/rules/frontend-angular.mdc`, and:
-
-```markdown
----
-paths:
-  - "**/*.component.ts"
-  - "**/*.directive.ts"
-description: Angular component and reactivity conventions
----
-
-<!-- generated by second-brain-workflow@ea34c5a from rules/frontend-angular.md -->
-
-- Use `OnPush` change detection on every component.
-- Prefer signals over `BehaviorSubject` for local component state.
-```
-
-as `.claude/rules/frontend-angular.md` — near-identical to the source, since
-that's Claude Code's native shape. Both carry a provenance comment naming the
-exact commit the content came from; edit the source and re-render, never the
-generated file.
+For a full worked example — one source file next to the exact `.mdc` and
+`.claude/rules/*.md` it produces — see
+[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md#what-rendering-actually-produces).
 
 The source format is Claude Code's native shape, so that emitter is a
 near-identity and Cursor's comma-separated `globs` is the derived one. That
