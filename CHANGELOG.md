@@ -17,6 +17,19 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+
+- `docs/vault-ci/guard.yml` failed on every run, unconditionally: `actions/checkout`
+  sets `origin` to an HTTPS URL while `vault.json` conventionally records the
+  SSH form, which the identity check's remote comparison read as a repointed
+  vault. Added a step normalizing origin to the SSH form using
+  `github.repository` (not `vault.json`, so the check still catches a real
+  repoint) before running the guard. Caught immediately when actually wiring
+  the template into a real vault repo.
+- `docs/vault-ci/guard.yml`'s `ENGINE_REF` default was still `v0.1.0`, which
+  predates the `--range`/`--rev` flags the template itself invokes — also
+  caught the same way. Now defaults to `v0.2.0`.
+
 ## [0.2.0] - 2026-08-03
 
 ### Added

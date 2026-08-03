@@ -21,7 +21,7 @@ permissions:
 
 env:
   ENGINE_REPO: dimeloper/second-brain-workflow
-  ENGINE_REF: v0.1.0
+  ENGINE_REF: v0.2.0   # v0.1.0 predates --range/--rev; nothing older works here
 
 jobs:
   guard:
@@ -32,6 +32,17 @@ jobs:
         with:
           path: vault
           fetch-depth: 0   # need the pre-push commit, not just the new tip
+
+      # actions/checkout sets origin to an HTTPS URL
+      # (https://github.com/owner/repo); vault.json conventionally records
+      # the SSH form (git@github.com:owner/repo.git) — same repo, different
+      # scheme, which the identity check's remote comparison reads as a
+      # mismatch otherwise. Rebuilt from github.repository (what GitHub
+      # itself says this workflow is running in), not from vault.json — so
+      # this still catches a real repoint, it just stops flagging a URL
+      # scheme difference as one. GitHub-hosted vaults only.
+      - name: Normalize the vault's origin to vault.json's URL scheme
+        run: git -C vault remote set-url origin "git@github.com:${{ github.repository }}.git"
 
       - name: Check out the engine
         uses: actions/checkout@v4
