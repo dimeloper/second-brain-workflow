@@ -27,8 +27,9 @@ points at.
   the work at hand, so the agent applies what you've already learned instead
   of re-deriving it every session.
 - **`check-follow-ups`** — read-only: scans recent daily notes' `Follow-ups`
-  sections and reports what's still open, looking back far enough to bridge
-  a weekend gap.
+  sections and reports what's still open, walking back to the last notes that
+  actually exist rather than a fixed number of calendar days — so it survives
+  a weekend, a holiday, or a vacation gap the same way.
 - **One rule set, every agent** — write short imperative rules once
   (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
   `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
