@@ -19,6 +19,8 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/config.sh
 . "${STANDARDS_DIR}/scripts/lib/config.sh"
 ds_config_load
+# shellcheck source=scripts/lib/vault-identity.sh
+. "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
 
 MAX_FILES="${GUARD_MAX_FILES:-20}"
 MAX_LINES="${GUARD_MAX_LINES:-2000}"
@@ -44,28 +46,17 @@ staged="$(git -C "${VAULT}" diff --cached --name-only)"
 
 # --- 1. vault identity -------------------------------------------------------
 # Catches the case that matters: a session configured for one vault committing
-# into another, or a clone repointed at someone else's remote.
-if [ -f "${VAULT}/vault.json" ]; then
-  vid="$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${VAULT}/vault.json" | head -1)"
-  vremote="$(sed -n 's/.*"remote"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${VAULT}/vault.json" | head -1)"
-
-  [ -n "${vid}" ] || fail "vault.json has no id"
-  if [ -n "${EXPECT_ID}" ] && [ "${vid}" != "${EXPECT_ID}" ]; then
-    fail "vault id mismatch: expected '${EXPECT_ID}', found '${vid}' in ${VAULT}/vault.json"
-  fi
-
-  if [ -n "${vremote}" ]; then
-    actual="$(git -C "${VAULT}" remote get-url origin 2>/dev/null || echo "")"
-    if [ -n "${actual}" ] && [ "${actual}" != "${vremote}" ]; then
-      fail "remote mismatch for vault '${vid}':
-       vault.json says  ${vremote}
-       origin points at ${actual}
-       Refusing to commit — this vault may have been repointed."
-    fi
-  fi
+# into another, or a clone repointed at someone else's remote. Shared with
+# init-vault.sh's --adopt check via scripts/lib/vault-identity.sh — one
+# implementation of "does this vault match what was expected."
+if vault_identity_check "${VAULT}" "${EXPECT_ID}"; then
+  vid="${VI_ID}"
 else
-  echo "guard: no vault.json in ${VAULT} — identity unchecked." >&2
-  echo "       create one with scripts/init-vault.sh --adopt to enable this check." >&2
+  case $? in
+    1) fail "${VI_ERROR}" ;;
+    2) echo "guard: no vault.json in ${VAULT} — identity unchecked." >&2
+       echo "       create one with scripts/init-vault.sh --adopt to enable this check." >&2 ;;
+  esac
 fi
 
 # --- 2. staged paths ---------------------------------------------------------

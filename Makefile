@@ -3,7 +3,7 @@
 VAULT ?= $(if $(SBW_VAULT),$(SBW_VAULT),$(HOME)/vaults/second-brain)
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
                  scripts/guard-vault-commit.sh scripts/verify-claude-load.sh scripts/lib/config.sh \
-                 tests/lib.sh $(wildcard tests/test-*.sh)
+                 scripts/lib/vault-identity.sh tests/lib.sh $(wildcard tests/test-*.sh)
 
 help:
 	@echo "make lint                shellcheck every shell script"

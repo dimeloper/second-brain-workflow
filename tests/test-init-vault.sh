@@ -81,6 +81,46 @@ echo "LOCAL EDIT" >> "${V}/practices/cross-cutting/propose-then-approve-vault-wr
 assert_contains "${V}/practices/cross-cutting/propose-then-approve-vault-writes.md" \
   "LOCAL EDIT" "does not overwrite an edited seeded rule"
 
+# --- adopt identity check -----------------------------------------------------
+# --adopt must not silently scaffold content into someone else's (or the
+# wrong) vault. A directory that already has a vault.json is treated as a
+# pre-existing vault whose id (and remote, once git is involved) must agree.
+OTHER="${SANDBOX}/other"
+mkdir -p "${OTHER}"
+cat > "${OTHER}/vault.json" <<'EOF'
+{
+  "id": "personal",
+  "remote": "",
+  "schema_version": 1
+}
+EOF
+"${INIT}" --path "${OTHER}" --id work --adopt >/dev/null 2>&1
+assert_exit 1 $? "--adopt aborts when --id disagrees with vault.json"
+assert_no_file "${OTHER}/_templates/daily-note.md" "aborted adopt (id mismatch) writes nothing"
+
+"${INIT}" --path "${OTHER}" --id personal --adopt >/dev/null 2>&1
+assert_exit 0 $? "--adopt proceeds once --id matches"
+assert_file "${OTHER}/_templates/daily-note.md" "matching adopt scaffolds normally"
+
+REMOTED="${SANDBOX}/remoted"
+mkdir -p "${REMOTED}"
+git -C "${REMOTED}" init -q
+git -C "${REMOTED}" remote add origin "git@example.com:me/actual.git"
+cat > "${REMOTED}/vault.json" <<'EOF'
+{
+  "id": "work",
+  "remote": "git@example.com:me/claimed.git",
+  "schema_version": 1
+}
+EOF
+"${INIT}" --path "${REMOTED}" --id work --adopt >/dev/null 2>&1
+assert_exit 1 $? "--adopt aborts on a remote mismatch"
+assert_no_file "${REMOTED}/_templates/daily-note.md" "aborted adopt (remote mismatch) writes nothing"
+
+FRESH="${SANDBOX}/fresh"
+"${INIT}" --path "${FRESH}" --id anything >/dev/null 2>&1
+assert_exit 0 $? "a fresh vault (no vault.json yet) is unaffected by the identity check"
+
 # --- guardrails --------------------------------------------------------------
 NE="${SANDBOX}/nonempty"
 mkdir -p "${NE}"; echo x > "${NE}/thing.txt"

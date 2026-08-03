@@ -18,6 +18,8 @@
 set -euo pipefail
 
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/vault-identity.sh
+. "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
 
 PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0
 while [ $# -gt 0 ]; do
@@ -51,6 +53,18 @@ if [ -e "${VAULT}" ] && [ "${ADOPT}" -eq 0 ]; then
     echo "Pass --adopt to add only what is missing." >&2
     exit 1
   fi
+fi
+
+# A pre-existing vault.json means this is an adopt of someone else's (or a
+# wrong) vault, not a fresh one — verify identity before adding anything.
+# Shared with guard-vault-commit.sh via scripts/lib/vault-identity.sh, so a
+# vault whose id or remote doesn't match cannot silently gain content, even
+# though init-vault.sh never touches existing files (write_if_absent) and so
+# never needs the full commit guard's staged-diff checks.
+if [ -f "${VAULT}/vault.json" ] && ! vault_identity_check "${VAULT}" "${ID}"; then
+  echo "init-vault: ${VI_ERROR}" >&2
+  echo "init-vault: refusing to adopt — this looks like a different vault." >&2
+  exit 1
 fi
 
 created=0

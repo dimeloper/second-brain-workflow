@@ -25,7 +25,7 @@ points at.
 ## What you get
 
 - **Capture what you learn** — `update-second-brain` is the only write path
-  into the vault: captures a session into a daily note, proposes new practice
+  for practice and daily-note content: captures a session into a daily note, proposes new practice
   notes, promotes existing ones by evidence, then commits and pushes. See
   [Cold path](#cold-path-obsidian-vault).
 - **Apply what you already know** — `obsidian-knowledge-base` finds and
@@ -104,7 +104,7 @@ Three skills own the vault, and the read/write split is deliberate:
 | Skill | Role |
 |-------|------|
 | `obsidian-knowledge-base` | **read only** — find applicable notes, score work against them |
-| `update-second-brain` | **the only write path** — daily note, practice proposals, promotions, commit, push |
+| `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
 | `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes |
 
 Say **update second brain** at the end of a session to capture and publish it,
@@ -183,7 +183,13 @@ It scaffolds `practices/{app,backend,frontend,cross-cutting}`, `_templates/`,
 generates an empty index. It seeds no *domain* practice notes — those are earned
 from real work — but does write the four cross-cutting notes describing how the
 vault itself operates, because `update-second-brain` reads them at runtime.
-Re-running is safe; `--adopt` lets it fill gaps in an existing vault.
+Re-running is safe; `--adopt` lets it fill gaps in an existing vault — and,
+since `--adopt` is the one other path that can add content to a vault, it
+verifies the same identity (`vault.json`'s `id` and `remote`) the commit guard
+checks below, via the shared `scripts/lib/vault-identity.sh`, before adding
+anything. It only ever adds missing fixed scaffold files though — never
+arbitrary content, never an overwrite, never a delete — so it doesn't need
+the guard's path/size/secret checks, only the identity check.
 
 **The vault is the isolation boundary, not the rule set.** Rules flow outward
 freely: applying your own conventions to an employer's code is fine. The
