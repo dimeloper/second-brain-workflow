@@ -54,7 +54,7 @@ points at.
 ```bash
 git clone --recurse-submodules https://github.com/dimeloper/second-brain-workflow.git
 cd second-brain-workflow
-git checkout "$(git tag --sort=-v:refname | head -1)"   # newest release; omit to track main
+git checkout "$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"   # newest release; omit to track main
 git submodule update --init --recursive
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
   --remote git@github.com:<account>/second-brain.git
@@ -120,8 +120,8 @@ Three skills own the vault, and the read/write split is deliberate:
 Say **update second brain** at the end of a session to capture and publish it,
 or **check my tasks** any morning to see what's still open. "Recent" is
 deliberately narrow — a commitment that fell out of that window is
-`check-followups.py`'s job instead, part of the [Review loop](#review-loop),
-not a skill.
+`make audit`'s job instead (via `check-followups.py`), part of the
+[Review loop](#review-loop), not a skill.
 
 ### Worked example
 
@@ -232,9 +232,12 @@ Local skills live under `skills/` (categorized). Upstream skills are
 vendored as a pinned submodule and installed by allowlist:
 
 ```bash
-git submodule update --init      # first clone only
+git submodule update --init
 ./scripts/sync-skills.sh         # or: make sync-skills
 ```
+
+Already done by the Quickstart; re-run after a checkout that moves the
+submodule's pin.
 
 | Source | Contents |
 |--------|----------|
@@ -384,8 +387,8 @@ matching file as the active tab, once with a non-matching one. Answering
 instantly means the rule was in context; searching the repo first means it was
 not.
 
-Verified 2026-08-02: known immediately on `*.component.ts`, and on a `.txt` file
-the agent had to grep for it. Scoping confirmed on both agents.
+Verified 2026-08-02 on Cursor 3.14.7: known immediately on `*.component.ts`, and
+on a `.txt` file the agent had to grep for it. Scoping confirmed on both agents.
 
 ## Versioning
 
@@ -437,8 +440,7 @@ pinned — skipping the submodule step leaves vendored skills at whatever they
 were before the rollback, which defeats the point of pinning. [`make
 doctor`](docs/GUARD.md#make-doctor) reports a submodule left at the wrong commit, so a
 switch-and-forget doesn't go unnoticed. Rules and vault content are untouched
-by any of this — only the
-tooling that renders/audits/installs them moves.
+by any of this — only the tooling that renders/audits/installs them moves.
 
 ## License
 
