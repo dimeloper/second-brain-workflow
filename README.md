@@ -97,7 +97,8 @@ every agent](#one-rule-set-every-agent).
 
 ## Cold path (Obsidian vault)
 
-Long-form practice notes live in `~/vaults/second-brain` (`practices/**`).
+Long-form practice notes live in your vault (`practices/**`) — `~/vaults/second-brain`
+by default, overridable via `SBW_VAULT`.
 
 Agents start from the generated index `practices/INDEX.md` — one file listing
 every note with its maturity, repo count, tags and a one-line rule — and open
@@ -353,7 +354,7 @@ Renders into a throwaway repo and runs two headless sessions with an
 must load the rule, and reading one that matches nothing must not. The second
 case is the one that matters — without it, "the rule loaded" is equally
 consistent with every rule always loading, which would make scoping decorative.
-Verified on this machine 2026-08-02 against Claude Code 2.1.220:
+Verified 2026-08-02 on macOS against Claude Code 2.1.220:
 
 ```
     session_start    CLAUDE.md
