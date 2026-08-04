@@ -50,19 +50,18 @@ points at.
 ## Quickstart
 
 ```bash
-git clone --recurse-submodules --branch v<VERSION> \
-  git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
+git clone --recurse-submodules https://github.com/dimeloper/second-brain-workflow.git
 cd second-brain-workflow
+git checkout "$(git tag --sort=-v:refname | head -1)"   # newest release; omit to track main
+git submodule update --init --recursive
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
   --remote git@github.com:<account>/second-brain.git
 ./scripts/sync-skills.sh
 ```
 
-Replace `v<VERSION>` with the tag named on
-[the latest release](https://github.com/dimeloper/second-brain-workflow/releases/latest),
-or drop `--branch v<VERSION>` entirely to track `main` instead — see
-[Versioning](#versioning) for the bump policy and rollback. `--remote` is
-only recorded, not pushed to — create that repo yourself, private, first.
+Runnable as-is — see [Versioning](#versioning) for the bump policy and how to
+pin or roll back to a specific tag instead of the newest. `--remote` is only
+recorded, not pushed to — create that repo yourself, private, first.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
@@ -406,17 +405,8 @@ a bare version string, not markdown), so it's the one file `render.py`
 always overwrites rather than checking for a hand-written override — don't
 hand-edit it.
 
-**Pin, or track `main`:**
-
-```bash
-git clone --recurse-submodules --branch v<VERSION> \
-  git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
-git clone --recurse-submodules \
-  git@github.com:dimeloper/second-brain-workflow.git   # tracking: whatever main has
-```
-
-Find the current `v<VERSION>` on
-[the latest release](https://github.com/dimeloper/second-brain-workflow/releases/latest).
+See [Quickstart](#quickstart) for cloning at the newest release; drop the
+`git checkout` line there to track `main` instead.
 
 **Rollback:** in the engine checkout,
 

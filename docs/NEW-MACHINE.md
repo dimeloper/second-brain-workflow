@@ -27,23 +27,24 @@ target bash and the skills directories are POSIX paths.
 ### 1. Clone the engine
 
 ```bash
-git clone --recurse-submodules --branch v<VERSION> \
-  git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
+git clone git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
 cd ~/second-brain-workflow
+git checkout "$(git tag --sort=-v:refname | head -1)"   # newest release; omit to track main
+git submodule update --init --recursive
 ```
 
-That pins a tagged release — the stable option. Find the current `v<VERSION>`
-on [the latest release](https://github.com/dimeloper/second-brain-workflow/releases/latest),
-or drop `--branch v<VERSION>` to track `main` instead; see the README's
+That pins the newest tagged release — the stable option. See the README's
 [Versioning](../README.md#versioning) section for the bump policy and how to
-roll back.
+roll back to an older one.
 
 No SSH key set up yet (or a work machine you don't want to add one to)?
 Clone over HTTPS instead — read-only, no auth needed for a public repo:
 
 ```bash
-git clone --recurse-submodules --branch v<VERSION> \
-  https://github.com/dimeloper/second-brain-workflow.git ~/second-brain-workflow
+git clone https://github.com/dimeloper/second-brain-workflow.git ~/second-brain-workflow
+cd ~/second-brain-workflow
+git checkout "$(git tag --sort=-v:refname | head -1)"   # newest release; omit to track main
+git submodule update --init --recursive
 ```
 
 If you are cloning someone else's engine onto a work machine, use a **read-only
