@@ -298,6 +298,22 @@ exits 1 only for orphaned rules — that's the one finding that means a rule
 is actively citing evidence that no longer exists; everything else is a
 visible backlog, not a block.
 
+`make audit` also runs `check-followups.py`, the long-range counterpart to the
+`check-follow-ups` skill:
+
+```bash
+./scripts/check-followups.py --vault ~/vaults/second-brain   # or: make audit
+```
+
+The skill deliberately looks back only as far as the last few daily notes
+that actually exist, so it survives a weekend or a vacation gap without
+drowning in old news — but an item still `- [ ]` in a note *outside* that
+window has nothing surfacing it again; it just stops being seen. This script
+covers the rest: every `YYYY-MM-DD.md` at the vault root, not just the recent
+few, reporting an open follow-up whose note is older than `--stale-days`
+(default 30). Same shape as the stale-claim and thin-evidence findings
+above — a backlog to notice, so it always exits 0.
+
 `make audit` also runs `rule-budget.py`, estimating the always-on rule set's
 per-turn cost — a rule with no `paths:` loads on every turn, for every agent,
 whether or not it's relevant:

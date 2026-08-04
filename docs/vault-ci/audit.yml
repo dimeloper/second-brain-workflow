@@ -83,9 +83,14 @@ jobs:
       # (1 = an orphaned rule, the one finding that means a rule is actively
       # citing evidence that no longer exists) — matching the script's own
       # exit semantics, not `make audit`'s local behavior, which also fails
-      # on a rule-budget overage. Everything else from both scripts,
-      # including an over-budget rule set, is a backlog item surfaced in the
-      # tracking issue below, not a build break.
+      # on a rule-budget overage. Everything else from all three scripts,
+      # including an over-budget rule set and every stale follow-up, is a
+      # backlog item surfaced in the tracking issue below, not a build break.
+      #
+      # check-followups.py doesn't actually need a rules directory — it only
+      # reads --vault — but it runs in this same step (gated behind
+      # vars.RULES_REPO like the other two) so the tracking issue stays one
+      # report instead of three.
       - name: Run the audit
         id: audit
         run: |
@@ -94,6 +99,8 @@ jobs:
             --vault "${GITHUB_WORKSPACE}/vault" \
             --rules-dir "${GITHUB_WORKSPACE}/rules/rules" 2>&1)"
           lineage_rc=$?
+          followups="$(python3 engine/scripts/check-followups.py \
+            --vault "${GITHUB_WORKSPACE}/vault" 2>&1)"
           budget="$(python3 engine/scripts/rule-budget.py \
             --rules-dir "${GITHUB_WORKSPACE}/rules/rules" 2>&1)"
           delim="EOF_$(uuidgen)"
@@ -101,10 +108,14 @@ jobs:
             echo "report<<${delim}"
             echo "${lineage}"
             echo
+            echo "${followups}"
+            echo
             echo "${budget}"
             echo "${delim}"
           } >> "${GITHUB_OUTPUT}"
           echo "${lineage}"
+          echo
+          echo "${followups}"
           echo
           echo "${budget}"
           exit "${lineage_rc}"
