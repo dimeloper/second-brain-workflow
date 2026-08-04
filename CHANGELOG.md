@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-04
+
 ### Added
 
 - `check-followups.py`, the long-range counterpart to the `check-follow-ups`
@@ -28,6 +30,9 @@ write release notes, not two to keep in sync by hand.
   machine" reference material (enforcement tiers, trust model, `make
   doctor`, lineage/follow-up/rule-budget checks) out of pitch position into
   dedicated docs, leaving the README with the conceptual model and links.
+- The Cursor rule-verification "Verified" line now also names the Cursor
+  version tested, matching the Claude Code line's existing
+  "on macOS against Claude Code 2.1.220."
 
 ### Changed
 
@@ -35,13 +40,32 @@ write release notes, not two to keep in sync by hand.
   is now documented in one place (`docs/GUARD.md#make-doctor`) instead of
   three scattered README mentions and a Makefile help string that just said
   "etc."
+- The audit/lineage/follow-up-staleness material previously folded under
+  "A vault per machine" now has its own `### Review loop` heading — it's
+  unrelated to machine isolation, and burying it there meant a reader had
+  to read past isolation content to find it. The trust model's most
+  distinctive clause (the guard's expected id comes from the machine's own
+  config, never from the vault being checked) is now stated inline instead
+  of requiring a click into `docs/GUARD.md`.
+- Cold path now states that `~/vaults/second-brain` is a default, overridable
+  via `SBW_VAULT`, not a fixed path.
 
 ### Fixed
 
-- README and `docs/NEW-MACHINE.md` clone examples hardcoded the current
-  release tag (`v0.2.0`); every future release would leave them one version
-  behind. Replaced with a `v<VERSION>` placeholder and a link to
-  `/releases/latest`.
+- README and `docs/NEW-MACHINE.md`'s clone-and-checkout examples went
+  through three defects in sequence before landing: a hardcoded release tag
+  (`v0.2.0`) went stale after every future release; the `v<VERSION>`
+  placeholder that replaced it fixed staleness but couldn't be pasted and
+  run without a manual lookup; and the self-resolving snippet that replaced
+  *that* (`git tag --sort=-v:refname | head -1`) could pick a prerelease or
+  a stray non-version tag, since a version sort doesn't validate what counts
+  as a release. Final form filters to real semver tags first
+  (`grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$'`) and splits the tag resolution onto
+  its own `latest=$(...)` line so the `git checkout` doesn't wrap in
+  GitHub's rendered code blocks — applied identically to both files, which
+  had drifted out of sync more than once along the way. The Versioning
+  section's own redundant copy of the same example was removed in favor of
+  a link to the Quickstart.
 - `docs/NEW-MACHINE.md`'s "Keeping two machines apart" and step 8 only
   described the fast-path guard and `audit.yml`, silently omitting the
   pre-commit hook and `guard.yml` CI backstop that the README's
@@ -58,6 +82,25 @@ write release notes, not two to keep in sync by hand.
 - `docs/vault-ci/guard.yml`'s `ENGINE_REF` default was still `v0.1.0`, which
   predates the `--range`/`--rev` flags the template itself invokes — also
   caught the same way. Now defaults to `v0.2.0`.
+- `./scripts/init-vault.sh` installs a `pre-commit` hook by default as a side
+  effect of the command shown in the README — that wasn't noted where the
+  command appears, only three sections later in `docs/GUARD.md`. Added the
+  one clause plus the `--no-hook` escape hatch inline.
+- The follow-up-tracking story had two entry points and no stated division
+  between them — the "Never lose a follow-up" bullet described only
+  `check-follow-ups`'s recent-window half, and nothing told a reader that a
+  commitment outside that window is `make audit`'s job. It had also drifted
+  to naming three different owners for that job across three sections, with
+  a spelling mismatch against the skill's own hyphenated name. Stated the
+  division once, named the script exactly once, and attributed ownership to
+  `make audit` consistently everywhere else.
+- The Skills section's `git submodule update --init` carried a
+  `# first clone only` comment that contradicted the Quickstart, a few lines
+  earlier, already having run `--init --recursive` — now reads "already done
+  by the Quickstart; re-run after a checkout that moves the pin."
+- "Verified on this machine 2026-08-02" read oddly in a public README naming
+  a specific author's machine; now names what was actually tested instead of
+  "this machine."
 
 ## [0.2.0] - 2026-08-03
 
@@ -136,6 +179,7 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dimeloper/second-brain-workflow/releases/tag/v0.1.0
