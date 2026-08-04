@@ -1,0 +1,99 @@
+# Auditing the vault
+
+`make audit` runs three read-only scripts against a real vault — the review
+side of the capture-then-review loop the README's project model describes.
+Read the README first for why this exists; this is the reference material.
+
+```bash
+make audit   # or run each script below individually
+```
+
+Like `guard` and `vault-index-check`, it needs a real vault and rules
+directory, so it isn't part of `make check` — CI runs each script's own test
+suite against fixtures instead.
+
+## Lineage: rules ↔ practice notes
+
+Practice notes are the source. When a note reaches `maturity: enforced`, a
+human distills it into a rule under `rules/` (in whichever repo
+`SBW_RULES_DIR` resolves to), then repos re-sync. Tooling reports; it never
+promotes a note to a rule.
+
+Record that lineage: add `source: <note-slug>` to the rule's frontmatter,
+naming the note it was distilled from (the same slug every `[[wikilink]]` in
+the vault already uses). Nothing renders it — `source:` never reaches
+`.mdc`/`.claude/rules/*.md` output — it exists purely so the capture side
+(automated) and the review side (otherwise entirely manual) can be
+cross-checked:
+
+```bash
+./scripts/check-lineage.py --vault ~/vaults/second-brain   # or: make audit
+```
+
+Reports, read-only, never writes: an **unpromoted note** (`enforced`, no rule
+traces back to it), an **orphaned rule** (its source note is gone or demoted
+below `enforced`), a **stale claim** (`enforced`, unreviewed past
+`--stale-months`, default 6 — the same 180-day window `review-queue.md` uses
+for a different purpose), and **thin evidence** (`enforced` with fewer repos
+than the vault's own idea→trialing→enforced bar, read from
+`00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
+number — exempting a note whose `**Observed in:**` line says exactly
+"enforced by preference," this vault's own way of marking a personal default
+that was never meant to clear that bar; a note that's close but doesn't
+match exactly is still counted as thin evidence *and* named separately as a
+near-miss, so a typo can't silently cost a note its exemption). If that
+threshold can't be read unambiguously — the file is missing, reworded past
+recognition, or states two different numbers — the script exits with a
+named, specific error rather than silently skipping the check. Otherwise
+exits 1 only for orphaned rules — that's the one finding that means a rule
+is actively citing evidence that no longer exists; everything else is a
+visible backlog, not a block.
+
+## Stale follow-ups
+
+`make audit` also runs `check-followups.py`, the long-range counterpart to the
+`check-follow-ups` skill:
+
+```bash
+./scripts/check-followups.py --vault ~/vaults/second-brain   # or: make audit
+```
+
+The skill deliberately looks back only as far as the last few daily notes
+that actually exist, so it survives a weekend or a vacation gap without
+drowning in old news — but an item still `- [ ]` in a note *outside* that
+window has nothing surfacing it again; it just stops being seen. This script
+covers the rest: every `YYYY-MM-DD.md` at the vault root, not just the recent
+few, reporting an open follow-up whose note is older than `--stale-days`
+(default 30). Same shape as the stale-claim and thin-evidence findings
+above — a backlog to notice, so it always exits 0.
+
+## Rule token budget
+
+`make audit` also runs `rule-budget.py`, estimating the always-on rule set's
+per-turn cost — a rule with no `paths:` loads on every turn, for every agent,
+whether or not it's relevant:
+
+```bash
+./scripts/rule-budget.py --targets cursor,claude-code
+```
+
+Measures the *rendered* output per target (frontmatter and provenance
+comment included, not just the source file), since that's what actually
+reaches an agent's context. Fails above a ceiling read from `.rule-budget` —
+a plain integer, sibling of wherever `rules/` resolves to, same as
+`AGENTS.md` — defaulting to 2000 if that file doesn't exist. This engine
+ships no rules of its own, so there's nothing here to calibrate the starting
+number against; run `make audit` once you have a real rule set and adjust
+from what's actually there, not the other way around. See
+`.rule-budget.example`.
+
+## Running it weekly in CI
+
+A target you have to remember to run is a target that quietly stops getting
+run — the failure mode `update-second-brain` doesn't have, since it's
+automated. The engine's own CI can't close that gap (no vault), but a vault
+repo has one by definition: `docs/vault-ci/audit.yml` is a workflow template
+a vault repo can copy in to get this running weekly, opening or updating one
+tracking issue with the findings rather than a red X for anything short of
+an orphaned rule. See `docs/vault-ci/README.md` for setup, including the
+honest version of what a private rules repo means for CI access.

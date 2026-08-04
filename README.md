@@ -178,195 +178,39 @@ is what writes the practice note once a pattern like this repeats.
 
 ### A vault per machine
 
-One vault per machine, each with its own `vault.json` (`id`, `remote`). Create
-one with:
+One vault per machine, each with its own `vault.json` (`id`, `remote`):
 
 ```bash
 ./scripts/init-vault.sh --path ~/vaults/work-brain --id work \
   --remote git@github.com:<account>/work-brain.git
 ```
 
-It scaffolds `practices/{app,backend,frontend,cross-cutting}`, `_templates/`,
-`00-maps/`, `bases/`, a `.gitignore` and `vault.json`, runs `git init`, and
-generates an empty index. It seeds no *domain* practice notes — those are earned
-from real work — but does write the four cross-cutting notes describing how the
-vault itself operates, because `update-second-brain` reads them at runtime.
-Re-running is safe; `--adopt` lets it fill gaps in an existing vault — and,
-since `--adopt` is the one other path that can add content to a vault, it
-verifies the same identity (`vault.json`'s `id` and `remote`) the commit guard
-checks below, via the shared `scripts/lib/vault-identity.sh`, before adding
-anything. It only ever adds missing fixed scaffold files though — never
-arbitrary content, never an overwrite, never a delete — so it doesn't need
-the guard's path/size/secret checks, only the identity check.
-
 **The vault is the isolation boundary, not the rule set.** Rules flow outward
 freely: applying your own conventions to an employer's code is fine. The
 direction that must never happen is a practice learned on employer work landing
 in a personal or public repo — and that is a vault write. So every commit is
-checked:
+checked against the machine's expected vault identity:
 
 ```bash
 ./scripts/guard-vault-commit.sh --expect-id work
 ```
 
-or, so it doesn't need the flag every time, set once per machine in
-`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config`:
+enforced three ways — a fast path built into `update-second-brain`, a local
+`pre-commit` backstop, and a CI backstop that's the only one of the three
+that still catches `git commit --no-verify`. This is why there is no layer
+system: the thing that needed isolating was the vault, and a per-commit
+identity check does that directly, not a second rule tier. See
+[docs/GUARD.md](docs/GUARD.md) for the full mechanics, the trust model
+behind the identity check, and what `make doctor` verifies about a machine's
+setup.
 
-```
-SBW_EXPECTED_VAULT_ID=work
-```
-
-It blocks a staged path outside the vault's allowed set, a `vault.json` id that
-isn't the one this machine expects, an `origin` that doesn't match the one
-recorded in `vault.json`, an implausibly large diff, deletion of an `enforced`
-note, conflict markers, and anything that looks like a credential.
-
-Three things run this exact script, in increasing order of how hard they are
-to skip, and none is a substitute for another:
-
-- **The fast path.** `update-second-brain` runs it before every commit it
-  makes — the common case, since that skill is the only write path for
-  content.
-- **The local backstop.** `init-vault.sh` installs it as this vault's
-  `pre-commit` hook by default, so a hand-run `git commit` inside the vault —
-  no skill, no agent, nobody remembering to invoke anything — is guarded too.
-  It's idempotent (`--no-hook` opts out; re-running never clobbers an
-  existing hook, ours or not) and derives its `--expect-id` the same way any
-  other invocation does, since a git hook has nothing vault-specific it could
-  trustworthily derive one from itself. `make doctor` reports a vault whose
-  hook is missing or isn't ours, so an unguarded machine is visible rather
-  than silently exposed.
-- **The one that can't be skipped.** `git commit --no-verify` skips the
-  pre-commit hook — including by an agent that decides a failing check is a
-  reasonable thing to route around — and GitHub offers no pre-receive hook
-  outside Enterprise. `--range`/`--rev` let this same script check a pushed
-  commit range instead of a staged index (there's no staging area once a
-  push has already happened), so `docs/vault-ci/guard.yml` can run it in CI
-  on every push. **Be honest about what this does and doesn't fix:** CI
-  catches a bypass *after* the push, not before — for a private vault that's
-  containment, not prevention. The fix at that point is `git revert`, plus
-  history rewriting and a rotated credential if whatever leaked was real, not
-  an assumption that a red X means nothing happened. See
-  `docs/vault-ci/README.md` for setup and this same caveat in more detail.
-
-**Trust model:** the expected id is a property of the *machine*, resolved from
-`--expect-id` > `SBW_EXPECTED_VAULT_ID` env > the machine config file — never
-from `vault.json` in the vault being checked. If it came from the vault
-itself, a repointed or freshly cloned vault would bring its own "correct"
-answer along with it, and the check would prove nothing. `vault.json` says
-what the vault *claims* to be; the machine config says what this machine
-*expects*; the guard's job is only to confirm the two agree. An adopter
-wiring this up must set `SBW_EXPECTED_VAULT_ID` (or pass `--expect-id`)
-independently of anything in the vault directory itself — if neither
-resolves, the guard fails closed rather than silently skipping the check.
-
-This is why there is no layer system. The thing that needed isolating was the
-vault, and a per-commit identity check does that directly.
-
-#### `make doctor`
-
-Machine/vault health — not content, that's `make audit` below, and not code,
-that's `make check`. Three checks, read-only, none overlapping:
-
-```bash
-VAULT=~/vaults/second-brain make doctor   # or: ./scripts/doctor.sh --vault ...
-```
-
-- **Commit-guard hook** — this vault's `pre-commit` hook is installed and is
-  ours: the local backstop from the enforcement tiers above.
-- **Skill parity across `SKILLS_DIRS`** — a skill installed into one
-  configured skills directory but missing from another is invisible from
-  whichever agent reads the second one. See [Skills](#skills).
-- **Vendored submodule drift** — `vendor/obsidian-skills` checked out at a
-  commit other than the one this engine checkout's tag actually pins, the
-  state a bare `git checkout <tag>` leaves behind. See
-  [Rollback](#versioning).
-
-Exits non-zero if anything is worth a look; `-h` prints this same list from
-the script itself, so it can't drift out of step with what's actually
-checked.
-
-Practice notes are the source. When a note reaches `maturity: enforced`, a human
-distills it into a rule under `rules/` (in whichever repo `SBW_RULES_DIR`
-resolves to), then repos re-sync. Tooling reports; it never promotes a note to
-a rule.
-
-Record that lineage: add `source: <note-slug>` to the rule's frontmatter,
-naming the note it was distilled from (the same slug every `[[wikilink]]` in
-the vault already uses). Nothing renders it — `source:` never reaches
-`.mdc`/`.claude/rules/*.md` output — it exists purely so the capture side
-(automated) and the review side (otherwise entirely manual) can be
-cross-checked:
-
-```bash
-./scripts/check-lineage.py --vault ~/vaults/second-brain   # or: make audit
-```
-
-Reports, read-only, never writes: an **unpromoted note** (`enforced`, no rule
-traces back to it), an **orphaned rule** (its source note is gone or demoted
-below `enforced`), a **stale claim** (`enforced`, unreviewed past
-`--stale-months`, default 6 — the same 180-day window `review-queue.md` uses
-for a different purpose), and **thin evidence** (`enforced` with fewer repos
-than the vault's own idea→trialing→enforced bar, read from
-`00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
-number — exempting a note whose `**Observed in:**` line says exactly
-"enforced by preference," this vault's own way of marking a personal default
-that was never meant to clear that bar; a note that's close but doesn't
-match exactly is still counted as thin evidence *and* named separately as a
-near-miss, so a typo can't silently cost a note its exemption). If that
-threshold can't be read unambiguously — the file is missing, reworded past
-recognition, or states two different numbers — the script exits with a
-named, specific error rather than silently skipping the check. Otherwise
-exits 1 only for orphaned rules — that's the one finding that means a rule
-is actively citing evidence that no longer exists; everything else is a
-visible backlog, not a block.
-
-`make audit` also runs `check-followups.py`, the long-range counterpart to the
-`check-follow-ups` skill:
-
-```bash
-./scripts/check-followups.py --vault ~/vaults/second-brain   # or: make audit
-```
-
-The skill deliberately looks back only as far as the last few daily notes
-that actually exist, so it survives a weekend or a vacation gap without
-drowning in old news — but an item still `- [ ]` in a note *outside* that
-window has nothing surfacing it again; it just stops being seen. This script
-covers the rest: every `YYYY-MM-DD.md` at the vault root, not just the recent
-few, reporting an open follow-up whose note is older than `--stale-days`
-(default 30). Same shape as the stale-claim and thin-evidence findings
-above — a backlog to notice, so it always exits 0.
-
-`make audit` also runs `rule-budget.py`, estimating the always-on rule set's
-per-turn cost — a rule with no `paths:` loads on every turn, for every agent,
-whether or not it's relevant:
-
-```bash
-./scripts/rule-budget.py --targets cursor,claude-code
-```
-
-Measures the *rendered* output per target (frontmatter and provenance
-comment included, not just the source file), since that's what actually
-reaches an agent's context. Fails above a ceiling read from `.rule-budget` —
-a plain integer, sibling of wherever `rules/` resolves to, same as
-`AGENTS.md` — defaulting to 2000 if that file doesn't exist. This engine
-ships no rules of its own, so there's nothing here to calibrate the starting
-number against; run `make audit` once you have a real rule set and adjust
-from what's actually there, not the other way around. See
-`.rule-budget.example`.
-
-Like `guard` and `vault-index-check`, `make audit` needs a real vault and
-rules directory, so it isn't part of `make check` — CI runs both scripts'
-own tests against fixtures instead.
-
-A target you have to remember to run is a target that quietly stops getting
-run — the failure mode `update-second-brain` doesn't have, since it's
-automated. The engine's own CI can't close that gap (no vault), but a vault
-repo has one by definition: `docs/vault-ci/audit.yml` is a workflow template
-a vault repo can copy in to get this running weekly, opening or updating one
-tracking issue with the findings rather than a red X for anything short of
-an orphaned rule. See `docs/vault-ci/README.md` for setup, including the
-honest version of what a private rules repo means for CI access.
+Practice notes are the source: when one reaches `maturity: enforced`, a human
+distills it into a rule, and `source:` in the rule's frontmatter records the
+lineage. `make audit` is the review side of that — orphaned rules, stale
+claims, thin evidence, an over-budget always-on rule set, and now stale
+follow-up commitments too, all read-only, none blocking except an orphaned
+rule. See [docs/AUDIT.md](docs/AUDIT.md) for what each check does and the CI
+template that runs it weekly.
 
 ## Skills
 
@@ -395,7 +239,7 @@ ln -s ~/.claude/skills/use-railway ~/.cursor/skills/use-railway
 
 `sync-skills.sh` leaves that link alone — it points outside this repo, so it is
 never repointed or pruned. Re-run the command after a fresh Railway install,
-or run [`make doctor`](#make-doctor), which detects exactly this — a skill
+or run [`make doctor`](docs/GUARD.md#make-doctor), which detects exactly this — a skill
 present in one configured skills directory but missing from another, ours or
 not — and prints the exact `ln -s` to fix it. Detection only; it never links
 anything itself.
@@ -586,7 +430,7 @@ then re-render each onboarded repo (`./scripts/render.py <repo>`). Checking
 out a tag alone does not move `vendor/obsidian-skills` to the commit that tag
 pinned — skipping the submodule step leaves vendored skills at whatever they
 were before the rollback, which defeats the point of pinning. [`make
-doctor`](#make-doctor) reports a submodule left at the wrong commit, so a
+doctor`](docs/GUARD.md#make-doctor) reports a submodule left at the wrong commit, so a
 switch-and-forget doesn't go unnoticed. Rules and vault content are untouched
 by any of this — only the
 tooling that renders/audits/installs them moves.

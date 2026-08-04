@@ -119,10 +119,10 @@ edits, or promotes a rule or a practice note on its own.
 ## Guard (`guard.yml`)
 
 `guard-vault-commit.sh` is what `update-second-brain` and the vault's own
-`pre-commit` hook both run before a commit — the checks documented in the
-main README's "A vault per machine" section (path allowlist, size caps, no
-deleting an `enforced` note, conflict markers, secret-shaped strings, and
-the vault-identity check). Both of those run *before* a commit is made,
+`pre-commit` hook both run before a commit — the checks documented in
+[docs/GUARD.md](../GUARD.md) (path allowlist, size caps, no deleting an
+`enforced` note, conflict markers, secret-shaped strings, and the
+vault-identity check). Both of those run *before* a commit is made,
 which means both are skippable: `git commit --no-verify` skips the hook,
 and there is no equivalent to opt out of skipping — including for an agent
 that decides a failing check is a reasonable thing to route around.
@@ -170,5 +170,5 @@ Three enforcement points, in increasing order of how hard they are to skip:
 the skill invocation (`update-second-brain` runs the guard before every
 commit it makes) is the fast path; the local `pre-commit` hook is the
 backstop for a hand-run `git commit`; `guard.yml` is push-time CI, the one
-that survives `--no-verify`. See the main README's "A vault per machine"
-section for the same three-layer summary in context.
+that survives `--no-verify`. See [docs/GUARD.md](../GUARD.md) for the same
+three-layer summary in context.

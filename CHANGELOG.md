@@ -17,8 +17,37 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+
+- `check-followups.py`, the long-range counterpart to the `check-follow-ups`
+  skill: reports open `## Follow-ups` items whose daily note is older than
+  `--stale-days` (default 30), across every note at the vault root rather
+  than just the recent window the skill deliberately limits itself to. Wired
+  into `make audit` and `docs/vault-ci/audit.yml`.
+- `docs/GUARD.md` and `docs/AUDIT.md`: split the README's "A vault per
+  machine" reference material (enforcement tiers, trust model, `make
+  doctor`, lineage/follow-up/rule-budget checks) out of pitch position into
+  dedicated docs, leaving the README with the conceptual model and links.
+
+### Changed
+
+- `make doctor`'s scope (commit-guard hook, skill parity, submodule drift)
+  is now documented in one place (`docs/GUARD.md#make-doctor`) instead of
+  three scattered README mentions and a Makefile help string that just said
+  "etc."
+
 ### Fixed
 
+- README and `docs/NEW-MACHINE.md` clone examples hardcoded the current
+  release tag (`v0.2.0`); every future release would leave them one version
+  behind. Replaced with a `v<VERSION>` placeholder and a link to
+  `/releases/latest`.
+- `docs/NEW-MACHINE.md`'s "Keeping two machines apart" and step 8 only
+  described the fast-path guard and `audit.yml`, silently omitting the
+  pre-commit hook and `guard.yml` CI backstop that the README's
+  enforcement-tier model already documented — the doc someone actually
+  reads while setting up a work machine wasn't kept in step with the README
+  pass that added those tiers.
 - `docs/vault-ci/guard.yml` failed on every run, unconditionally: `actions/checkout`
   sets `origin` to an HTTPS URL while `vault.json` conventionally records the
   SSH form, which the identity check's remote comparison read as a repointed

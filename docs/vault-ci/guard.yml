@@ -72,7 +72,7 @@ jobs:
       # The expected vault id comes from THIS repo's variable, never from
       # vault.json — the same non-circular trust model as the local guard
       # (see guard-vault-commit.sh's own comment on EXPECT_ID, and the
-      # engine README's "A vault per machine" section: a repointed or
+      # engine's docs/GUARD.md trust model section: a repointed or
       # freshly cloned vault must not be able to bring its own "correct"
       # answer along with it). Configure once: Settings > Secrets and
       # variables > Actions > Variables > EXPECTED_VAULT_ID. Leaving it
