@@ -50,7 +50,7 @@ points at.
 ## Quickstart
 
 ```bash
-git clone --recurse-submodules --branch v0.2.0 \
+git clone --recurse-submodules --branch v<VERSION> \
   git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
 cd second-brain-workflow
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
@@ -58,9 +58,11 @@ cd second-brain-workflow
 ./scripts/sync-skills.sh
 ```
 
-Drop `--branch v0.2.0` to track `main` instead — see [Versioning](#versioning)
-for the bump policy and rollback. `--remote` is only recorded, not pushed
-to — create that repo yourself, private, first.
+Replace `v<VERSION>` with the tag named on
+[the latest release](https://github.com/dimeloper/second-brain-workflow/releases/latest),
+or drop `--branch v<VERSION>` entirely to track `main` instead — see
+[Versioning](#versioning) for the bump policy and rollback. `--remote` is
+only recorded, not pushed to — create that repo yourself, private, first.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
