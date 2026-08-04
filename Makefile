@@ -13,7 +13,7 @@ help:
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make guard               run the vault commit guard against VAULT"
-	@echo "make doctor              report gaps: missing commit-guard hook, etc."
+	@echo "make doctor              report gaps: commit-guard hook, skill parity, submodule drift"
 	@echo "make audit               lineage + stale follow-ups + always-on rule token budget"
 	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
 	@echo "make check               lint + test + non-mutating checks"

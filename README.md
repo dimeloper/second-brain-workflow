@@ -263,6 +263,29 @@ resolves, the guard fails closed rather than silently skipping the check.
 This is why there is no layer system. The thing that needed isolating was the
 vault, and a per-commit identity check does that directly.
 
+#### `make doctor`
+
+Machine/vault health — not content, that's `make audit` below, and not code,
+that's `make check`. Three checks, read-only, none overlapping:
+
+```bash
+VAULT=~/vaults/second-brain make doctor   # or: ./scripts/doctor.sh --vault ...
+```
+
+- **Commit-guard hook** — this vault's `pre-commit` hook is installed and is
+  ours: the local backstop from the enforcement tiers above.
+- **Skill parity across `SKILLS_DIRS`** — a skill installed into one
+  configured skills directory but missing from another is invisible from
+  whichever agent reads the second one. See [Skills](#skills).
+- **Vendored submodule drift** — `vendor/obsidian-skills` checked out at a
+  commit other than the one this engine checkout's tag actually pins, the
+  state a bare `git checkout <tag>` leaves behind. See
+  [Rollback](#versioning).
+
+Exits non-zero if anything is worth a look; `-h` prints this same list from
+the script itself, so it can't drift out of step with what's actually
+checked.
+
 Practice notes are the source. When a note reaches `maturity: enforced`, a human
 distills it into a rule under `rules/` (in whichever repo `SBW_RULES_DIR`
 resolves to), then repos re-sync. Tooling reports; it never promotes a note to
@@ -372,9 +395,10 @@ ln -s ~/.claude/skills/use-railway ~/.cursor/skills/use-railway
 
 `sync-skills.sh` leaves that link alone — it points outside this repo, so it is
 never repointed or pruned. Re-run the command after a fresh Railway install,
-or run `make doctor`, which detects a skill present in one configured skills
-directory but missing from another — ours or not — and prints the exact
-`ln -s` to fix it. Detection only; it never links anything itself.
+or run [`make doctor`](#make-doctor), which detects exactly this — a skill
+present in one configured skills directory but missing from another, ours or
+not — and prints the exact `ln -s` to fix it. Detection only; it never links
+anything itself.
 
 Skills install into **every** directory in `SKILLS_DIRS`, defaulting to
 `~/.cursor/skills` and `~/.claude/skills`, so Cursor and Claude Code resolve the
@@ -561,9 +585,10 @@ git submodule update --init --recursive   # vendor/obsidian-skills is pinned per
 then re-render each onboarded repo (`./scripts/render.py <repo>`). Checking
 out a tag alone does not move `vendor/obsidian-skills` to the commit that tag
 pinned — skipping the submodule step leaves vendored skills at whatever they
-were before the rollback, which defeats the point of pinning. `make doctor`
-reports a submodule left at the wrong commit, so a switch-and-forget doesn't
-go unnoticed. Rules and vault content are untouched by any of this — only the
+were before the rollback, which defeats the point of pinning. [`make
+doctor`](#make-doctor) reports a submodule left at the wrong commit, so a
+switch-and-forget doesn't go unnoticed. Rules and vault content are untouched
+by any of this — only the
 tooling that renders/audits/installs them moves.
 
 ## License

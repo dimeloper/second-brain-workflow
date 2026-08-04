@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Machine health check: reports gaps that nothing else surfaces on its own —
-# a vault whose commit guard isn't wired in as a pre-commit hook, a skill
-# installed for one agent but not another, a vendored submodule left at the
-# wrong commit after a tag switch, and so on. Read-only; changes nothing.
-# Exits non-zero if anything is worth a look, so it composes with CI or a
-# cron job, but it is not part of `make check` — like `make guard` and
-# `make vault-index-check`, it needs a real vault, and CI has none.
+# Machine health check: three read-only checks, none overlapping with
+# `make audit` (content) or `make check` (code):
+#   - the vault's commit guard is wired in as a pre-commit hook, and it's ours
+#   - a skill installed into one configured skills dir isn't missing from another
+#   - a vendored submodule isn't left at the wrong commit after a tag switch
+# Changes nothing. Exits non-zero if anything is worth a look, so it composes
+# with CI or a cron job, but it is not part of `make check` — like `make guard`
+# and `make vault-index-check`, it needs a real vault, and CI has none.
 #
 #   ./doctor.sh [--vault PATH]
 set -euo pipefail
