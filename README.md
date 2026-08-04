@@ -184,6 +184,10 @@ One vault per machine, each with its own `vault.json` (`id`, `remote`):
   --remote git@github.com:<account>/work-brain.git
 ```
 
+This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook
+(`--no-hook` opts out), so a hand-run `git commit` here is guarded even with
+no agent involved.
+
 **The vault is the isolation boundary, not the rule set.** Rules flow outward
 freely: applying your own conventions to an employer's code is fine. The
 direction that must never happen is a practice learned on employer work landing
