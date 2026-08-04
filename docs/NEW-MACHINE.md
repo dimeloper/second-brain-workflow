@@ -29,7 +29,8 @@ target bash and the skills directories are POSIX paths.
 ```bash
 git clone git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
 cd ~/second-brain-workflow
-git checkout "$(git tag --sort=-v:refname | head -1)"   # newest release; omit to track main
+latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+git checkout "$latest"    # newest release; skip both lines to track main
 git submodule update --init --recursive
 ```
 
@@ -43,7 +44,8 @@ Clone over HTTPS instead — read-only, no auth needed for a public repo:
 ```bash
 git clone https://github.com/dimeloper/second-brain-workflow.git ~/second-brain-workflow
 cd ~/second-brain-workflow
-git checkout "$(git tag --sort=-v:refname | head -1)"   # newest release; omit to track main
+latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+git checkout "$latest"    # newest release; skip both lines to track main
 git submodule update --init --recursive
 ```
 

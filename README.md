@@ -54,7 +54,8 @@ points at.
 ```bash
 git clone --recurse-submodules https://github.com/dimeloper/second-brain-workflow.git
 cd second-brain-workflow
-git checkout "$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)"   # newest release; omit to track main
+latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+git checkout "$latest"    # newest release; skip both lines to track main
 git submodule update --init --recursive
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
   --remote git@github.com:<account>/second-brain.git
