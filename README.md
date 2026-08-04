@@ -39,6 +39,8 @@ points at.
   `Follow-ups` sections and reports what's still open, walking back to the
   last notes that actually exist rather than a fixed number of calendar days
   — so it survives a weekend, a holiday, or a vacation gap the same way.
+  Anything still open *outside* that window is `make audit`'s job. See
+  [Review loop](#review-loop).
 - **One rule set, every agent** — write short imperative rules once
   (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
   `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
@@ -115,7 +117,10 @@ Three skills own the vault, and the read/write split is deliberate:
 | `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes |
 
 Say **update second brain** at the end of a session to capture and publish it,
-or **check my tasks** any morning to see what's still open.
+or **check my tasks** any morning to see what's still open. "Recent" is
+deliberately narrow — a commitment that fell out of that window is
+`check-followups.py`'s job instead, part of the [Review loop](#review-loop),
+not a skill.
 
 ### Worked example
 
