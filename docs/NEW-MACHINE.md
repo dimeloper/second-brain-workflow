@@ -204,15 +204,20 @@ agent](../README.md#one-rule-set-every-agent) section for why Claude Code's
 shape is canonical and Cursor's `globs` is derived, plus the full targets
 table and CI/verification commands.
 
-### 8. Set up the weekly audit (optional, per vault)
+### 8. Set up CI (optional, per vault)
 
-`make audit` (lineage + rule budget) is easy to forget once it's not part of
-any workflow you already run. Copy `docs/vault-ci/audit.yml` into
-`.github/workflows/audit.yml` **in the vault repo**, not here — this engine
-checkout has no vault, so its own CI can never run this. See
-`docs/vault-ci/README.md` for the rules-directory setup (this step is not
-optional; both scripts hard-require one) and what does or doesn't fail the
-run.
+Two independent templates, both copied into `.github/workflows/` **in the
+vault repo**, not here — this engine checkout has no vault, so its own CI can
+never run either:
+
+- `docs/vault-ci/audit.yml` — `make audit` (lineage + rule budget) is easy to
+  forget once it's not part of any workflow you already run.
+- `docs/vault-ci/guard.yml` — the CI backstop from
+  ["Keeping two machines apart"](#keeping-two-machines-apart) below; the only
+  tier that still catches a `--no-verify` bypass.
+
+See `docs/vault-ci/README.md` for the rules-directory setup (not optional;
+both scripts hard-require one) and what does or doesn't fail each run.
 
 ---
 
@@ -232,7 +237,8 @@ different `--id` from the other machine's.
 Rules flow outward freely — applying your own conventions to an employer's code
 is fine. The direction that must never happen is a practice learned on employer
 work landing in a personal or public repo, and that is always a *vault write*.
-So the vault is the boundary, enforced per commit:
+So the vault is the boundary, enforced per commit by the same script, run
+three ways, in increasing order of how hard they are to skip:
 
 ```bash
 ./scripts/guard-vault-commit.sh --expect-id <id>
@@ -241,8 +247,20 @@ So the vault is the boundary, enforced per commit:
 It refuses a staged path outside the vault's allowed set, a `vault.json` id that
 isn't the one expected, an `origin` that doesn't match `vault.json`, an
 implausibly large diff, deletion of an `enforced` note, conflict markers, and
-anything resembling a credential. `update-second-brain` runs it before
-committing.
+anything resembling a credential.
+
+- **The fast path.** `update-second-brain` runs it before every commit it
+  makes.
+- **The local backstop.** Step 4 installs it as this vault's `pre-commit`
+  hook by default, so a hand-run `git commit` here — no skill, no agent — is
+  guarded too. `make doctor` reports a vault whose hook is missing or isn't
+  ours.
+- **The one that can't be skipped.** `git commit --no-verify` skips the
+  pre-commit hook, and there's no way to stop that locally. Copy
+  `docs/vault-ci/guard.yml` into `.github/workflows/guard.yml` **in the vault
+  repo** (same place as step 8's `audit.yml`) so a bypassed commit is still
+  caught on push. This is containment, not prevention — CI catches it *after*
+  the push. See `docs/vault-ci/README.md` for setup and that caveat in full.
 
 **Never on a work machine:** clone the personal vault, configure personal
 remotes, or copy notes across.
