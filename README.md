@@ -525,11 +525,14 @@ hand-edit it.
 **Pin, or track `main`:**
 
 ```bash
-git clone --recurse-submodules --branch v0.2.0 \
+git clone --recurse-submodules --branch v<VERSION> \
   git@github.com:dimeloper/second-brain-workflow.git   # stable: a tagged release
 git clone --recurse-submodules \
   git@github.com:dimeloper/second-brain-workflow.git   # tracking: whatever main has
 ```
+
+Find the current `v<VERSION>` on
+[the latest release](https://github.com/dimeloper/second-brain-workflow/releases/latest).
 
 **Rollback:** in the engine checkout,
 
