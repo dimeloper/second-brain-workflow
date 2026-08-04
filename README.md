@@ -194,22 +194,27 @@ checked against the machine's expected vault identity:
 ./scripts/guard-vault-commit.sh --expect-id work
 ```
 
-enforced three ways — a fast path built into `update-second-brain`, a local
-`pre-commit` backstop, and a CI backstop that's the only one of the three
-that still catches `git commit --no-verify`. This is why there is no layer
+enforced three ways — a fast path built into `update-second-brain`, the
+pre-commit hook above, and a CI backstop that's the only one of the three
+that still catches `git commit --no-verify`. The expected id comes from the
+machine's own config, never from the vault being checked, so a repointed or
+freshly cloned vault can't vouch for itself. This is why there is no layer
 system: the thing that needed isolating was the vault, and a per-commit
 identity check does that directly, not a second rule tier. See
 [docs/GUARD.md](docs/GUARD.md) for the full mechanics, the trust model
 behind the identity check, and what `make doctor` verifies about a machine's
 setup.
 
+### Review loop
+
 Practice notes are the source: when one reaches `maturity: enforced`, a human
 distills it into a rule, and `source:` in the rule's frontmatter records the
 lineage. `make audit` is the review side of that — orphaned rules, stale
-claims, thin evidence, an over-budget always-on rule set, and now stale
-follow-up commitments too, all read-only, none blocking except an orphaned
-rule. See [docs/AUDIT.md](docs/AUDIT.md) for what each check does and the CI
-template that runs it weekly.
+claims, thin evidence, an over-budget always-on rule set, and a follow-up
+commitment still open past the recent window `check-follow-ups` already
+covers — all read-only, none blocking except an orphaned rule. See
+[docs/AUDIT.md](docs/AUDIT.md) for what each check does and the CI template
+that runs it weekly.
 
 ## Skills
 
