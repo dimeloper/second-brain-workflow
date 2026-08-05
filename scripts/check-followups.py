@@ -27,6 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
+from lib.config import origin_describe  # noqa: E402
+from lib.vault_state import classify  # noqa: E402
 
 DATE_NOTE_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\.md$')
 FOLLOWUP_ITEM_RE = re.compile(r'^-\s\[ \]\s+(.*)$')
@@ -110,8 +112,11 @@ def main():
     if args.as_of and as_of is None:
         sys.exit(f"--as-of: not an ISO date: {args.as_of}")
 
-    if not vault.is_dir():
-        sys.exit(f"Vault not found: {vault}")
+    state, message = classify(
+        vault, "the --vault flag" if args.vault else origin_describe("SBW_VAULT")
+    )
+    if state == "missing":
+        sys.exit(message)
 
     stale = audit(vault, args.stale_days, as_of)
     print(report(stale, vault, args.stale_days))

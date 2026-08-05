@@ -19,6 +19,18 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- `scripts/lib/vault-state.sh` and `scripts/lib/vault_state.py`: classify a
+  vault path as `missing`, `not-a-repo`, `no-vault-json` or `ready`, with one
+  canonical message per state, shared by `doctor.sh`,
+  `guard-vault-commit.sh` and the three Python auditors.
+  `tests/test-vault-state.sh` compares the two implementations
+  byte-for-byte per state, since a duplicated message is what drifts.
+- `ds_origin_describe` (shell) / `origin_describe` (Python) in the config
+  libs: name where a key's value came from — the `--vault` flag, the
+  `SBW_VAULT` environment variable, the config file by path, or the built-in
+  default. A path that points nowhere now says which knob produced it.
+- `docs/GUARD.md` documents `doctor`'s exit codes and the severity of each
+  vault state.
 - `scripts/lib/resolve-vault.sh`: prints the vault this machine resolves to,
   by the same environment > config file > default chain the scripts use. The
   Makefile consults it instead of re-deriving the fallback in make syntax.
@@ -33,8 +45,20 @@ write release notes, not two to keep in sync by hand.
   partial setup), and `$EDITOR` is unset on a fresh machine, so the line
   expands to a bare path the shell then tries to execute.
 
+### Changed
+
+- `doctor.sh` exits `2` when a finding is a misconfiguration, `1` when the
+  findings are only unfinished setup, `0` when clean. Previously any finding
+  exited `1`. A caller that only tested for non-zero is unaffected.
+
 ### Fixed
 
+- `doctor` no longer reports "`<path>` is not a git repo yet — nothing to
+  guard" for a path that doesn't exist at all. That message covered two
+  problems with different causes and different fixes — a wrong path versus
+  unfinished setup — and sent a reader after the wrong one. It also missed a
+  third state entirely: with our pre-commit hook present but no `vault.json`,
+  it reported `ok` and exited 0 on a directory nothing identified as a vault.
 - Every `make` target that takes a vault (`guard`, `doctor`, `audit`,
   `vault-index`, `vault-index-check`) now resolves it the way the script it
   wraps does. `VAULT ?= $(if $(SBW_VAULT),...,$(HOME)/vaults/second-brain)`

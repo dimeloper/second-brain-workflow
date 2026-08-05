@@ -28,9 +28,34 @@ ds_expand_tilde() {
   esac
 }
 
+# Human phrase for where a key's value came from, for an error message that
+# tells the reader which knob to reach for. Requires ds_config_load to have
+# run — it records <KEY>_ORIGIN as it resolves.
+ds_origin_describe() {
+  local key="$1" origin
+  eval "origin=\${${key}_ORIGIN:-}"
+  case "$origin" in
+    environment) echo "the ${key} environment variable" ;;
+    config)      echo "${key} in $(ds_config_path)" ;;
+    *)           echo "the built-in default (no ${key} in $(ds_config_path))" ;;
+  esac
+}
+
 ds_config_load() {
   local file key value line
   file="$(ds_config_path)"
+
+  # Snapshot provenance before anything is resolved: once the file has been
+  # read there is no way to tell a value that arrived from the environment
+  # from one this function assigned.
+  for key in $SBW_CONFIG_KEYS; do
+    eval "is_set=\${$key+set}"
+    if [ "${is_set:-}" = "set" ]; then
+      eval "${key}_ORIGIN=environment"
+    else
+      eval "${key}_ORIGIN="
+    fi
+  done
 
   if [ -f "$file" ]; then
     while IFS= read -r line || [ -n "$line" ]; do
@@ -53,8 +78,15 @@ ds_config_load() {
       [ "${is_set:-}" = "set" ] && continue
       eval "$key=\$(ds_expand_tilde \"\$value\")"
       eval "export $key"
+      eval "${key}_ORIGIN=config"
     done < "$file"
   fi
+
+  # Anything still unaccounted for is about to take its built-in default.
+  for key in $SBW_CONFIG_KEYS; do
+    eval "origin=\${${key}_ORIGIN:-}"
+    [ -n "${origin:-}" ] || eval "${key}_ORIGIN=default"
+  done
 
   # Defaults, applied only when a key is genuinely unset.
   [ -n "${SBW_VAULT+set}" ] || SBW_VAULT="$HOME/vaults/second-brain"

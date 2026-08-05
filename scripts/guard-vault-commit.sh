@@ -29,10 +29,13 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ds_config_load
 # shellcheck source=scripts/lib/vault-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
+# shellcheck source=scripts/lib/vault-state.sh
+. "${STANDARDS_DIR}/scripts/lib/vault-state.sh"
 
 MAX_FILES="${GUARD_MAX_FILES:-20}"
 MAX_LINES="${GUARD_MAX_LINES:-2000}"
 VAULT="${SBW_VAULT}"
+VAULT_ORIGIN="$(ds_origin_describe SBW_VAULT)"
 # Precedence: --expect-id flag (below) > SBW_EXPECTED_VAULT_ID env > machine
 # config (both already resolved by ds_config_load) > empty. Never the vault
 # under inspection itself — see the trust-model note in README.md.
@@ -42,7 +45,11 @@ REV=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --vault) VAULT="${2:?--vault needs a value}"; shift 2 ;;
+    --vault)
+      VAULT="${2:?--vault needs a value}"
+      VAULT_ORIGIN="the --vault flag"
+      shift 2
+      ;;
     --expect-id) EXPECT_ID="${2:?--expect-id needs a value}"; shift 2 ;;
     --range) RANGE="${2:?--range needs a BASE..HEAD value}"; shift 2 ;;
     --rev) REV="${2:?--rev needs a value}"; shift 2 ;;
@@ -55,8 +62,16 @@ fail() { echo "guard: $1" >&2; exit 1; }
 
 [ -z "${RANGE}" ] || [ -z "${REV}" ] || fail "--range and --rev are mutually exclusive"
 
-[ -d "${VAULT}" ] || fail "vault not found: ${VAULT}"
-[ -d "${VAULT}/.git" ] || fail "not a git repo: ${VAULT}"
+# Same four-state classification doctor reports, so the guard and the checkup
+# never describe the same broken path two different ways. Only the first two
+# states abort here: a git repo with no vault.json is handled further down,
+# where the identity check already has a documented "nothing to check against"
+# path — tightening that is a change to what the guard blocks, not to how it
+# describes things, so it is deliberately left alone.
+vault_state "${VAULT}" "${VAULT_ORIGIN}" || true
+case "${VS_STATE}" in
+  missing|not-a-repo) fail "${VS_MESSAGE}" ;;
+esac
 
 # --- diff source: the staged index, or a commit range/single rev -----------
 # Every check below reads through diff_paths()/diff_body()/PRE_REF rather than

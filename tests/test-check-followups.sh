@@ -100,8 +100,9 @@ rc_missing=$?
 assert_exit 1 "${rc_missing}" "a missing vault fails loudly, not silently"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_missing}" in
-  *"Vault not found"*) pass "a missing vault names itself in the error" ;;
-  *) fail "a missing vault names itself in the error" "${out_missing}" ;;
+  *"no such path"*"came from the --vault flag"*)
+    pass "a missing vault names itself and which knob produced the path" ;;
+  *) fail "a missing vault names itself and which knob produced the path" "${out_missing}" ;;
 esac
 
 finish

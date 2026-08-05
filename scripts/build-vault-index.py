@@ -23,6 +23,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
+from lib.config import origin_describe  # noqa: E402
+from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
 
 GENERATED_BY = "scripts/build-vault-index.py"
@@ -178,8 +180,11 @@ def main():
     args = ap.parse_args()
 
     vault = resolve_vault(args.vault)
-    if not vault.is_dir():
-        sys.exit(f"Vault not found: {vault}")
+    state, message = classify(
+        vault, "the --vault flag" if args.vault else origin_describe("SBW_VAULT")
+    )
+    if state == "missing":
+        sys.exit(message)
 
     notes, problems = collect(vault)
     content = render(notes)

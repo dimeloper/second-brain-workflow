@@ -126,6 +126,36 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   state a bare `git checkout <tag>` leaves behind. See the README's
   [Rollback](../README.md#versioning) section.
 
-Exits non-zero if anything is worth a look; `-h` prints this same list from
-the script itself, so it can't drift out of step with what's actually
-checked.
+`-h` prints this same list from the script itself, so it can't drift out of
+step with what's actually checked.
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | everything checked out |
+| 1 | warnings only — setup is unfinished, but nothing is misconfigured |
+| 2 | at least one error — something is configured wrong, and finishing setup won't fix it |
+
+Warnings stay non-zero deliberately. Every check here exists to surface a
+state nothing else surfaces — a stale submodule still renders fine, a skill
+missing from one skills directory is invisible from the other agent — so a
+scheduled run that exited 0 on those findings would be decorative. What made
+this confusing mid-setup wasn't the exit code but one message and one
+severity covering two different problems.
+
+Those are now told apart, along with two more states, because the fix for
+each is in a different place:
+
+| State | Severity | Because |
+|-------|----------|---------|
+| path doesn't exist | error (2) | the configuration points nowhere; the message names the knob that produced the path — the `--vault` flag, the `SBW_VAULT` environment variable, the config file, or the built-in default |
+| exists, not a git repo | warning (1) | setup is unfinished — `init-vault.sh --adopt` finishes it |
+| git repo, no `vault.json` | warning (1) | nothing identifies it as a vault, so the identity check has nothing to compare against |
+| git repo with `vault.json` | — | the hook checks below apply |
+
+`guard-vault-commit.sh` classifies a path the same way, through the shared
+`scripts/lib/vault-state.sh`, so the guard and the checkup never describe one
+broken path two different ways. The Python auditors (`check-lineage.py`,
+`check-followups.py`, `build-vault-index.py`) use the Python mirror of it for
+the same reason.

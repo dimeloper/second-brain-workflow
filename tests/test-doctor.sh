@@ -151,6 +151,7 @@ FAKE_ENGINE="${SANDBOX}/fake-engine"
 mkdir -p "${FAKE_ENGINE}/scripts/lib"
 cp "${ENGINE}/scripts/doctor.sh" "${FAKE_ENGINE}/scripts/doctor.sh"
 cp "${ENGINE}/scripts/lib/config.sh" "${FAKE_ENGINE}/scripts/lib/config.sh"
+cp "${ENGINE}/scripts/lib/vault-state.sh" "${FAKE_ENGINE}/scripts/lib/vault-state.sh"
 git -C "${FAKE_ENGINE}" init -q
 git -c protocol.file.allow=always -C "${FAKE_ENGINE}" \
   submodule add -q "file://${SUBMOD_UPSTREAM}" vendor/thing >/dev/null 2>&1

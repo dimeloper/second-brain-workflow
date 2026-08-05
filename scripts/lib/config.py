@@ -34,6 +34,27 @@ def config_path():
     return Path(base) / "second-brain-workflow" / "config"
 
 
+def origin_describe(key):
+    """Human phrase for where a key's value came from.
+
+    For an error message that tells the reader which knob to reach for. Kept
+    stateless — unlike the shell side, load() never mutates os.environ, so the
+    provenance can simply be recomputed rather than snapshotted. Wording must
+    match ds_origin_describe in lib/config.sh; test-vault-state.sh asserts it.
+    """
+    path = config_path()
+    if key in os.environ:
+        return f"the {key} environment variable"
+    if path.is_file():
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.partition("=")[0].strip() == key:
+                return f"{key} in {path}"
+    return f"the built-in default (no {key} in {path})"
+
+
 def _expand(value):
     """Expand a leading ~ only — a config file must not run shell code."""
     if value == "~" or value.startswith("~/"):
