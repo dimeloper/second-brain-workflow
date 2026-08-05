@@ -17,6 +17,35 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+
+- `tests/test-doc-snippets.sh`: fails if a shell-tagged code fence in a
+  reader-facing doc contains an angle-bracket placeholder or a bare
+  `$EDITOR`. Both classes broke a real first-time onboarding — zsh reads
+  `<account>` as a redirection and aborts the command *before* the script
+  runs (while the next command in the block still executes, leaving a silent
+  partial setup), and `$EDITOR` is unset on a fresh machine, so the line
+  expands to a bare path the shell then tries to execute.
+
+### Fixed
+
+- Every shell snippet in `README.md`, `docs/NEW-MACHINE.md` and
+  `docs/GUARD.md` now survives a copy-paste into zsh: `<account>`/`<id>`/
+  `<name>` became `YOUR_ACCOUNT`/`VAULT_ID`/`VAULT_NAME`, URL arguments are
+  quoted, and the rollback snippet assigns the tag to a variable instead of
+  interpolating `v<VERSION>`.
+- `docs/NEW-MACHINE.md` step 5 writes the machine config with a quoted
+  heredoc rather than `$EDITOR <path>`, so it needs no editor and no
+  expansion — and its keys no longer carry trailing `# ...` comments, which
+  the config parser does **not** strip: `SBW_EXPECTED_VAULT_ID=work  # must
+  match --id` set the expected id to `work  # must match --id`, making the
+  guard reject every commit for an id mismatch it couldn't explain.
+  `config.example`'s format note said only "`#` starts a comment"; it now
+  says a comment must start its own line.
+- `make doctor VAULT=~/...` is documented as `VAULT=$HOME/...`: zsh does not
+  tilde-expand a `make` variable argument, though bash does, so the tilde
+  form silently worked for some people and stat'd nothing for others.
+
 ## [0.3.0] - 2026-08-04
 
 ### Added

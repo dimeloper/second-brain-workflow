@@ -12,7 +12,7 @@ One vault per machine, each with its own `vault.json` (`id`, `remote`):
 
 ```bash
 ./scripts/init-vault.sh --path ~/vaults/work-brain --id work \
-  --remote git@github.com:<account>/work-brain.git
+  --remote "git@github.com:YOUR_ACCOUNT/work-brain.git"
 ```
 
 It scaffolds `practices/{app,backend,frontend,cross-cutting}`, `_templates/`,
@@ -104,7 +104,7 @@ Machine/vault health — not content, that's [`make audit`](AUDIT.md), and not
 code, that's `make check`. Three checks, read-only, none overlapping:
 
 ```bash
-VAULT=~/vaults/second-brain make doctor   # or: ./scripts/doctor.sh --vault ...
+VAULT="$HOME/vaults/second-brain" make doctor   # or: ./scripts/doctor.sh --vault ...
 ```
 
 - **Commit-guard hook** — this vault's `pre-commit` hook is installed and is

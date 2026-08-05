@@ -52,19 +52,20 @@ points at.
 ## Quickstart
 
 ```bash
-git clone --recurse-submodules https://github.com/dimeloper/second-brain-workflow.git
+git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 git checkout "$latest"    # newest release; skip both lines to track main
 git submodule update --init --recursive
 ./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
-  --remote git@github.com:<account>/second-brain.git
+  --remote "git@github.com:YOUR_ACCOUNT/second-brain.git"
 ./scripts/sync-skills.sh
 ```
 
-Runnable as-is — see [Versioning](#versioning) for the bump policy and how to
-pin or roll back to a specific tag instead of the newest. `--remote` is only
-recorded, not pushed to — create that repo yourself, private, first.
+Substitute `YOUR_ACCOUNT`; the rest is paste-and-run. See
+[Versioning](#versioning) for the bump policy and how to pin or roll back to a
+specific tag instead of the newest. `--remote` is only recorded, not pushed
+to — create that repo yourself, private, first.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
@@ -188,7 +189,7 @@ One vault per machine, each with its own `vault.json` (`id`, `remote`):
 
 ```bash
 ./scripts/init-vault.sh --path ~/vaults/work-brain --id work \
-  --remote git@github.com:<account>/work-brain.git
+  --remote "git@github.com:YOUR_ACCOUNT/work-brain.git"
 ```
 
 This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook
@@ -430,7 +431,8 @@ See [Quickstart](#quickstart) for cloning at the newest release; drop the
 **Rollback:** in the engine checkout,
 
 ```bash
-git checkout v<VERSION>
+version=v0.2.0                            # the release to roll back to
+git checkout "$version"
 git submodule update --init --recursive   # vendor/obsidian-skills is pinned per-commit, not per-tag
 ./scripts/sync-skills.sh                  # installed skills are symlinks into that submodule
 ```

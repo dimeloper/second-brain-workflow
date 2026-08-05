@@ -1,8 +1,9 @@
 # second-brain-workflow machine configuration
 #
 # Copy to ${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config and edit.
-# Format is KEY=value, one per line. `#` starts a comment. No shell expansion
-# beyond a leading ~, so write ~/vaults/... not $HOME/vaults/...
+# Format is KEY=value, one per line. A comment must start its own line — a
+# trailing `# ...` is not stripped, it becomes part of the value. No shell
+# expansion beyond a leading ~, so write ~/vaults/... not $HOME/vaults/...
 #
 # Precedence, highest first:
 #   1. CLI flag        (--vault, --targets)

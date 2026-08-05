@@ -27,7 +27,7 @@ target bash and the skills directories are POSIX paths.
 ### 1. Clone the engine
 
 ```bash
-git clone git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
+git clone "git@github.com:dimeloper/second-brain-workflow.git" ~/second-brain-workflow
 cd ~/second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 git checkout "$latest"    # newest release; skip both lines to track main
@@ -42,7 +42,7 @@ No SSH key set up yet (or a work machine you don't want to add one to)?
 Clone over HTTPS instead — read-only, no auth needed for a public repo:
 
 ```bash
-git clone https://github.com/dimeloper/second-brain-workflow.git ~/second-brain-workflow
+git clone "https://github.com/dimeloper/second-brain-workflow.git" ~/second-brain-workflow
 cd ~/second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 git checkout "$latest"    # newest release; skip both lines to track main
@@ -66,7 +66,7 @@ Two ways to add your own conventions:
 - **Separate repo (recommended if the engine itself is public and your
   conventions aren't):**
   ```bash
-  git clone git@github.com:<account>/<your-rules-repo>.git ~/dev-conventions
+  git clone "git@github.com:YOUR_ACCOUNT/YOUR_RULES_REPO.git" ~/dev-conventions
   ```
   Then point the engine at it — see step 5. `AGENTS.md` lives at that repo's
   root, `rules/*.md` in its `rules/` subdirectory.
@@ -88,8 +88,8 @@ or a symlink owned by another tool; it reports those and exits non-zero.
 ### 4. Create a vault
 
 ```bash
-./scripts/init-vault.sh --path ~/vaults/<name> --id <id> \
-  --remote git@github.com:<account>/<repo>.git
+./scripts/init-vault.sh --path ~/vaults/VAULT_NAME --id VAULT_ID \
+  --remote "git@github.com:YOUR_ACCOUNT/VAULT_REPO.git"
 ```
 
 `--id` is what the guard checks *against* on every commit — see step 5 for
@@ -99,8 +99,10 @@ yourself, private, first.
 
 This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook,
 so a hand-run `git commit` here is guarded even with no agent involved —
-`--no-hook` opts out. `make doctor` (VAULT=~/vaults/<name>) reports a vault
-whose hook is missing or isn't ours.
+`--no-hook` opts out. `make doctor VAULT=$HOME/vaults/VAULT_NAME` reports a
+vault whose hook is missing or isn't ours — spell it `$HOME`, not `~`, because
+zsh does not expand a tilde in a `make` variable argument (bash does, which is
+why this one silently works for some people and not others).
 
 The vault starts with no domain practice notes. It does get four cross-cutting
 notes describing how the vault itself operates, because `update-second-brain`
@@ -108,20 +110,34 @@ reads them at runtime.
 
 ### 5. Configure this machine
 
-```bash
-$EDITOR ${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config
-```
+Substitute `VAULT_NAME` and `VAULT_ID`, then paste the whole block — no editor
+needed, and nothing here depends on `$EDITOR` being set:
 
-```
-SBW_VAULT=~/vaults/<name>
-RENDER_TARGETS=claude-code,agents     # or cursor,agents — or all three
-SKILLS_DIRS=~/.claude/skills          # narrow it if only one agent is installed
-SBW_RULES_DIR=~/dev-conventions/rules   # only if rules live in a separate repo
-SBW_EXPECTED_VAULT_ID=<id>              # must match --id from step 4
+```bash
+config="${XDG_CONFIG_HOME:-$HOME/.config}/second-brain-workflow/config"
+mkdir -p "$(dirname "$config")"
+cat > "$config" <<'EOF'
+# Comments must be on their own line — a trailing `# ...` becomes part of the
+# value. Write ~/... not $HOME/..., since this file gets no shell expansion.
+SBW_VAULT=~/vaults/VAULT_NAME
+# or cursor,agents — or all three
+RENDER_TARGETS=claude-code,agents
+# narrow it if only one agent is installed
+SKILLS_DIRS=~/.claude/skills
+# only if rules live in a separate repo
+SBW_RULES_DIR=~/dev-conventions/rules
+# must match --id from step 4
+SBW_EXPECTED_VAULT_ID=VAULT_ID
+EOF
+cat "$config"      # confirm what actually landed
 ```
 
 See `config.example` for every key. Precedence is CLI flag > environment > this
-file > defaults.
+file > defaults. Two format rules that bite if broken: the file is parsed, not
+sourced, so **only a leading `~` is expanded** (`$HOME/...` stays literal), and
+**a comment must start its own line** — `SBW_EXPECTED_VAULT_ID=work  # ...`
+sets the id to `work  # ...`, and the guard then rejects every commit for an
+id mismatch it can't explain.
 
 `SBW_EXPECTED_VAULT_ID` is what makes the commit guard non-circular: it's read
 from *this machine's* config, never from the vault's own `vault.json` — so a
@@ -244,7 +260,7 @@ So the vault is the boundary, enforced per commit by the same script, run
 three ways, in increasing order of how hard they are to skip:
 
 ```bash
-./scripts/guard-vault-commit.sh --expect-id <id>
+./scripts/guard-vault-commit.sh --expect-id VAULT_ID
 ```
 
 It refuses a staged path outside the vault's allowed set, a `vault.json` id that
