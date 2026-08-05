@@ -19,6 +19,12 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- `scripts/lib/resolve-vault.sh`: prints the vault this machine resolves to,
+  by the same environment > config file > default chain the scripts use. The
+  Makefile consults it instead of re-deriving the fallback in make syntax.
+- `tests/test-make-vault.sh`: asserts `make` and the shared resolver agree,
+  that a config-only setup is honoured, and that `VAULT=` on the command line
+  or in the environment still overrides.
 - `tests/test-doc-snippets.sh`: fails if a shell-tagged code fence in a
   reader-facing doc contains an angle-bracket placeholder or a bare
   `$EDITOR`. Both classes broke a real first-time onboarding — zsh reads
@@ -29,6 +35,17 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- Every `make` target that takes a vault (`guard`, `doctor`, `audit`,
+  `vault-index`, `vault-index-check`) now resolves it the way the script it
+  wraps does. `VAULT ?= $(if $(SBW_VAULT),...,$(HOME)/vaults/second-brain)`
+  read only the *environment variable* — make cannot read the config file —
+  so a machine configured purely through the config file got the built-in
+  default from every make entry point. Worse, those targets pass the value on
+  as `--vault`, the highest-precedence input, so the wrong answer silently
+  beat the correct resolution inside the script: `make doctor` reported a
+  confident "ok  commit guard installed" about the personal vault on a
+  machine whose config named the work one. Anyone whose config file and
+  built-in default already agreed sees no change.
 - Every shell snippet in `README.md`, `docs/NEW-MACHINE.md` and
   `docs/GUARD.md` now survives a copy-paste into zsh: `<account>`/`<id>`/
   `<name>` became `YOUR_ACCOUNT`/`VAULT_ID`/`VAULT_NAME`, URL arguments are

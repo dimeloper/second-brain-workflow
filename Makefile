@@ -1,9 +1,21 @@
 .PHONY: help lint test vault-index vault-index-check sync-skills explain guard doctor audit verify-claude check
 
-VAULT ?= $(if $(SBW_VAULT),$(SBW_VAULT),$(HOME)/vaults/second-brain)
+# Resolved by the same code the scripts use, never re-derived in make syntax:
+# make cannot read the config file, so a fallback written here would ignore it
+# and then win anyway, since these targets pass the result as --vault. Only
+# computed when VAULT isn't already set, so `make doctor VAULT=/path` and
+# `VAULT=/path make doctor` both still override it. Write $(HOME), not ~, on
+# the command line — make does no tilde expansion, and neither does zsh in a
+# variable argument.
+ENGINE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+ifeq ($(origin VAULT),undefined)
+  VAULT := $(shell $(ENGINE_DIR)scripts/lib/resolve-vault.sh)
+endif
+
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
-                 scripts/lib/config.sh scripts/lib/vault-identity.sh tests/lib.sh $(wildcard tests/test-*.sh)
+                 scripts/lib/config.sh scripts/lib/vault-identity.sh \
+                 scripts/lib/resolve-vault.sh tests/lib.sh $(wildcard tests/test-*.sh)
 
 help:
 	@echo "make lint                shellcheck every shell script"

@@ -104,8 +104,16 @@ Machine/vault health — not content, that's [`make audit`](AUDIT.md), and not
 code, that's `make check`. Three checks, read-only, none overlapping:
 
 ```bash
+make doctor                                     # resolved vault, same as the script
 VAULT="$HOME/vaults/second-brain" make doctor   # or: ./scripts/doctor.sh --vault ...
 ```
+
+With nothing passed, every vault-taking `make` target resolves through
+`scripts/lib/resolve-vault.sh` — the same environment > config file > default
+chain the scripts themselves use, so `make doctor` and `./scripts/doctor.sh`
+can't name different vaults. Write `$HOME`, never `~`, when you do pass a path
+on the command line: make performs no tilde expansion, and neither does zsh in
+a variable argument, so `VAULT=~/vaults/...` stats nothing.
 
 - **Commit-guard hook** — this vault's `pre-commit` hook is installed and is
   ours: the local backstop above.
