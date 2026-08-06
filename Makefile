@@ -1,4 +1,5 @@
-.PHONY: help lint test vault-index vault-index-check sync-skills explain guard doctor audit verify-claude check
+.PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
+        vault-index-check sync-skills explain guard doctor audit verify-claude check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
 # make cannot read the config file, so a fallback written here would ignore it
@@ -18,8 +19,8 @@ SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault
                  scripts/lib/resolve-vault.sh tests/lib.sh $(wildcard tests/test-*.sh)
 
 help:
-	@echo "make lint                shellcheck every shell script"
-	@echo "make test                run the test suite against fixtures"
+	@echo "make lint                shellcheck every shell script (needs shellcheck)"
+	@echo "make test                run the test suite against fixtures — no extra tools"
 	@echo "make vault-index         regenerate <vault>/practices/INDEX.md"
 	@echo "make vault-index-check   fail if the index is stale"
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
@@ -29,14 +30,36 @@ help:
 	@echo "make audit               lineage + stale follow-ups + always-on rule token budget"
 	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
+	@echo "                         (skips shellcheck if it isn't installed)"
 	@echo ""
 	@echo "Render into a repo:  ./scripts/render.py <repo> [--targets ...]"
 	@echo "VAULT=$(VAULT)"
 
-lint:
+# shellcheck is the toolchain's only external dependency, and the two entry
+# points want opposite things from it. `make lint` is asked for on purpose, so a
+# missing shellcheck is an error there — skipping silently would report success
+# for work never done. `make check` is the "is this machine healthy" command, so
+# it degrades: a visible skip line, then everything else still runs. Before
+# this, a machine without shellcheck got `make: *** [lint] Error 1` and not one
+# of the tests executed. CI installs shellcheck, so coverage there is unchanged.
+#
+# Split three ways so neither entry point duplicates the other's commands, and
+# so lint-python — which needs nothing but python3 — runs in both cases.
+lint: require-shellcheck lint-shell lint-python
+
+require-shellcheck:
 	@command -v shellcheck >/dev/null || { \
-	  echo "shellcheck not installed — brew install shellcheck"; exit 1; }
-	@shellcheck -x $(SHELL_SOURCES) && echo "shellcheck clean"
+	  echo "shellcheck not installed — brew install shellcheck"; \
+	  echo "  (or run 'make test', which needs no extra tools)"; exit 1; }
+
+lint-shell:
+	@if command -v shellcheck >/dev/null; then \
+	  shellcheck -x $(SHELL_SOURCES) && echo "shellcheck clean"; \
+	else \
+	  echo "shellcheck: skipped — install shellcheck to enable (brew install shellcheck)"; \
+	fi
+
+lint-python:
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
 	  scripts/check-followups.py scripts/rule-budget.py scripts/lib/config.py scripts/lib/frontmatter.py \
 	  && echo "python syntax OK"
@@ -93,5 +116,9 @@ sync-skills:
 #
 # vault-index-check is deliberately not here: CI has no vault, and a stale index
 # is a vault-repo concern. Run `make vault-index-check` locally.
-check: lint test
+#
+# lint-shell rather than lint: without shellcheck this reports the skip and
+# carries on, so the exit status comes from the tests. With it, a shellcheck
+# finding still fails the run exactly as before.
+check: lint-shell lint-python test
 	@./scripts/render.py --explain >/dev/null && echo "rule scoping OK"

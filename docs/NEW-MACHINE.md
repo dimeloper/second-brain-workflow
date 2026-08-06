@@ -18,7 +18,10 @@ target bash and the skills directories are POSIX paths.
 - `git`, `python3`, `bash` (the system bash 3.2 on macOS is fine)
 - The agent(s) you use: Cursor, Claude Code, or both
 - Obsidian 1.12+ if you want the vault's Bases views (optional)
-- `shellcheck` only if you plan to run `make lint`
+- `shellcheck` — required by `make lint`, which fails without it. `make check`
+  uses it when present and prints a visible skip line when it isn't, so a
+  machine without it still runs everything else. `make test` needs nothing
+  beyond the three above.
 
 ---
 
@@ -196,12 +199,19 @@ rather than silently skipping the check.
 ### 6. Prove it works here
 
 ```bash
+make test               # the toolchain itself, against fixtures — needs no extra tools
+make check              # the above plus shellcheck, if it is installed
 make verify-claude      # if you use Claude Code — costs two model calls
 ```
 
-Renders into a throwaway repo and checks that a scoped rule loads on a matching
-file and not otherwise. Skip it only if you have no rules yet — it needs at
-least one glob-scoped rule to test.
+`make test` is the one to reach for first: it touches no real vault, no real
+repo and no skills directory, and needs nothing beyond `git`, `python3` and
+`bash`. `make check` adds shellcheck and a rule-scoping check, and prints
+`shellcheck: skipped` rather than failing if shellcheck isn't installed.
+
+`make verify-claude` renders into a throwaway repo and checks that a scoped
+rule loads on a matching file and not otherwise. Skip it only if you have no
+rules yet — it needs at least one glob-scoped rule to test.
 
 For Cursor, see the canary method in the README. There is no automated
 equivalent.

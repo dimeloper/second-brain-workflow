@@ -86,6 +86,16 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- `make check` no longer dies when shellcheck isn't installed. It printed
+  `make: *** [lint] Error 1` and ran none of the test suite — on a machine
+  following `docs/NEW-MACHINE.md`, which listed shellcheck as needed "only if
+  you plan to run `make lint`" while step 6 told you to verify. It now prints
+  `shellcheck: skipped — install shellcheck to enable` and runs everything
+  else, taking its exit status from the tests. `make lint`, which is asked for
+  on purpose, still fails without it and now names `make test` as the
+  dependency-free alternative. `lint` is split into `require-shellcheck`,
+  `lint-shell` and `lint-python`, so the python syntax check — which needs
+  nothing but python3 — is no longer stranded behind the shellcheck guard.
 - The README's Quickstart hardcoded `--id personal` and
   `--path ~/vaults/second-brain`, so following it on a work machine produced a
   vault whose id said `personal` — which then had to be undone, and if it
