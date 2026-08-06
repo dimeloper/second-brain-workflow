@@ -17,6 +17,17 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+
+- `sync-skills.sh` printed each installed skill's target shortened to be
+  relative to the checkout, while `ln -sfn` wrote an absolute one. `->` is
+  symlink notation, so a relative path beside it reads as a relative link —
+  and that misreading is what led a reviewer to design a cleanup tool around
+  matching link text against `second-brain-workflow`, a substring absolute
+  links never contain. It now prints exactly what `readlink` would, asserted
+  against `readlink` in `tests/test-sync-skills.sh` so the two can't diverge
+  again.
+
 ## [0.4.1] - 2026-08-06
 
 ### Fixed

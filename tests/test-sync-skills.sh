@@ -75,4 +75,21 @@ printf 'SKILLS_DIRS=%s\n' "${D}" > "${SANDBOX}/config"
 env -u SKILLS_DIRS SBW_CONFIG_FILE="${SANDBOX}/config" "${SYNC}" >/dev/null 2>&1
 assert_symlink "${D}/update-second-brain" "config file sets SKILLS_DIRS"
 
+# What it prints next to `->` must be the link's real target. Printing a path
+# shortened to be relative to the checkout read as a *relative link*, and that
+# misreading is what sent a cleanup tool looking for a substring absolute links
+# never contain. Asserted against readlink so the two cannot diverge again.
+name="check-follow-ups"
+if [ -L "${A}/${name}" ]; then
+  printed="$("${SYNC}" 2>/dev/null | sed -n "s|^  ${name} -> ||p" | head -1)"
+  actual="$(readlink "${A}/${name}")"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if [ -n "${printed}" ] && [ "${printed}" = "${actual}" ]; then
+    pass "the printed target is the link's real target, as readlink reports it"
+  else
+    fail "the printed target is the link's real target, as readlink reports it" \
+      "printed [${printed}] but the link points at [${actual}]"
+  fi
+fi
+
 finish

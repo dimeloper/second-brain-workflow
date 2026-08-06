@@ -150,21 +150,16 @@ README's [Removing them again](../README.md#removing-them-again).
 be the number of skills you expect, in *every* configured directory:
 
 ```
-~/.claude/skills
-  check-follow-ups -> skills/workflow/check-follow-ups
-  mcp-per-project -> skills/workflow/mcp-per-project
-  obsidian-knowledge-base -> skills/workflow/obsidian-knowledge-base
-  onboard-repo -> skills/workflow/onboard-repo
-  update-second-brain -> skills/workflow/update-second-brain
-  obsidian-bases -> vendor/obsidian-skills/skills/obsidian-bases
-  obsidian-markdown -> vendor/obsidian-skills/skills/obsidian-markdown
+/Users/you/.claude/skills
+  check-follow-ups -> /Users/you/second-brain-workflow/skills/workflow/check-follow-ups
+  ...
+  obsidian-markdown -> /Users/you/second-brain-workflow/vendor/obsidian-skills/skills/obsidian-markdown
   7 skill(s)
 ```
 
-Fewer than expected, or a `!!` line, means a name collided with something
-already there and was left alone. Those arrows show each skill's source path
-inside the checkout, not the link's own text — the links written on disk are
-absolute.
+One line per skill — the target shown is the link's real target, the same thing
+`readlink` would print — then the count. Fewer than expected, or a `!!` line,
+means a name collided with something already there and was left alone.
 
 ### 4. Create a vault
 

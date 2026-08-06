@@ -108,7 +108,13 @@ for skills_home in "${targets[@]}"; do
     fi
 
     run ln -sfn "${skill_dir}" "${target}"
-    echo "  ${name} -> ${skill_dir#"${STANDARDS_DIR}/"}"
+    # The full target, not one shortened to be relative to the checkout. `->`
+    # is symlink notation, so printing a relative path next to it reads as a
+    # relative link — and that misreading sent a reviewer building a cleanup
+    # tool down a path that could never have worked, matching link text against
+    # a substring that absolute links do not contain. What this prints is now
+    # exactly what readlink would show.
+    echo "  ${name} -> ${skill_dir}"
     synced=$((synced + 1))
   done <<< "${DESIRED}"
 
