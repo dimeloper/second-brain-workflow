@@ -55,17 +55,44 @@ points at.
 git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-git checkout "$latest"    # newest release; skip both lines to track main
+echo "latest = $latest"                       # empty means no release yet
+[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
 git submodule update --init --recursive
-./scripts/init-vault.sh --path ~/vaults/second-brain --id personal \
+
+# This machine's role. Both lines are meant to be edited.
+vault_id=personal                             # personal, work, …
+vault_path=~/vaults/second-brain
+
+./scripts/init-vault.sh --path "$vault_path" --id "$vault_id" \
   --remote "git@github.com:YOUR_ACCOUNT/second-brain.git"
 ./scripts/sync-skills.sh
 ```
 
-Substitute `YOUR_ACCOUNT`; the rest is paste-and-run. See
-[Versioning](#versioning) for the bump policy and how to pin or roll back to a
-specific tag instead of the newest. `--remote` is only recorded, not pushed
-to — create that repo yourself, private, first.
+Edit `vault_id`/`vault_path` and substitute `YOUR_ACCOUNT`; the rest is
+paste-and-run. On a work machine those are `work` and `~/vaults/work-brain` —
+following this section verbatim there gets you a vault whose id says
+`personal`, which then has to be undone.
+
+**`vault_id` must match this machine's `SBW_EXPECTED_VAULT_ID`.** Those two
+disagreeing is the single most common way to end up with a setup that fails on
+its first commit, so `init-vault.sh` writes both together when no config file
+exists yet, and prints what it wrote:
+
+```
+Wrote /Users/you/.config/second-brain-workflow/config:
+    # Written by init-vault.sh. See config.example for every key.
+    SBW_VAULT=/Users/you/vaults/second-brain
+    SBW_EXPECTED_VAULT_ID=personal
+```
+
+If a config file already exists it is never touched — you get told which line
+to add instead. `--no-config` skips this entirely. See
+[`config.example`](config.example) for every key and
+[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) for writing it by hand.
+
+See [Versioning](#versioning) for the bump policy and how to pin or roll back
+to a specific tag instead of the newest. `--remote` is only recorded, not
+pushed to — create that repo yourself, private, first.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See

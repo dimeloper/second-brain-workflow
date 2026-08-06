@@ -17,7 +17,10 @@ SANDBOX=""
 
 setup_sandbox() {
   SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/second-brain-workflow-test.XXXXXX")"
-  # Never resolve real user config during a test run.
+  # Never resolve real user config during a test run. Note that this path is
+  # where init-vault.sh *writes* a machine config when none exists, so a test
+  # that runs init-vault.sh no longer has "no config" afterwards — delete this
+  # file if that is the state you mean to assert against.
   export SBW_CONFIG_FILE="${SANDBOX}/no-such-config"
   trap 'teardown_sandbox' EXIT INT TERM
 }

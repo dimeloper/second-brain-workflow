@@ -30,7 +30,8 @@ target bash and the skills directories are POSIX paths.
 git clone "git@github.com:dimeloper/second-brain-workflow.git" ~/second-brain-workflow
 cd ~/second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-git checkout "$latest"    # newest release; skip both lines to track main
+echo "latest = $latest"                       # empty means no release yet
+[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
 git submodule update --init --recursive
 ```
 
@@ -45,7 +46,8 @@ Clone over HTTPS instead — read-only, no auth needed for a public repo:
 git clone "https://github.com/dimeloper/second-brain-workflow.git" ~/second-brain-workflow
 cd ~/second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-git checkout "$latest"    # newest release; skip both lines to track main
+echo "latest = $latest"                       # empty means no release yet
+[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
 git submodule update --init --recursive
 ```
 
@@ -108,6 +110,23 @@ credentials, and still carry a personal address into an employer's history.
 whether or not you pin one, so a wrong one is visible before the first commit
 rather than after the push.
 
+This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook,
+so a hand-run `git commit` here is guarded even with no agent involved —
+`--no-hook` opts out. `make doctor VAULT=$HOME/vaults/VAULT_NAME` reports a
+vault whose hook is missing or isn't ours — spell it `$HOME`, not `~`, because
+zsh does not expand a tilde in a `make` variable argument (bash does, which is
+why this one silently works for some people and not others).
+
+The vault starts with no domain practice notes. It does get four cross-cutting
+notes describing how the vault itself operates, because `update-second-brain`
+reads them at runtime.
+
+When no config file exists yet, this also writes one with `SBW_VAULT` and
+`SBW_EXPECTED_VAULT_ID` and prints it. Those two must agree with `--id`, and
+here is the one moment both are known, so they can't be made to disagree by
+hand. An existing config file is never touched — you get told which line to
+add. `--no-config` skips it.
+
 ### Give the machine the right git identity
 
 The real fix is not `git config user.email` per repo, which has to be
@@ -134,21 +153,13 @@ resolves the same chain a commit would rather than just reading one config
 file, or with `make doctor`, which reports a resolved identity that disagrees
 with what `vault.json` declares.
 
-This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook,
-so a hand-run `git commit` here is guarded even with no agent involved —
-`--no-hook` opts out. `make doctor VAULT=$HOME/vaults/VAULT_NAME` reports a
-vault whose hook is missing or isn't ours — spell it `$HOME`, not `~`, because
-zsh does not expand a tilde in a `make` variable argument (bash does, which is
-why this one silently works for some people and not others).
-
-The vault starts with no domain practice notes. It does get four cross-cutting
-notes describing how the vault itself operates, because `update-second-brain`
-reads them at runtime.
-
 ### 5. Configure this machine
 
-Substitute `VAULT_NAME` and `VAULT_ID`, then paste the whole block — no editor
-needed, and nothing here depends on `$EDITOR` being set:
+Step 4 already wrote `SBW_VAULT` and `SBW_EXPECTED_VAULT_ID` if you had no
+config file. Write it in full when you need the other keys, or when a config
+already existed and was therefore left alone. Substitute `VAULT_NAME` and
+`VAULT_ID`, then paste the whole block — no editor needed, and nothing here
+depends on `$EDITOR` being set:
 
 ```bash
 config="${XDG_CONFIG_HOME:-$HOME/.config}/second-brain-workflow/config"

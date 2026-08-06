@@ -76,6 +76,13 @@ assert_exit 0 $? "--expect-id flag takes precedence over SBW_EXPECTED_VAULT_ID"
 # The circularity this closes: without this, an unconfigured machine's guard
 # only checked that vault.json HAD an id, never that it was the RIGHT one —
 # so a wrong vault.json would pass simply by being internally consistent.
+#
+# init-vault.sh now writes a machine config when none exists, and this suite
+# creates its vault with it — so the config it wrote has to go before
+# "unconfigured" means anything here. Deleting it is the point of the case: the
+# state under test is a machine with no expected id at all, which is still
+# reachable (--no-config, a deleted config, a bare CI runner).
+rm -f "${SBW_CONFIG_FILE}"
 unset SBW_EXPECTED_VAULT_ID
 out="$("${GUARD}" --vault "${VAULT}" 2>&1)"
 rc=$?

@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./init-vault.sh --path <dir> --id <id> [--remote <url>] [--adopt] [--no-hook]
-#                   [--identity-email <addr>]
+#                   [--identity-email <addr>] [--no-config]
 #
 #   --path     where the vault goes, e.g. ~/vaults/work-brain
 #   --id       short identifier, e.g. work — recorded in vault.json and checked
@@ -16,8 +16,17 @@
 #              recorded in vault.json and enforced by guard-vault-commit.sh.
 #              Optional; without it commits are not checked against an author.
 #              Only written when vault.json is created — see the note below.
+#   --no-config
+#              don't write this machine's config file even if none exists.
 #
 # Idempotent: re-running adds missing pieces and leaves existing files alone.
+#
+# Writes the machine config (SBW_VAULT + SBW_EXPECTED_VAULT_ID) when no config
+# file exists at all, and prints exactly what it wrote. Without it the guard
+# fails closed on the very first commit — the state a reader following only the
+# README's Quickstart landed in, since the id in vault.json and the machine's
+# expected id have to agree and nothing was setting the second one. An existing
+# config file is never touched; --no-config skips this entirely.
 #
 # Installs guard-vault-commit.sh as this vault's pre-commit hook by default —
 # the backstop that makes the identity check an invariant of committing here
@@ -33,8 +42,13 @@ set -euo pipefail
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/vault-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
+# For ds_config_path only — one definition of where the config lives, not a
+# second copy of the XDG logic here. ds_config_load is deliberately not called:
+# this script writes the config, it does not resolve one.
+# shellcheck source=scripts/lib/config.sh
+. "${STANDARDS_DIR}/scripts/lib/config.sh"
 
-PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0; IDENTITY_EMAIL=""
+PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0; IDENTITY_EMAIL=""; NO_CONFIG=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --path)     PATH_ARG="${2:?--path needs a value}"; shift 2 ;;
@@ -43,7 +57,8 @@ while [ $# -gt 0 ]; do
     --adopt)    ADOPT=1; shift ;;
     --no-hook)  NO_HOOK=1; shift ;;
     --identity-email) IDENTITY_EMAIL="${2:?--identity-email needs a value}"; shift 2 ;;
-    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --no-config) NO_CONFIG=1; shift ;;
+    -h|--help) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -324,6 +339,44 @@ if [ "${created}" -eq 0 ]; then
 else
   echo "Added ${created} item(s)."
 fi
+# The two things that have to agree — vault.json's id and this machine's
+# SBW_EXPECTED_VAULT_ID — are both known right here, so writing them together
+# is the one moment they cannot be made to disagree by hand. Without it the
+# guard fails closed on the very first commit, which is where a reader
+# following only the Quickstart ended up.
+#
+# This does not weaken the non-circular trust model. What that model forbids is
+# the *guard* reading its expectation out of the vault it is checking, so a
+# repointed or freshly cloned vault can't vouch for itself. The expectation
+# still lives on the machine, in a file this writes once from an id a human
+# passed in; nothing later re-derives it from vault.json. Automating a human
+# assertion is not the same as letting the vault assert it.
+#
+# Only ever when the file does not exist. An existing config is the user's,
+# may carry keys this knows nothing about, and on a second vault would already
+# hold a different expected id — merging into that is not this script's call.
+CONFIG_FILE="$(ds_config_path)"
+if [ "${NO_CONFIG}" -eq 0 ] && [ ! -e "${CONFIG_FILE}" ]; then
+  mkdir -p "$(dirname "${CONFIG_FILE}")"
+  cat > "${CONFIG_FILE}" <<EOF
+# Written by init-vault.sh. See config.example for every key.
+SBW_VAULT=${VAULT}
+SBW_EXPECTED_VAULT_ID=${ID}
+EOF
+  echo
+  echo "Wrote ${CONFIG_FILE}:"
+  sed 's/^/    /' "${CONFIG_FILE}"
+elif [ "${NO_CONFIG}" -eq 0 ]; then
+  echo
+  echo "${CONFIG_FILE} already exists — left untouched."
+  if ! grep -q "^[[:space:]]*SBW_EXPECTED_VAULT_ID[[:space:]]*=[[:space:]]*${ID}[[:space:]]*$" \
+         "${CONFIG_FILE}" 2>/dev/null; then
+    echo "It does not set SBW_EXPECTED_VAULT_ID=${ID}, so the guard will refuse"
+    echo "commits into this vault until it does. Add or change that line:"
+    echo "    SBW_EXPECTED_VAULT_ID=${ID}"
+  fi
+fi
+
 # Always print the identity a commit here would carry, pinned or not. Seeing it
 # at creation time is what would have caught a personal address on a work
 # machine before the first commit rather than after the push. Deliberately not

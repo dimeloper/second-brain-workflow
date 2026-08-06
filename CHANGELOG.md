@@ -19,6 +19,15 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- `init-vault.sh` writes this machine's config (`SBW_VAULT` +
+  `SBW_EXPECTED_VAULT_ID`) when no config file exists, and prints exactly what
+  it wrote. The vault's id and the machine's expected id have to agree, and
+  `init-vault.sh` is the one moment both are known — previously they were two
+  separate manual steps and the Quickstart documented only the first, so the
+  first commit died on `no expected vault id configured for this machine`. An
+  existing config file is never touched: you get told which line to add.
+  `--no-config` skips it.
+
 - **Commit authorship checking**, opt-in per vault via an `identity` object in
   `vault.json` (`email`, `email_pattern` for EMU/noreply addresses, optional
   `name`). `guard-vault-commit.sh` refuses a commit whose author isn't the
@@ -77,6 +86,20 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- The README's Quickstart hardcoded `--id personal` and
+  `--path ~/vaults/second-brain`, so following it on a work machine produced a
+  vault whose id said `personal` — which then had to be undone, and if it
+  wasn't, put the machine's config and the vault in exactly the disagreement
+  the guard exists to detect. The id and path are now shell variables the
+  reader is told to edit, and the section states that `vault_id` must match
+  `SBW_EXPECTED_VAULT_ID`.
+- The docs' tag-resolution snippet ran `git checkout ""` against a repo with no
+  matching tag, failing with `fatal: empty string is not a valid pathspec` —
+  a message about pathspecs, for a problem about tags. It now echoes the
+  resolved tag and skips the checkout when there is none.
+- `docs/NEW-MACHINE.md`'s git-identity section had been inserted mid-step-4,
+  orphaning the pre-commit-hook paragraph that followed it from the
+  `init-vault.sh` prose it belongs to. Moved after step 4's body.
 - `doctor.sh`'s new author check used a bare `return` for "this vault pins no
   identity", which propagates the failed test's status; under `set -e` that
   aborted the whole run, silently dropping the remaining checks and the
