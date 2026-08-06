@@ -79,6 +79,23 @@ check_hook() {
   fi
 }
 
+# A vault created before the author check existed has no identity block, so the
+# check silently doesn't apply — on the machine where a personal address reached
+# an employer repo, that is still true of the vault it happened in. Nothing else
+# tells you: `--adopt` fills scaffold *files* and never edits vault.json, so
+# there is no automatic upgrade. Hence naming the exact line to add rather than
+# reporting a bare "optional". Severity stays `ok`: the check genuinely is
+# opt-in, and doctor cannot know whether a given vault ought to pin one.
+# printf, not echo: the pattern example contains a backslash, and echo's
+# handling of those is not portable.
+no_identity() {
+  ok "vault.json pins no commit author — the check is opt-in, so it is not running here"
+  printf '%s\n' '        a vault created before this feature has no identity block; add one to enable it:'
+  printf '%s\n' '          "identity": { "email": "you@example.com" }'
+  printf '%s\n' '          or, for addresses that vary: { "email_pattern": ".*@example\\.com$" }'
+  printf '%s\n' '        see docs/GUARD.md#upgrading-an-existing-vault'
+}
+
 # The point of reporting it here is timing: the guard catches an author
 # mismatch at the first commit, which on the machine this came from was already
 # one commit too late. An error rather than a warning — a git identity that
@@ -103,10 +120,10 @@ check_author() {
       if [ -n "${AI_EXPECT}" ]; then
         ok "commits here would be authored as ${email}, which is what vault.json declares"
       else
-        ok "vault.json declares no commit identity — commits are not checked against an author (optional)"
+        no_identity
       fi
       ;;
-    2) ok "vault.json declares no commit identity — commits are not checked against an author (optional)" ;;
+    2) no_identity ;;
     *) err "${AI_ERROR}" ;;
   esac
 }

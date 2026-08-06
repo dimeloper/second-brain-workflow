@@ -218,10 +218,25 @@ esac
 
 V="${SANDBOX}/v-doctor-none"
 make_vault "${V}" "" "${WRONG}"
+# Not just "says something": an existing vault has to be told what it is
+# missing and how to add it, since nothing else will — --adopt does not migrate
+# manifests. Asserted on the actionable half, not only the headline.
+out="$(doctor_out "${V}")"
 TESTS_RUN=$((TESTS_RUN + 1))
-case "$(doctor_out "${V}")" in
-  *"declares no commit identity"*) pass "doctor says so when nothing is pinned, without complaining" ;;
-  *) fail "doctor says so when nothing is pinned, without complaining" "$(doctor_out "${V}")" ;;
+case "${out}" in
+  *"pins no commit author"*'"identity": { "email"'*"upgrading-an-existing-vault"*)
+    pass "doctor names the key to add when nothing is pinned, without complaining" ;;
+  *) fail "doctor names the key to add when nothing is pinned, without complaining" "${out}" ;;
+esac
+# Severity, not exit code: this fixture has no pre-commit hook either, so the
+# run legitimately exits 1 for that. What must hold is that the *identity*
+# finding is an `ok` — the check is opt-in, so an unpinned vault is not itself a
+# problem, however loudly the advice is worded.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"ok    vault.json pins no commit author"*)
+    pass "and reports it as ok, not a warning — the check is opt-in" ;;
+  *) fail "and reports it as ok, not a warning — the check is opt-in" "${out}" ;;
 esac
 
 # Regression: check_author used a bare `return`, which propagates the failed

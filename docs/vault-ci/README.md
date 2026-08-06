@@ -121,8 +121,9 @@ edits, or promotes a rule or a practice note on its own.
 `guard-vault-commit.sh` is what `update-second-brain` and the vault's own
 `pre-commit` hook both run before a commit — the checks documented in
 [docs/GUARD.md](../GUARD.md) (path allowlist, size caps, no deleting an
-`enforced` note, conflict markers, secret-shaped strings, and the
-vault-identity check). Both of those run *before* a commit is made,
+`enforced` note, conflict markers, secret-shaped strings, the vault-identity
+check, and — where `vault.json` declares one — the **commit-author** check).
+Both of those run *before* a commit is made,
 which means both are skippable: `git commit --no-verify` skips the hook,
 and there is no equivalent to opt out of skipping — including for an agent
 that decides a failing check is a reasonable thing to route around.
@@ -131,6 +132,18 @@ that decides a failing check is a reasonable thing to route around.
 the pushed commit range instead of a staged index, since there's no staging
 area once a push has already happened. This is the layer that can't be
 `--no-verify`'d away.
+
+That includes the commit-author check, which in range mode reads **each
+commit's recorded author** and names the offending commit, rather than the local
+config — by the time this runs, whatever config produced the commit is gone. So
+`git commit --no-verify` with the wrong author is caught here, which is the
+whole point.
+
+**It only works if `ENGINE_REF` points at a release that has the check.**
+Anything before `v0.4.0` predates it entirely, so a workflow pinned there runs a
+guard that never looks at authorship — green, and checking less than you think.
+The shipped templates track the current release; if you copied them earlier,
+bump `ENGINE_REF` deliberately and re-read what you gained.
 
 ### Setup
 

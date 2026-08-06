@@ -21,7 +21,12 @@ permissions:
 
 env:
   ENGINE_REPO: dimeloper/second-brain-workflow
-  ENGINE_REF: v0.2.0   # v0.1.0 predates --range/--rev; nothing older works here
+  # Must be a release that has the checks you expect to run. v0.1.0 predates
+  # --range/--rev, and anything before v0.4.0 predates the commit-author check
+  # — pinning one of those silently gives you a CI backstop that does not check
+  # authorship at all, which is most of the reason this workflow exists.
+  # tests/test-release-consistency.sh keeps this in step with VERSION.
+  ENGINE_REF: v0.4.2
 
 jobs:
   guard:

@@ -17,8 +17,18 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-08-06
+
 ### Fixed
 
+- **The shipped CI templates pinned engines that predate the checks they are
+  meant to run.** `docs/vault-ci/guard.yml` shipped `ENGINE_REF: v0.2.0` and
+  `audit.yml` `v0.1.0`, so a vault repo copying them got a push-time guard
+  running an engine with no commit-author check at all — green, and checking
+  less than the reader thinks. Both now track the current release. The author
+  check itself always did run in `--range` mode, reading each commit's recorded
+  author and naming the offending commit; the template's pin was what defeated
+  it in practice.
 - `sync-skills.sh` printed each installed skill's target shortened to be
   relative to the checkout, while `ln -sfn` wrote an absolute one. `->` is
   symlink notation, so a relative path beside it reads as a relative link —
@@ -27,6 +37,28 @@ write release notes, not two to keep in sync by hand.
   links never contain. It now prints exactly what `readlink` would, asserted
   against `readlink` in `tests/test-sync-skills.sh` so the two can't diverge
   again.
+
+### Added
+
+- `docs/GUARD.md#upgrading-an-existing-vault`: **there is no automatic vault
+  upgrade path, and now it says so.** A vault only has the `vault.json` keys
+  that existed when it was created, `--adopt` fills scaffold *files* and never
+  edits a manifest, and `--identity-email` only writes into a `vault.json` it
+  creates. So an `identity` block on an existing vault is a hand edit, with
+  the exact JSON and the command to confirm it parsed.
+- `tests/test-release-consistency.sh`: `VERSION`, the newest `CHANGELOG`
+  section, both comparison links, and `ENGINE_REF` in both CI templates must
+  name the same release — the invariant that quietly broke for three releases.
+  Bumping `ENGINE_REF` is now part of the release checklist in the README.
+
+### Changed
+
+- `make doctor` no longer reports a vault with no `identity` block as a bland
+  optional `ok`. It names the exact key to add and links the upgrade section,
+  because nothing else tells an existing user their vault predates the check —
+  which is still true of the vault the original incident happened in. Severity
+  stays `ok`: the check is genuinely opt-in, and doctor can't know whether a
+  given vault ought to pin one.
 
 ## [0.4.1] - 2026-08-06
 
@@ -376,7 +408,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.2.0...v0.3.0

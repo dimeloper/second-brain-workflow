@@ -111,6 +111,51 @@ That tier is also the only one a local `--no-verify` can't skip.
 `make doctor` reports the same mismatch against the identity a commit *would*
 be made with, so it surfaces at setup time instead of at the first commit.
 
+## Upgrading an existing vault
+
+**A vault only has the `vault.json` keys that existed when it was created.**
+Every capability added since — the `identity` block above is the first, and
+won't be the last — applies to vaults made after it shipped. There is no
+automatic migration, and the two things that look like one aren't:
+
+- **`init-vault.sh --adopt` fills scaffold *files* only.** It adds missing
+  directories, templates and cross-cutting notes, and it never edits an
+  existing `vault.json`, because its one invariant is that it doesn't rewrite
+  content it didn't write. So it will not add an `identity` block, and re-running
+  it will not upgrade a manifest.
+- **`--identity-email` only writes into a `vault.json` it creates.** Passed
+  against a vault that already has one, it prints the JSON to add and changes
+  nothing.
+
+So the upgrade path is deliberately manual, and `make doctor` is what tells you
+an upgrade is available: a vault with no `identity` block gets a line naming the
+exact key to add. Add it to `vault.json` by hand:
+
+```json
+{
+  "id": "work",
+  "remote": "https://github.com/YOUR_ACCOUNT/work-brain.git",
+  "identity": { "email_pattern": ".*@example\\.com$" },
+  "schema_version": 1
+}
+```
+
+then confirm the tooling reads it:
+
+```bash
+make doctor VAULT="$HOME/vaults/VAULT_NAME"
+```
+
+A vault that pins an identity reports `commits here would be authored as …`,
+and a resolved address that disagrees with the declaration is an error (exit
+2). If you get the "pins no commit author" line instead, the key didn't parse —
+check it's inside the top-level object and that the JSON is still valid.
+
+**Vaults predating v0.4.0 are the ones that matter most here**, because the
+incident that motivated the check happened in one: a personal address in an
+employer-owned vault's history, with every check that existed at the time
+passing.
+
 ## Three enforcement tiers
 
 Three things run this exact script, in increasing order of how hard they are

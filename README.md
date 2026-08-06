@@ -461,12 +461,16 @@ are tagged `v<VERSION>`. Bump policy:
 
 **Cutting a release:** move [`CHANGELOG.md`](CHANGELOG.md)'s `[Unreleased]`
 entries under a new `## [X.Y.Z] - YYYY-MM-DD` heading (add the two
-comparison links at the file's bottom), bump `VERSION` to match, tag
+comparison links at the file's bottom), bump `VERSION` to match, bump
+`ENGINE_REF` in **both** `docs/vault-ci/*.yml` templates to the new tag, tag
 `v<VERSION>`, and point the GitHub Release's notes at that changelog section
 rather than writing them by hand — one place to describe what changed, not
 two that can say different things. A **Major** entry in the changelog always
 names the specific action required, since that's the part a commit log
-can't supply on its own.
+can't supply on its own. `tests/test-release-consistency.sh` enforces the
+`VERSION`/changelog/`ENGINE_REF` half of that list, because a template pinned
+several releases back gives an adopter a workflow that quietly runs fewer
+checks than they think.
 
 Every rendered file's provenance comment names both the commit and the
 engine version it came from, and a plain `.sbw-version` file is written at
