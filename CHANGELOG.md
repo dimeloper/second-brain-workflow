@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-06
+
 ### Added
 
 - `docs/NEW-MACHINE.md` is rebuilt around **verification checkpoints**: every
@@ -34,7 +36,6 @@ write release notes, not two to keep in sync by hand.
 - Prerequisites that were needed but unlisted: a git identity suited to the
   machine, and credentials that can push to the vault remote (HTTPS plus a
   fine-grained PAT where an EMU/SSO account can't easily take an SSH key).
-
 - `make uninstall` / `scripts/uninstall.sh`: removes the skills this engine
   installed, from every directory in `SKILLS_DIRS`. Previewing is the default
   and `--yes` is the only thing that acts (`--dry-run` says the default
@@ -48,7 +49,6 @@ write release notes, not two to keep in sync by hand.
   checkout (another tool's install, e.g. Railway's `use-railway`), a broken
   link that isn't ours, the skills directories themselves, any vault, the
   machine config, or rendered rules in onboarded repos.
-
 - `init-vault.sh` writes this machine's config (`SBW_VAULT` +
   `SBW_EXPECTED_VAULT_ID`) when no config file exists, and prints exactly what
   it wrote. The vault's id and the machine's expected id have to agree, and
@@ -57,7 +57,6 @@ write release notes, not two to keep in sync by hand.
   first commit died on `no expected vault id configured for this machine`. An
   existing config file is never touched: you get told which line to add.
   `--no-config` skips it.
-
 - **Commit authorship checking**, opt-in per vault via an `identity` object in
   `vault.json` (`email`, `email_pattern` for EMU/noreply addresses, optional
   `name`). `guard-vault-commit.sh` refuses a commit whose author isn't the
@@ -81,7 +80,6 @@ write release notes, not two to keep in sync by hand.
   opt-in it can never become the routine nuisance that teaches `--no-verify`.
   A vault with no `identity` block behaves exactly as before. A declared
   identity that can't be *read* fails closed rather than passing.
-
 - `scripts/lib/vault-state.sh` and `scripts/lib/vault_state.py`: classify a
   vault path as `missing`, `not-a-repo`, `no-vault-json` or `ready`, with one
   canonical message per state, shared by `doctor.sh`,
@@ -344,7 +342,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/dimeloper/second-brain-workflow/releases/tag/v0.1.0

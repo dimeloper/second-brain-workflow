@@ -44,11 +44,6 @@ target bash and the skills directories are POSIX paths.
   fine-grained personal access token is the realistic path. Nothing here
   pushes for you, so this only has to work by the time *you* push.
 
-> The features described below — `--identity-email`, `make uninstall`,
-> `make doctor`'s four vault states — are newer than the `v0.3.0` tag that
-> step 1 pins. Until the next release, track `main` (skip the checkout lines)
-> if you want them.
-
 ---
 
 ## Fresh start
@@ -93,7 +88,7 @@ git submodule status
 ```
 
 ```
-latest = v0.3.0
+latest = v0.4.0
  a1dc48e68138490d522c04cbf5822214c6eb1202 vendor/obsidian-skills (heads/main)
 ```
 
