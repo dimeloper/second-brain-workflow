@@ -19,6 +19,22 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- `docs/NEW-MACHINE.md` is rebuilt around **verification checkpoints**: every
+  numbered step ends with the exact command to confirm it worked and the real
+  output to expect, captured by running the walkthrough end to end on a
+  simulated fresh machine rather than written from memory. New checkpoints
+  cover submodule state, the skill count per directory, `vault.json` plus a
+  `grep -c` proving the pre-commit hook is *ours* rather than merely present,
+  `git var GIT_AUTHOR_IDENT`, `make doctor`, and the guard's own line above
+  git's on the first commit.
+- A **troubleshooting table** in `docs/NEW-MACHINE.md`, every row drawn from a
+  real first-setup failure, with `tests/test-troubleshooting.sh` asserting the
+  messages it quotes still exist in the source that emits them — and that
+  every numbered step still has a Check.
+- Prerequisites that were needed but unlisted: a git identity suited to the
+  machine, and credentials that can push to the vault remote (HTTPS plus a
+  fine-grained PAT where an EMU/SSO account can't easily take an SSH key).
+
 - `make uninstall` / `scripts/uninstall.sh`: removes the skills this engine
   installed, from every directory in `SKILLS_DIRS`. Previewing is the default
   and `--yes` is the only thing that acts (`--dry-run` says the default
@@ -100,6 +116,9 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- `init-vault.sh` told you to write `SBW_VAULT` into a config file it had just
+  written itself — a contradiction introduced when it gained that ability.
+  Its closing "Next" step now reflects what actually happened.
 - `make check` no longer dies when shellcheck isn't installed. It printed
   `make: *** [lint] Error 1` and ran none of the test suite — on a machine
   following `docs/NEW-MACHINE.md`, which listed shellcheck as needed "only if

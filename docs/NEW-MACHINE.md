@@ -8,6 +8,19 @@ Two paths. Pick one deliberately — they differ in what arrives with you.
 - **[Carry your rules](#carry-your-rules)** — a second machine for the same
   person and the same stack.
 
+> **Get this one thing right.** The vault's `--id` and this machine's
+> `SBW_EXPECTED_VAULT_ID` must be the same string. Those two disagreeing is the
+> single most common way to end up with a setup that dies on its first commit,
+> and the error you get names an id you never typed. `init-vault.sh` writes both
+> together when no config file exists yet, so the usual way to break it is
+> editing one of them afterwards.
+
+Every step ends with a **Check** — the exact command, and the output to expect
+from it. Run it before moving on; each one catches a distinct way the step
+before it silently half-worked. If something looks wrong, see
+[Troubleshooting](#troubleshooting) at the bottom, which is built from real
+first-setup failures rather than imagined ones.
+
 Everything below assumes macOS or Linux. Windows is not supported: the scripts
 target bash and the skills directories are POSIX paths.
 
@@ -22,6 +35,19 @@ target bash and the skills directories are POSIX paths.
   uses it when present and prints a visible skip line when it isn't, so a
   machine without it still runs everything else. `make test` needs nothing
   beyond the three above.
+- **A git identity that suits this machine.** Not optional and easy to miss:
+  commits into the vault are authored by whatever `user.email` resolves to, and
+  on a fresh work machine that is usually still a personal address. See
+  [Give the machine the right git identity](#give-the-machine-the-right-git-identity).
+- **Credentials that can push to the vault remote.** On a managed machine where
+  an EMU or SSO account can't easily take an SSH key, HTTPS plus a
+  fine-grained personal access token is the realistic path. Nothing here
+  pushes for you, so this only has to work by the time *you* push.
+
+> The features described below — `--identity-email`, `make uninstall`,
+> `make doctor`'s four vault states — are newer than the `v0.3.0` tag that
+> step 1 pins. Until the next release, track `main` (skip the checkout lines)
+> if you want them.
 
 ---
 
@@ -59,6 +85,25 @@ deploy key**. That makes it mechanically impossible to push work-derived
 conventions back to a personal repo — a stronger guarantee than remembering not
 to.
 
+**Check.**
+
+```bash
+echo "latest = $latest"
+git submodule status
+```
+
+```
+latest = v0.3.0
+ a1dc48e68138490d522c04cbf5822214c6eb1202 vendor/obsidian-skills (heads/main)
+```
+
+An empty `latest` means no release tag resolved — the checkout was skipped and
+you are on `main`, which is fine as long as you meant it. On the submodule line
+the **leading character is the whole point**: a space means in sync, `-` means
+never initialized (re-run the `git submodule update`), `+` means checked out at
+a different commit than this tag pins. Vendored skills still link and render in
+the `+` state, which is why nothing else notices it.
+
 ### 2. Point at your rules
 
 The engine ships with `rules/` empty — it works with zero rules, rendering
@@ -80,6 +125,16 @@ Two ways to add your own conventions:
   `cp AGENTS.md.example AGENTS.md` then edit it. No configuration needed —
   this is the engine-relative default.
 
+**Check.**
+
+```bash
+./scripts/render.py --explain
+```
+
+It prints where `rules/` and `AGENTS.md` resolved from and what each target
+would emit. Nothing listed and no error means an empty rule set, which is a
+valid starting state — not a failure to fix now.
+
 ### 3. Install the skills
 
 ```bash
@@ -96,17 +151,37 @@ links left dangling by a checkout you already deleted, and leaves your vault,
 your config file and any onboarded repo's rendered rules alone. See the
 README's [Removing them again](../README.md#removing-them-again).
 
+**Check.** The count on the last line per directory is the assertion — it should
+be the number of skills you expect, in *every* configured directory:
+
+```
+~/.claude/skills
+  check-follow-ups -> skills/workflow/check-follow-ups
+  mcp-per-project -> skills/workflow/mcp-per-project
+  obsidian-knowledge-base -> skills/workflow/obsidian-knowledge-base
+  onboard-repo -> skills/workflow/onboard-repo
+  update-second-brain -> skills/workflow/update-second-brain
+  obsidian-bases -> vendor/obsidian-skills/skills/obsidian-bases
+  obsidian-markdown -> vendor/obsidian-skills/skills/obsidian-markdown
+  7 skill(s)
+```
+
+Fewer than expected, or a `!!` line, means a name collided with something
+already there and was left alone. Those arrows show each skill's source path
+inside the checkout, not the link's own text — the links written on disk are
+absolute.
+
 ### 4. Create a vault
 
 ```bash
 ./scripts/init-vault.sh --path ~/vaults/VAULT_NAME --id VAULT_ID \
-  --remote "git@github.com:YOUR_ACCOUNT/VAULT_REPO.git"
+  --remote "https://github.com/YOUR_ACCOUNT/VAULT_REPO.git"
 ```
 
-`--id` is what the guard checks *against* on every commit — see step 5 for
-telling this machine what to expect — so make it meaningful (`personal`,
-`work`). The remote is recorded but **not** pushed to — create the repo
-yourself, private, first.
+`--id` is what the guard checks *against* on every commit, so make it meaningful
+(`personal`, `work`) — and see the note at the top of this page about it
+matching `SBW_EXPECTED_VAULT_ID`. The remote is recorded but **not** pushed
+to — create the repo yourself, private, first.
 
 Add `--identity-email you@work.example.com` on a machine where commits must be
 authored as a particular address. It records that in `vault.json`, and the
@@ -121,10 +196,7 @@ rather than after the push.
 
 This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook,
 so a hand-run `git commit` here is guarded even with no agent involved —
-`--no-hook` opts out. `make doctor VAULT=$HOME/vaults/VAULT_NAME` reports a
-vault whose hook is missing or isn't ours — spell it `$HOME`, not `~`, because
-zsh does not expand a tilde in a `make` variable argument (bash does, which is
-why this one silently works for some people and not others).
+`--no-hook` opts out.
 
 The vault starts with no domain practice notes. It does get four cross-cutting
 notes describing how the vault itself operates, because `update-second-brain`
@@ -135,6 +207,31 @@ When no config file exists yet, this also writes one with `SBW_VAULT` and
 here is the one moment both are known, so they can't be made to disagree by
 hand. An existing config file is never touched — you get told which line to
 add. `--no-config` skips it.
+
+**Check.** Three things, and all three were informative in a real setup:
+
+```bash
+cat ~/vaults/VAULT_NAME/vault.json
+grep -c 'second-brain-workflow: vault-commit guard' ~/vaults/VAULT_NAME/.git/hooks/pre-commit
+git -C ~/vaults/VAULT_NAME remote -v
+```
+
+```
+{
+  "id": "work",
+  "remote": "https://github.com/YOUR_ACCOUNT/work-brain.git",
+  "schema_version": 1
+}
+1
+origin	https://github.com/YOUR_ACCOUNT/work-brain.git (fetch)
+origin	https://github.com/YOUR_ACCOUNT/work-brain.git (push)
+```
+
+The `id` must be the string you meant. `grep -c` returning `1` is what proves
+the hook is *ours* rather than merely present — a foreign `pre-commit` hook
+passes an `ls` and guards nothing. Empty `remote -v` output means `--remote` was
+omitted; you can add it later with `git remote add origin`, but `vault.json`
+will still say `""`, and the guard compares the two.
 
 ### Give the machine the right git identity
 
@@ -156,11 +253,22 @@ with `~/.gitconfig-work` holding:
 ```
 
 **The trailing slash on `gitdir:` is required** — without it the condition
-matches nothing, silently, and you are back to whatever the global identity
-was. Verify with `git -C ~/vaults/work-brain var GIT_AUTHOR_IDENT`, which
-resolves the same chain a commit would rather than just reading one config
-file, or with `make doctor`, which reports a resolved identity that disagrees
-with what `vault.json` declares.
+matches nothing, silently, and you are back to whatever the global identity was.
+
+**Check.**
+
+```bash
+git -C ~/vaults/VAULT_NAME var GIT_AUTHOR_IDENT
+```
+
+```
+Your Name <you@work.example.com> 1785997372 +0300
+```
+
+`git var` is the right question to ask: it resolves `includeIf`, the
+environment and every fallback, which reading one config file does not. If the
+address here is not the one you want in the vault's history, fix it *now* —
+after a push it takes a history rewrite on a repo you may not control.
 
 ### 5. Configure this machine
 
@@ -199,10 +307,35 @@ id mismatch it can't explain.
 `SBW_EXPECTED_VAULT_ID` is what makes the commit guard non-circular: it's read
 from *this machine's* config, never from the vault's own `vault.json` — so a
 repointed or freshly cloned vault can't bring its own "correct" answer along
-with it. Without it (and without `--expect-id`), the guard now fails closed
-rather than silently skipping the check.
+with it. Without it (and without `--expect-id`), the guard fails closed rather
+than silently skipping the check.
 
-### 6. Prove it works here
+**Check.** This is the checkpoint that catches a config the tooling can't see:
+
+```bash
+make doctor VAULT="$HOME/vaults/VAULT_NAME"
+```
+
+```
+second-brain-workflow doctor — vault: ~/vaults/work-brain
+  ok    commit guard installed as a pre-commit hook in ~/vaults/work-brain
+  ok    vault.json declares no commit identity — commits are not checked against an author (optional)
+  ok    only one skills directory configured — nothing to compare across
+  ok    vendored submodule(s) match the commit this checkout pins
+
+All checks passed.
+```
+
+Write `$HOME`, not `~`: make performs no tilde expansion, and neither does zsh
+in a variable argument, so `VAULT=~/vaults/...` stats nothing. Plain
+`make doctor` with no `VAULT=` resolves the vault from this config the same way
+the scripts do, which is the better check that the config is being read at all.
+
+Exit codes: `0` all clear, `1` warnings (setup unfinished), `2` at least one
+error (something is misconfigured and finishing setup won't fix it). See
+[docs/GUARD.md](GUARD.md#exit-codes).
+
+### 6. Prove the toolchain works here
 
 ```bash
 make test               # the toolchain itself, against fixtures — needs no extra tools
@@ -222,7 +355,37 @@ rules yet — it needs at least one glob-scoped rule to test.
 For Cursor, see the canary method in the README. There is no automated
 equivalent.
 
-### 7. Onboard one repo, then work
+### 7. Make the first commit
+
+The setup isn't proven until a commit has actually gone through the guard.
+
+```bash
+cd ~/vaults/VAULT_NAME
+git add -A
+git commit -m "practices: first note"
+```
+
+**Check.** The guard's own line must appear *above* git's:
+
+```
+guard: ok — 17 file(s), 303 line(s), vault 'work'
+[main (root-commit) 09ccdf3] practices: first note
+ 17 files changed, 303 insertions(+)
+```
+
+That line is the whole point of this checkpoint: it proves the hook ran, that it
+resolved an expected id, and that the vault it saw is the one you named. No
+`guard:` line at all means the hook never ran — check step 4's `grep -c`. A
+`guard:` line that refuses is doing its job; find the message in
+[Troubleshooting](#troubleshooting).
+
+What it checked, in one commit: every staged path is inside the vault's allowed
+set, `vault.json`'s id is the one this machine expects, `origin` matches what
+`vault.json` records, the commit's author matches any declared identity, the
+diff isn't implausibly large, no `enforced` note was deleted, and nothing looks
+like a conflict marker or a credential.
+
+### 8. Onboard one repo, then work
 
 ```bash
 ./scripts/render.py /path/to/a/repo
@@ -231,6 +394,10 @@ equivalent.
 Or say **onboard repo** to an agent. Then work normally, and say **update second
 brain** at the end of a session. Your first practices come from what you
 actually did — do not scaffold them.
+
+**Check.** `./scripts/render.py /path/to/a/repo --check` exits 0 when the
+rendered files match what the current rules would produce, and 1 on drift. Run
+it in that repo's CI, not just here.
 
 ### What rendering actually produces
 
@@ -287,7 +454,7 @@ agent](../README.md#one-rule-set-every-agent) section for why Claude Code's
 shape is canonical and Cursor's `globs` is derived, plus the full targets
 table and CI/verification commands.
 
-### 8. Set up CI (optional, per vault)
+### 9. Set up CI (optional, per vault)
 
 Two independent templates, both copied into `.github/workflows/` **in the
 vault repo**, not here — this engine checkout has no vault, so its own CI can
@@ -301,6 +468,36 @@ never run either:
 
 See `docs/vault-ci/README.md` for the rules-directory setup (not optional;
 both scripts hard-require one) and what does or doesn't fail each run.
+
+**Check.** Run each copied workflow once by hand from the vault repo's Actions
+tab (`workflow_dispatch`) rather than waiting for the schedule or the next push.
+A misconfigured `ENGINE_REF`, a missing rules-repo secret or an Actions
+permission that won't let `audit.yml` open its tracking issue all surface
+immediately that way, instead of a week later in a run nobody is watching.
+
+---
+
+## Troubleshooting
+
+Every row here is something that actually went wrong during a first setup, not
+a hypothetical.
+
+| Symptom | Cause and fix |
+|---|---|
+| `zsh: no such file or directory: account` | You pasted a snippet containing `<account>`; zsh read `<account>` as a redirection and aborted the command *before* the script ran — while the next line of the block still executed, leaving a half-finished setup. The docs no longer contain such placeholders; if you are following an older copy, replace every `<...>` before pasting. |
+| `zsh: no such file or directory: /Users/…/config` right after a `mkdir` | An unset `$EDITOR` expanded to nothing, so the shell tried to execute the path. Nothing is wrong with the directory. Use step 5's heredoc, which needs no editor. |
+| `fatal: empty string is not a valid pathspec` | `git checkout "$latest"` with no release tag resolved. Step 1's snippet echoes `latest` and skips the checkout when it is empty. |
+| `guard: no expected vault id configured for this machine` | `SBW_EXPECTED_VAULT_ID` isn't set anywhere, and the guard fails closed rather than guessing. Set it in the config file (step 5) — or re-run `init-vault.sh` on a machine with no config and it writes it for you. |
+| `guard: vault id mismatch: expected 'personal', found 'work'` | The classic disagreement from the top of this page. One of the two is wrong; decide which, then fix that one. |
+| `guard: vault id mismatch: expected 'work   # must match --id', found 'work'` | An inline comment in the config file became part of the value. Comments must start their own line. |
+| `guard: commit author does not match the identity …` | `user.email` resolves to the wrong address for this vault. The message carries the exact `git config` command; the durable fix is the `includeIf` above. |
+| Commits already pushed under the wrong name | The author is recorded in history, so fixing config now changes nothing already committed. `git log --format='%h %ae'` shows the damage; correcting it means rewriting history on that repo. Set the identity *before* the first commit — step 4's output and `make doctor` both tell you in advance. |
+| `no such path: ~/vaults/… — it came from SBW_VAULT in …/config` | The configured vault path doesn't exist. The message names which knob produced it, so you know which one to correct. This is an error (exit 2), not unfinished setup. |
+| `… exists but is not a git repo — setup is unfinished` | The directory is there but was never initialised. Run `init-vault.sh … --adopt`. This is distinct from the row above on purpose: one means the configuration is wrong, the other that setup stopped early. |
+| `make doctor` reports a different vault than your config names | Older versions re-derived the vault in make syntax, which cannot read the config file, so every `make` target used the built-in default. Fixed; if you still see it, check for `SBW_VAULT` or `VAULT` exported in your shell, and note that `VAULT=~/…` on a make command line stays a literal tilde — use `$HOME`. |
+| `shellcheck not installed` then `make: *** [lint] Error 1`, and no tests ran | Exactly what it says, and `make lint` treats it as an error because you asked for it by name. `make check` instead prints `skipped — install shellcheck to enable` and runs everything else. `make test` needs no extra tools at all. |
+| Skills missing from one agent but not the other | A name collided in one directory, or Railway wrote `use-railway` into `~/.claude/skills` only. `make doctor` reports the asymmetry and prints the exact `ln -s`. |
+| Broken skill links after deleting a checkout | `make uninstall` from *any* checkout finds them — it reports each as `dangling, from a deleted checkout` — and `YES=1` removes them. A broken link that isn't ours is listed and left alone. |
 
 ---
 
@@ -328,9 +525,9 @@ three ways, in increasing order of how hard they are to skip:
 ```
 
 It refuses a staged path outside the vault's allowed set, a `vault.json` id that
-isn't the one expected, an `origin` that doesn't match `vault.json`, an
-implausibly large diff, deletion of an `enforced` note, conflict markers, and
-anything resembling a credential.
+isn't the one expected, an `origin` that doesn't match `vault.json`, a commit
+author that isn't the declared identity, an implausibly large diff, deletion of
+an `enforced` note, conflict markers, and anything resembling a credential.
 
 - **The fast path.** `update-second-brain` runs it before every commit it
   makes.
@@ -341,7 +538,7 @@ anything resembling a credential.
 - **The one that can't be skipped.** `git commit --no-verify` skips the
   pre-commit hook, and there's no way to stop that locally. Copy
   `docs/vault-ci/guard.yml` into `.github/workflows/guard.yml` **in the vault
-  repo** (same place as step 8's `audit.yml`) so a bypassed commit is still
+  repo** (same place as step 9's `audit.yml`) so a bypassed commit is still
   caught on push. This is containment, not prevention — CI catches it *after*
   the push. See `docs/vault-ci/README.md` for setup and that caveat in full.
 

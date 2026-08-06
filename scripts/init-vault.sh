@@ -427,13 +427,23 @@ if [ -n "${resolved_email}" ] && [ -n "${IDENTITY_EMAIL}" ] \
   echo "        path = ~/.gitconfig-work"
 fi
 
+# Step 2 depends on what actually happened above: telling someone to write a
+# config line this script just wrote is a contradiction, and following it would
+# be a no-op that reads like a missed step.
+if grep -q "^[[:space:]]*SBW_VAULT[[:space:]]*=[[:space:]]*${VAULT}[[:space:]]*$" \
+     "${CONFIG_FILE}" 2>/dev/null; then
+  step2="This machine already points at it — ${CONFIG_FILE} says so."
+else
+  step2="Point this machine at it:
+       SBW_VAULT=${VAULT}
+     in ${CONFIG_FILE}"
+fi
+
 cat <<EOF
 
 Next:
   1. Open ${VAULT} in Obsidian (enable Dataview for 00-maps/).
-  2. Point this machine at it:
-       SBW_VAULT=${VAULT}
-     in \${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config
+  2. ${step2}
   3. Create the remote yourself — **private** — then push.
   4. Capture a session: say "update second brain".
 
