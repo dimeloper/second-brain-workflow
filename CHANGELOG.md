@@ -17,6 +17,30 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An `identity` block with a misspelled key pinned nothing, silently.** Only
+  `email`, `name` and `email_pattern` are read; anything else fell through to
+  the same "nothing was declared" path as a vault with no block at all, so the
+  guard printed a plain `ok` and `make doctor` reported *"a vault created
+  before this feature has no identity block"* — true of the parser, false of
+  the file, and pointing at the wrong fix. An unrecognised key now fails
+  closed, naming the key and the vocabulary that would have worked. This is the
+  state a round-4 retest hit; the staged-path check it was reported as, which
+  would have meant the check never ran on the tier the pre-commit hook uses,
+  does not exist — all three tiers enforce it and each now has its own test.
+- `make doctor` no longer describes an `identity` block that is present but
+  declares nothing as an absent one. Same consequence, different fix.
+
+### Added
+
+- `tests/test-author-identity.sh` asserts the author check independently in
+  each of its three tiers — staged index invoked directly, the same through the
+  pre-commit hook `init-vault.sh` installs, and `--range` against a recorded
+  commit. Only two were covered, which is why a report that the staged tier
+  never fired could not be settled from the suite. `docs/GUARD.md` now carries
+  the same three tiers as a table.
+
 ## [0.4.2] - 2026-08-06
 
 ### Fixed

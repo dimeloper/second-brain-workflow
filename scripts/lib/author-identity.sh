@@ -28,6 +28,13 @@
 #                  offered in the fix command.
 #   name           exact match on the author name, checked only if present
 #
+# Those three are the whole vocabulary, and a key outside it is an error rather
+# than a key to ignore. A misspelled "email_patern" is indistinguishable, to
+# every tool here, from a vault that pinned nothing — the guard passes, and
+# `make doctor` reports the vault has no identity block at all, which is both
+# false and points at the wrong fix. That is the exact shape this check exists
+# to eliminate, reintroduced one typo deep.
+#
 # Usage:
 #   . scripts/lib/author-identity.sh
 #   author_identity_check "<vault>" "<author-email>" "<author-name>"
@@ -51,7 +58,7 @@
 author_identity_check() {
   local vault="$1" email="${2:-}" name="${3:-}"
   local vjson="${vault}/vault.json" parsed
-  local want_email want_name want_pattern
+  local want_email want_name want_pattern want_unknown
 
   AI_ERROR=""
   AI_EXPECT=""
@@ -70,6 +77,7 @@ author_identity_check() {
 
   parsed="$(python3 -c '
 import json, sys
+KNOWN = ("email", "name", "email_pattern")
 try:
     with open(sys.argv[1], encoding="utf-8") as fh:
         ident = json.load(fh).get("identity") or {}
@@ -79,8 +87,9 @@ except Exception as exc:
 if not isinstance(ident, dict):
     print("ERR", "identity is not an object", sep="\t")
     raise SystemExit(0)
+unknown = [k for k in ident if k not in KNOWN]
 print("OK", ident.get("email", ""), ident.get("name", ""),
-      ident.get("email_pattern", ""), sep="\t")
+      ident.get("email_pattern", ""), ", ".join(sorted(unknown)), sep="\t")
 ' "${vjson}" 2>/dev/null)" || {
     AI_ERROR="${vjson} declares an identity but could not be parsed."
     return 3
@@ -101,6 +110,18 @@ print("OK", ident.get("email", ""), ident.get("name", ""),
   want_email="$(printf '%s' "${parsed}" | cut -f2)"
   want_name="$(printf '%s' "${parsed}" | cut -f3)"
   want_pattern="$(printf '%s' "${parsed}" | cut -f4)"
+  want_unknown="$(printf '%s' "${parsed}" | cut -f5)"
+
+  # A key we don't recognise is a declaration that silently wouldn't apply —
+  # the one outcome this whole check exists to make impossible. Reported before
+  # the empty-object case below, so a manifest that pins nothing *because* of a
+  # typo never reads as one that pins nothing on purpose.
+  if [ -n "${want_unknown}" ]; then
+    AI_ERROR="${vjson} declares an identity with unrecognised key(s): ${want_unknown}
+       Known keys are email, name and email_pattern. Refusing to run a check
+       that would silently not apply — fix the spelling, or remove the key."
+    return 3
+  fi
 
   # An empty object is a deliberate "nothing pinned here", not a broken one.
   [ -n "${want_email}${want_name}${want_pattern}" ] || return 0

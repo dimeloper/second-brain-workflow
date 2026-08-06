@@ -88,9 +88,20 @@ check_hook() {
 # opt-in, and doctor cannot know whether a given vault ought to pin one.
 # printf, not echo: the pattern example contains a backslash, and echo's
 # handling of those is not portable.
+#
+# Which of the two it is matters to the reader: "you never added the block" and
+# "your block is there and pins nothing" have the same consequence but not the
+# same fix, and telling someone staring at an identity block that they haven't
+# got one is how a real report gets dismissed as wrong.
 no_identity() {
+  local why="${1:-absent}"
   ok "vault.json pins no commit author — the check is opt-in, so it is not running here"
-  printf '%s\n' '        a vault created before this feature has no identity block; add one to enable it:'
+  if [ "${why}" = "empty" ]; then
+    printf '%s\n' '        the identity block is present but declares nothing, so it pins nothing;'
+    printf '%s\n' '        give it a key to enable the check:'
+  else
+    printf '%s\n' '        a vault created before this feature has no identity block; add one to enable it:'
+  fi
   printf '%s\n' '          "identity": { "email": "you@example.com" }'
   printf '%s\n' '          or, for addresses that vary: { "email_pattern": ".*@example\\.com$" }'
   printf '%s\n' '        see docs/GUARD.md#upgrading-an-existing-vault'
@@ -120,10 +131,10 @@ check_author() {
       if [ -n "${AI_EXPECT}" ]; then
         ok "commits here would be authored as ${email}, which is what vault.json declares"
       else
-        no_identity
+        no_identity empty
       fi
       ;;
-    2) no_identity ;;
+    2) no_identity absent ;;
     *) err "${AI_ERROR}" ;;
   esac
 }

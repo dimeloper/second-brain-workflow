@@ -84,6 +84,13 @@ is the address offered in the fix message. `name` is checked only if given. An
 `identity` object that is absent, or present but empty, checks nothing; a
 vault written before this existed behaves exactly as it did.
 
+Those three are also the **whole vocabulary**, and a key outside it is an error
+rather than a key to ignore. A misspelled `email_patern` declares nothing every
+tool here can see: the guard would pass, and `make doctor` would report a vault
+with no identity block at all — true of the parser, false of the file, and
+pointing at the wrong fix. The check exists to stop an identity going unchecked
+silently, so it refuses to be defeated one typo deep.
+
 `--identity-email` on `init-vault.sh` writes the block when it creates a
 `vault.json`. It won't edit one that already exists — that script only ever
 adds scaffold it wrote itself — so it prints the JSON to add by hand instead.
@@ -98,15 +105,24 @@ happens where someone declared they wanted one — so it can't become the routin
 nuisance that teaches `git commit --no-verify`, which is the one habit that
 would genuinely weaken every other check here.
 
-A declared identity that *can't be read* — malformed JSON, or `identity` set to
-something that isn't an object — fails closed rather than passing. "Declared but
-unreadable" silently becoming "nothing to check" is the same class of bug as the
-one this check exists to close.
+A declared identity that *can't be read* — malformed JSON, `identity` set to
+something that isn't an object, or an unrecognised key — fails closed rather
+than passing. "Declared but unreadable" silently becoming "nothing to check" is
+the same class of bug as the one this check exists to close.
 
-In `--range`/`--rev` mode the recorded author of each commit is checked, named
-individually, rather than the current local config: by the time
-`docs/vault-ci/guard.yml` runs, whatever config produced the commit is gone.
-That tier is also the only one a local `--no-verify` can't skip.
+The check runs in **three tiers**, and every one of them enforces it:
+
+| Tier | What it reads | Skipped by |
+|---|---|---|
+| The staged index, invoked directly (`update-second-brain`) | the identity the commit *would* carry — `git var GIT_AUTHOR_IDENT`, which resolves `includeIf`, the environment and every fallback | not running it |
+| The same, through the pre-commit hook | as above | `--no-verify` |
+| `--range`/`--rev`, in CI | each commit's *recorded* author, named individually | nothing |
+
+The last tier reads what the commit recorded rather than the current local
+config, because by the time `docs/vault-ci/guard.yml` runs, whatever config
+produced the commit is gone — and it is the only tier a local `--no-verify`
+can't skip. `tests/test-author-identity.sh` asserts each tier independently, so
+a check present in one path and absent in a parallel one fails the suite.
 
 `make doctor` reports the same mismatch against the identity a commit *would*
 be made with, so it surfaces at setup time instead of at the first commit.

@@ -107,6 +107,34 @@ V="${SANDBOX}/v-empty"
 make_vault "${V}" "{}" "anything@whatever.example"
 assert_exit 0 "$(guard_rc "${V}")" "an empty identity object pins nothing and blocks nothing"
 
+# --- a key we don't recognise is a declaration that wouldn't apply ----------
+# One typo away from the empty object above, and until this fixed it, one typo
+# away from no check at all: every want_* came back empty, the guard printed
+# plain `ok`, and doctor announced the vault had no identity block. A vault
+# whose author intended to pin an identity is not a vault that pinned nothing.
+V="${SANDBOX}/v-typo"
+make_vault "${V}" "{ \"email_patern\": \".*@work\\\\.example\\\\.com$\" }" "${WRONG}"
+out="$(guard "${V}")"
+assert_exit 1 "$(guard_rc "${V}")" "a misspelled identity key fails closed rather than pinning nothing"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"unrecognised key(s): email_patern"*)
+    pass "and names the key it didn't recognise" ;;
+  *) fail "and names the key it didn't recognise" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"email, name and email_pattern"*)
+    pass "and names the vocabulary that would have worked" ;;
+  *) fail "and names the vocabulary that would have worked" "${out}" ;;
+esac
+
+# A recognised key alongside an unrecognised one is still an error: the check
+# that did run is no evidence for the one that silently didn't.
+V="${SANDBOX}/v-typo-mixed"
+make_vault "${V}" "{ \"email\": \"${WANT}\", \"nmae\": \"Work Worker\" }" "${WANT}"
+assert_exit 1 "$(guard_rc "${V}")" "an unknown key beside a valid one is still an error"
+
 # --- email_pattern, for addresses that can't be pinned exactly --------------
 # The regex lives inside a JSON string, so ".*@work\\.example\\.com$" on disk
 # has to be decoded to .*@work\.example\.com$ before it is used as one.
@@ -239,6 +267,25 @@ case "${out}" in
   *) fail "and reports it as ok, not a warning — the check is opt-in" "${out}" ;;
 esac
 
+# An identity block that pins nothing is a different state from no block at
+# all, and the advice differs — so the message must not tell someone looking
+# straight at their identity block that they haven't got one.
+V="${SANDBOX}/v-doctor-empty"
+make_vault "${V}" "{}" "${WRONG}"
+out="$(doctor_out "${V}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"identity block is present but declares nothing"*)
+    pass "doctor distinguishes an empty identity block from an absent one" ;;
+  *) fail "doctor distinguishes an empty identity block from an absent one" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"has no identity block"*)
+    fail "and doesn't claim a vault with a block has none" "${out}" ;;
+  *) pass "and doesn't claim a vault with a block has none" ;;
+esac
+
 # Regression: check_author used a bare `return`, which propagates the failed
 # test's status and under `set -e` aborted doctor — silently dropping the
 # remaining checks and the summary for any vault with no vault.json.
@@ -249,6 +296,65 @@ case "$(doctor_out "${V}")" in
   *"thing(s) worth a look"*) pass "a vault with no vault.json still reaches doctor's summary" ;;
   *) fail "a vault with no vault.json still reaches doctor's summary" "$(doctor_out "${V}")" ;;
 esac
+
+# --- every tier that can run the check has a test that it does --------------
+# Round 4 reported the staged path as never running the author check. It does,
+# and has since the feature landed — but only two of the three tiers were
+# covered here, so the claim could not be settled from the suite; it took
+# rebuilding the fixture by hand. The gap that made that possible is the thing
+# worth closing: one test per tier, from one fixture, so a check that stops
+# firing in any single path fails here rather than in someone's retest.
+V="${SANDBOX}/v-tiers"
+make_vault "${V}" "{ \"email\": \"${WANT}\" }" "${WANT}"
+git -C "${V}" commit -q --no-verify -m first
+
+stage_note() {
+  printf -- '---\nmaturity: idea\n---\n\n# %s\n- x\n' "$1" \
+    > "${V}/practices/backend/$1.md"
+  git -C "${V}" add -A
+}
+
+# Tier 1 — the staged index, invoked directly: what update-second-brain calls.
+stage_note tier-one
+rc=0
+GIT_AUTHOR_EMAIL="${WRONG}" GIT_COMMITTER_EMAIL="${WRONG}" \
+  "${GUARD}" --vault "${V}" --expect-id work >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "tier 1/3 staged index, direct: a mismatched author is blocked"
+assert_exit 0 "$(guard_rc "${V}")" "tier 1/3 staged index, direct: the declared author passes"
+
+# Tier 2 — the same staged index through the pre-commit hook init-vault.sh
+# installs, reproduced verbatim: --vault only, expectation from the machine.
+cat > "${V}/.git/hooks/pre-commit" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec "${GUARD}" --vault "\$(git rev-parse --show-toplevel)"
+EOF
+chmod +x "${V}/.git/hooks/pre-commit"
+
+rc=0
+SBW_EXPECTED_VAULT_ID=work GIT_AUTHOR_EMAIL="${WRONG}" GIT_COMMITTER_EMAIL="${WRONG}" \
+  git -C "${V}" commit -q -m "through the hook" >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "tier 2/3 pre-commit hook: a mismatched author is blocked"
+# The exit code alone would also be satisfied by a hook that failed for some
+# unrelated reason — assert the commit genuinely did not happen.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(git -C "${V}" log -1 --format=%s)" in
+  first) pass "tier 2/3 pre-commit hook: and no commit was created" ;;
+  *) fail "tier 2/3 pre-commit hook: and no commit was created" \
+       "HEAD is now: $(git -C "${V}" log -1 --format=%s)" ;;
+esac
+
+rc=0
+SBW_EXPECTED_VAULT_ID=work git -C "${V}" commit -q -m "through the hook" >/dev/null 2>&1 || rc=$?
+assert_exit 0 "${rc}" "tier 2/3 pre-commit hook: the declared author commits normally"
+
+# Tier 3 — a commit that already exists, which is all CI ever sees.
+stage_note tier-three
+GIT_AUTHOR_EMAIL="${WRONG}" GIT_COMMITTER_EMAIL="${WRONG}" \
+  git -C "${V}" commit -q --no-verify -m "bad author" >/dev/null 2>&1
+rc=0
+"${GUARD}" --vault "${V}" --expect-id work --range "HEAD~1..HEAD" >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "tier 3/3 --range: a recorded mismatched author is blocked"
 
 # --- init-vault --identity-email --------------------------------------------
 V="${SANDBOX}/v-init"
