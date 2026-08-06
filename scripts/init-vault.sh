@@ -3,6 +3,7 @@
 #
 # Usage:
 #   ./init-vault.sh --path <dir> --id <id> [--remote <url>] [--adopt] [--no-hook]
+#                   [--identity-email <addr>]
 #
 #   --path     where the vault goes, e.g. ~/vaults/work-brain
 #   --id       short identifier, e.g. work — recorded in vault.json and checked
@@ -10,6 +11,11 @@
 #   --remote   git remote to add (not pushed; create the repo yourself, private)
 #   --adopt    allow a non-empty directory (adds only what is missing)
 #   --no-hook  skip installing the pre-commit hook (see below)
+#   --identity-email
+#              the address commits into this vault must be authored as,
+#              recorded in vault.json and enforced by guard-vault-commit.sh.
+#              Optional; without it commits are not checked against an author.
+#              Only written when vault.json is created — see the note below.
 #
 # Idempotent: re-running adds missing pieces and leaves existing files alone.
 #
@@ -28,7 +34,7 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/vault-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
 
-PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0
+PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0; IDENTITY_EMAIL=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --path)     PATH_ARG="${2:?--path needs a value}"; shift 2 ;;
@@ -36,6 +42,7 @@ while [ $# -gt 0 ]; do
     --remote)   REMOTE="${2:?--remote needs a value}"; shift 2 ;;
     --adopt)    ADOPT=1; shift ;;
     --no-hook)  NO_HOOK=1; shift ;;
+    --identity-email) IDENTITY_EMAIL="${2:?--identity-email needs a value}"; shift 2 ;;
     -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -96,13 +103,31 @@ for d in app backend frontend cross-cutting; do
   [ -e "${VAULT}/practices/${d}/.gitkeep" ] || : > "${VAULT}/practices/${d}/.gitkeep"
 done
 
-write_if_absent "${VAULT}/vault.json" <<EOF
+# The identity block is written only when the file is created. Adding a key to
+# an existing vault.json would be an *edit*, and this script's one invariant
+# under --adopt is that it adds missing scaffold files and never rewrites
+# content it didn't write. A vault that already exists gets told how to add it
+# by hand instead — see the note printed at the end.
+if [ -n "${IDENTITY_EMAIL}" ]; then
+  write_if_absent "${VAULT}/vault.json" <<EOF
+{
+  "id": "${ID}",
+  "remote": "${REMOTE}",
+  "identity": {
+    "email": "${IDENTITY_EMAIL}"
+  },
+  "schema_version": 1
+}
+EOF
+else
+  write_if_absent "${VAULT}/vault.json" <<EOF
 {
   "id": "${ID}",
   "remote": "${REMOTE}",
   "schema_version": 1
 }
 EOF
+fi
 
 write_if_absent "${VAULT}/.gitignore" <<'EOF'
 .DS_Store
@@ -299,6 +324,56 @@ if [ "${created}" -eq 0 ]; then
 else
   echo "Added ${created} item(s)."
 fi
+# Always print the identity a commit here would carry, pinned or not. Seeing it
+# at creation time is what would have caught a personal address on a work
+# machine before the first commit rather than after the push. Deliberately not
+# the heuristic the review floated — guessing which address "should" apply from
+# --remote's host is cleverness that is wrong sometimes, and a wrong guess here
+# is worse than stating the fact and letting the reader judge.
+resolved_ident="$(git -C "${VAULT}" var GIT_AUTHOR_IDENT 2>/dev/null || true)"
+resolved_email=""
+if [ -n "${resolved_ident}" ]; then
+  resolved_email="${resolved_ident#*<}"
+  resolved_email="${resolved_email%%>*}"
+fi
+
+echo
+if [ -n "${resolved_email}" ]; then
+  echo "Commits in this vault would be authored as: ${resolved_email}"
+else
+  echo "Commits here have no resolvable author identity yet (git config user.email is unset)."
+fi
+
+if [ -n "${IDENTITY_EMAIL}" ]; then
+  # Test for the address, not merely for an "identity" key: on a re-run against
+  # a vault that already pins a *different* address, the file was not touched,
+  # and claiming it "pins it to ${IDENTITY_EMAIL}" would report something
+  # untrue about the very check being set up.
+  if grep -q "\"email\"[[:space:]]*:[[:space:]]*\"${IDENTITY_EMAIL}\"" \
+       "${VAULT}/vault.json" 2>/dev/null; then
+    echo "vault.json pins it to ${IDENTITY_EMAIL} — the guard refuses a commit from any other address."
+  else
+    echo "vault.json already existed, so --identity-email was not written into it (this"
+    echo "script never rewrites content it didn't write). Add it by hand to enable the check:"
+    echo "    \"identity\": { \"email\": \"${IDENTITY_EMAIL}\" }"
+  fi
+elif ! grep -q '"identity"' "${VAULT}/vault.json" 2>/dev/null; then
+  echo "No author identity is pinned, so commits are not checked against one."
+  echo "To enable it, pass --identity-email, or add to vault.json:"
+  echo "    \"identity\": { \"email\": \"you@example.com\" }"
+fi
+
+if [ -n "${resolved_email}" ] && [ -n "${IDENTITY_EMAIL}" ] \
+   && [ "${resolved_email}" != "${IDENTITY_EMAIL}" ]; then
+  echo
+  echo "MISMATCH — this machine would author as ${resolved_email}, not ${IDENTITY_EMAIL}."
+  echo "Fix it now, before the first commit:"
+  echo "    git -C ${VAULT} config user.email '${IDENTITY_EMAIL}'"
+  echo "Or machine-wide for everything under that path — see docs/NEW-MACHINE.md:"
+  echo "    [includeIf \"gitdir:${VAULT}/\"]   # trailing slash required"
+  echo "        path = ~/.gitconfig-work"
+fi
+
 cat <<EOF
 
 Next:

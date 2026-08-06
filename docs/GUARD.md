@@ -49,8 +49,67 @@ SBW_EXPECTED_VAULT_ID=work
 
 It blocks a staged path outside the vault's allowed set, a `vault.json` id that
 isn't the one this machine expects, an `origin` that doesn't match the one
-recorded in `vault.json`, an implausibly large diff, deletion of an `enforced`
-note, conflict markers, and anything that looks like a credential.
+recorded in `vault.json`, a commit author that isn't the identity `vault.json`
+declares, an implausibly large diff, deletion of an `enforced` note, conflict
+markers, and anything that looks like a credential.
+
+## Commit authorship
+
+Everything above asks where content is *going*. This asks who the commit says
+it is *from* — the mirror axis, and the two are independent. A commit can
+satisfy every destination check, push with the correct credentials, and still
+be authored by a personal identity, because `user.email` resolves from a chain
+none of those checks look at. That happened: the first commit into an
+employer-owned vault carried a personal address, and nothing noticed until it
+was already in the repo's history.
+
+Opt in per vault, with an `identity` object in `vault.json`:
+
+```json
+{
+  "id": "work",
+  "remote": "git@github.com:YOUR_ACCOUNT/work-brain.git",
+  "identity": {
+    "email": "you@work.example.com",
+    "email_pattern": ".*@work\\.example\\.com$",
+    "name": "Your Name"
+  }
+}
+```
+
+All three keys are optional. `email` must match exactly. `email_pattern` is a
+regex, for EMU or `noreply` addresses that vary per repo where no single
+address can be pinned — when both are present the pattern decides and `email`
+is the address offered in the fix message. `name` is checked only if given. An
+`identity` object that is absent, or present but empty, checks nothing; a
+vault written before this existed behaves exactly as it did.
+
+`--identity-email` on `init-vault.sh` writes the block when it creates a
+`vault.json`. It won't edit one that already exists — that script only ever
+adds scaffold it wrote itself — so it prints the JSON to add by hand instead.
+
+**This blocks rather than warns**, which is a deliberate choice about a finding
+that is a hygiene and attribution problem rather than a content leak. A warning
+is effectively what the machine already produced: everything looked fine, and
+the wrong author is now permanent in someone else's history. Before the commit
+the fix is one command; after the push it needs a history rewrite on a repo you
+may not control. And because the check is opt-in per vault, a block only ever
+happens where someone declared they wanted one — so it can't become the routine
+nuisance that teaches `git commit --no-verify`, which is the one habit that
+would genuinely weaken every other check here.
+
+A declared identity that *can't be read* — malformed JSON, or `identity` set to
+something that isn't an object — fails closed rather than passing. "Declared but
+unreadable" silently becoming "nothing to check" is the same class of bug as the
+one this check exists to close.
+
+In `--range`/`--rev` mode the recorded author of each commit is checked, named
+individually, rather than the current local config: by the time
+`docs/vault-ci/guard.yml` runs, whatever config produced the commit is gone.
+That tier is also the only one a local `--no-verify` can't skip.
+
+`make doctor` reports the same mismatch against the identity a commit *would*
+be made with, so it surfaces at setup time instead of at the first commit.
 
 ## Three enforcement tiers
 

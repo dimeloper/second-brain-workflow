@@ -97,6 +97,43 @@ telling this machine what to expect — so make it meaningful (`personal`,
 `work`). The remote is recorded but **not** pushed to — create the repo
 yourself, private, first.
 
+Add `--identity-email you@work.example.com` on a machine where commits must be
+authored as a particular address. It records that in `vault.json`, and the
+guard then refuses a commit authored as anything else. This is a *different*
+axis from `--id`: that one checks which vault is being written to, this one
+checks who the commit claims to be from. Getting the first right does not imply
+the second — a commit can pass every destination check, push with the right
+credentials, and still carry a personal address into an employer's history.
+`init-vault.sh` prints the address commits here would actually be authored as,
+whether or not you pin one, so a wrong one is visible before the first commit
+rather than after the push.
+
+### Give the machine the right git identity
+
+The real fix is not `git config user.email` per repo, which has to be
+remembered for every vault and every clone. Key it on the path instead, in
+`~/.gitconfig`:
+
+```
+[includeIf "gitdir:~/vaults/work-brain/"]
+    path = ~/.gitconfig-work
+```
+
+with `~/.gitconfig-work` holding:
+
+```
+[user]
+    email = you@work.example.com
+    name = Your Name
+```
+
+**The trailing slash on `gitdir:` is required** — without it the condition
+matches nothing, silently, and you are back to whatever the global identity
+was. Verify with `git -C ~/vaults/work-brain var GIT_AUTHOR_IDENT`, which
+resolves the same chain a commit would rather than just reading one config
+file, or with `make doctor`, which reports a resolved identity that disagrees
+with what `vault.json` declares.
+
 This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook,
 so a hand-run `git commit` here is guarded even with no agent involved —
 `--no-hook` opts out. `make doctor VAULT=$HOME/vaults/VAULT_NAME` reports a

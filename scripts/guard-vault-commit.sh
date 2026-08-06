@@ -31,6 +31,8 @@ ds_config_load
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
 # shellcheck source=scripts/lib/vault-state.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-state.sh"
+# shellcheck source=scripts/lib/author-identity.sh
+. "${STANDARDS_DIR}/scripts/lib/author-identity.sh"
 
 MAX_FILES="${GUARD_MAX_FILES:-20}"
 MAX_LINES="${GUARD_MAX_LINES:-2000}"
@@ -137,6 +139,56 @@ else
     2) echo "guard: no vault.json in ${VAULT} — identity unchecked." >&2
        echo "       create one with scripts/init-vault.sh --adopt to enable this check." >&2 ;;
   esac
+fi
+
+# --- 1b. commit author identity ---------------------------------------------
+# The mirror of the check above, on the axis it doesn't cover. Everything else
+# here asks where content is going; this asks who the commit claims to be
+# from. The two are independent: a commit can satisfy every destination check,
+# push with the right credentials, and still carry a personal identity into an
+# employer-owned repo — which is exactly what happened, silently, because
+# nothing looked.
+#
+# This blocks rather than warns. A warning is what the machine already
+# effectively produced — the guard passed, everything looked fine, and the
+# wrong author is now permanent in someone else's history. Before the commit
+# the fix is one command; after the push it needs a history rewrite on a repo
+# you may not control. Since the whole check is opt-in per vault, blocking
+# only ever happens where someone declared they wanted it, so it can't become
+# the routine nuisance that teaches --no-verify — the one habit that would
+# genuinely weaken this guard. A vault that declares nothing is silent here;
+# `make doctor` is where "you haven't configured this" gets said.
+author_check() {
+  local email="$1" name="$2" prefix="$3" rc=0
+  author_identity_check "${VAULT}" "${email}" "${name}" || rc=$?
+  case "${rc}" in
+    0|2) return 0 ;;
+    *)   fail "${prefix}${AI_ERROR}" ;;
+  esac
+}
+
+if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
+  # The commits already exist, so their recorded authors are what matters —
+  # the local config that made them is long gone by the time CI runs.
+  while IFS="$(printf '\t')" read -r c_sha c_name c_email; do
+    [ -n "${c_sha}" ] || continue
+    author_check "${c_email}" "${c_name}" "commit ${c_sha}: "
+  done <<EOF
+$(git -C "${VAULT}" log --no-merges --format='%h%x09%an%x09%ae' "${BASE}..${NEW}" 2>/dev/null)
+EOF
+else
+  # The identity this commit would actually be made with — `git var` resolves
+  # includeIf, the environment and every fallback, which reading user.email
+  # straight out of a config file would not.
+  author_ident="$(git -C "${VAULT}" var GIT_AUTHOR_IDENT 2>/dev/null || true)"
+  if [ -z "${author_ident}" ]; then
+    author_check "" "" ""
+  else
+    author_name="${author_ident%% <*}"
+    author_email="${author_ident#*<}"
+    author_email="${author_email%%>*}"
+    author_check "${author_email}" "${author_name}" ""
+  fi
 fi
 
 # --- 2. staged paths ---------------------------------------------------------

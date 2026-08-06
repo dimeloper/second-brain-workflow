@@ -19,6 +19,30 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- **Commit authorship checking**, opt-in per vault via an `identity` object in
+  `vault.json` (`email`, `email_pattern` for EMU/noreply addresses, optional
+  `name`). `guard-vault-commit.sh` refuses a commit whose author isn't the
+  declared identity; `make doctor` reports the same mismatch at setup time
+  instead of at the first commit; `init-vault.sh --identity-email` records it
+  and always prints the address commits here would be authored as.
+  `docs/GUARD.md` has the reasoning, `docs/NEW-MACHINE.md` the `includeIf`
+  setup that actually fixes it machine-wide.
+
+  The guard checked vault id and origin — the *destination*. It never checked
+  who the commit claimed to be *from*, so the first commit into an
+  employer-owned vault was authored by a personal identity: global
+  `user.email` was still the personal one, the push authenticated fine with
+  work credentials, the guard passed, and the address is now permanent in that
+  repo's history. The mirror image of the leak the guard exists to prevent, on
+  an axis it didn't cover.
+
+  This **blocks** rather than warns — see `docs/GUARD.md#commit-authorship`
+  for why, in short: a warning is effectively what the machine already
+  produced, the fix before the commit is one command, and because the check is
+  opt-in it can never become the routine nuisance that teaches `--no-verify`.
+  A vault with no `identity` block behaves exactly as before. A declared
+  identity that can't be *read* fails closed rather than passing.
+
 - `scripts/lib/vault-state.sh` and `scripts/lib/vault_state.py`: classify a
   vault path as `missing`, `not-a-repo`, `no-vault-json` or `ready`, with one
   canonical message per state, shared by `doctor.sh`,
@@ -53,6 +77,11 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- `doctor.sh`'s new author check used a bare `return` for "this vault pins no
+  identity", which propagates the failed test's status; under `set -e` that
+  aborted the whole run, silently dropping the remaining checks and the
+  summary for any vault without a `vault.json`. Caught by the exit-code
+  assertions added in the previous item.
 - `doctor` no longer reports "`<path>` is not a git repo yet — nothing to
   guard" for a path that doesn't exist at all. That message covered two
   problems with different causes and different fixes — a wrong path versus

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Machine health check: three read-only checks, none overlapping with
+# Machine health check: four read-only checks, none overlapping with
 # `make audit` (content) or `make check` (code):
 #   - the vault's commit guard is wired in as a pre-commit hook, and it's ours
+#   - commits here would be authored as the identity vault.json declares
 #   - a skill installed into one configured skills dir isn't missing from another
 #   - a vendored submodule isn't left at the wrong commit after a tag switch
 # Changes nothing. Not part of `make check` — like `make guard` and
@@ -29,6 +30,8 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${STANDARDS_DIR}/scripts/lib/config.sh"
 # shellcheck source=scripts/lib/vault-state.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-state.sh"
+# shellcheck source=scripts/lib/author-identity.sh
+. "${STANDARDS_DIR}/scripts/lib/author-identity.sh"
 ds_config_load
 
 VAULT="${SBW_VAULT}"
@@ -40,7 +43,7 @@ while [ $# -gt 0 ]; do
       VAULT_ORIGIN="the --vault flag"
       shift 2
       ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -74,6 +77,38 @@ check_hook() {
   else
     warn "${VAULT}/.git/hooks/pre-commit exists but is not ours — the guard runs only via update-second-brain here, not on every commit"
   fi
+}
+
+# The point of reporting it here is timing: the guard catches an author
+# mismatch at the first commit, which on the machine this came from was already
+# one commit too late. An error rather than a warning — a git identity that
+# resolves to the wrong address is a setting that is wrong, not a step that
+# hasn't been taken yet, and finishing setup won't change it.
+check_author() {
+  # `return 0`, not a bare `return`: a bare one propagates the failed test's
+  # status, and under `set -e` that aborts the whole run — silently dropping
+  # the remaining checks and the summary for any vault without a vault.json.
+  [ -f "${VAULT}/vault.json" ] || return 0
+  local ident="" email="" name="" rc=0
+  ident="$(git -C "${VAULT}" var GIT_AUTHOR_IDENT 2>/dev/null || true)"
+  if [ -n "${ident}" ]; then
+    name="${ident%% <*}"
+    email="${ident#*<}"
+    email="${email%%>*}"
+  fi
+
+  author_identity_check "${VAULT}" "${email}" "${name}" || rc=$?
+  case "${rc}" in
+    0)
+      if [ -n "${AI_EXPECT}" ]; then
+        ok "commits here would be authored as ${email}, which is what vault.json declares"
+      else
+        ok "vault.json declares no commit identity — commits are not checked against an author (optional)"
+      fi
+      ;;
+    2) ok "vault.json declares no commit identity — commits are not checked against an author (optional)" ;;
+    *) err "${AI_ERROR}" ;;
+  esac
 }
 
 # Not vault-specific — SKILLS_DIRS is a machine-wide setting, so this runs
@@ -177,6 +212,7 @@ check_submodules() {
 
 echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
+check_author
 check_skills
 check_submodules
 
