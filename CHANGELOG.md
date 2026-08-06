@@ -17,6 +17,29 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-06
+
+### Fixed
+
+- Two tests were environment-dependent and failed anywhere but a
+  Homebrew-flavoured macOS machine, so `make test` and `make check` went red on
+  Linux and on any machine with no git identity configured:
+  - `tests/test-make-degrade.sh` expressed "shellcheck is absent" by stripping
+    every `PATH` directory containing it. On macOS that removes Homebrew's
+    `bin`; on Linux it removes `/usr/bin`, taking `make`, `python3` and `sed`
+    with it. The Makefile now takes an overridable `SHELLCHECK` variable and
+    the test names a binary that doesn't exist — no `PATH` surgery.
+  - `tests/test-author-identity.sh` asserted `init-vault.sh` prints the address
+    commits would carry, which needs an identity to resolve; `git var
+    GIT_AUTHOR_IDENT` fails outright where none does. It now pins
+    `GIT_AUTHOR_*` for that case and separately covers the
+    no-identity-resolvable branch.
+
+  Nothing in the shipped scripts changed behaviour — `SHELLCHECK ?=` is a new
+  seam with the same default. This is a test-only release, cut because `make
+  check` failing on a fresh Linux checkout is exactly the kind of first-setup
+  obstacle v0.4.0 set out to remove.
+
 ## [0.4.0] - 2026-08-06
 
 ### Added
@@ -342,7 +365,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.1.0...v0.2.0

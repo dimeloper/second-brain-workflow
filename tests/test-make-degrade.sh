@@ -14,35 +14,27 @@
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 setup_sandbox
 
-# A PATH with shellcheck removed and nothing else changed. Cheaper and more
-# faithful than a stub that lies about being absent.
-NOSC="${SANDBOX}/without-shellcheck"
-cat > "${NOSC}" <<'EOF'
-#!/bin/sh
-clean=""
-IFS=:
-for d in $PATH; do
-  [ -x "$d/shellcheck" ] && continue
-  clean="${clean:+$clean:}$d"
-done
-unset IFS
-PATH="$clean" exec "$@"
-EOF
-chmod +x "${NOSC}"
+# "Absent" is expressed by naming a binary that does not exist, via the
+# Makefile's SHELLCHECK variable — not by editing PATH. Stripping the directory
+# that holds shellcheck works on macOS (Homebrew's own bin) and destroys the
+# environment on Linux, where /usr/bin holds shellcheck *and* make, python3 and
+# sed. The first version of this test did exactly that and so passed locally
+# while failing on a Linux runner.
+ABSENT="sbw-no-such-shellcheck"
 
 echo "make degrades without shellcheck"
 
 TESTS_RUN=$((TESTS_RUN + 1))
-if "${NOSC}" sh -c 'command -v shellcheck >/dev/null'; then
-  fail "the harness can actually hide shellcheck" "shellcheck still on PATH"
+if command -v "${ABSENT}" >/dev/null 2>&1; then
+  fail "the stand-in name is genuinely not installed" "${ABSENT} exists on this machine"
 else
-  pass "the harness can actually hide shellcheck"
+  pass "the stand-in name is genuinely not installed"
 fi
 
 # --- make lint: still an error, because it was asked for --------------------
-out="$("${NOSC}" make -C "${ENGINE}" lint 2>&1)"
+out="$(make -C "${ENGINE}" lint SHELLCHECK="${ABSENT}" 2>&1)"
 rc=0
-"${NOSC}" make -C "${ENGINE}" lint >/dev/null 2>&1 || rc=$?
+make -C "${ENGINE}" lint SHELLCHECK="${ABSENT}" >/dev/null 2>&1 || rc=$?
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${rc}" -ne 0 ]; then
   pass "make lint fails without shellcheck rather than reporting success"
@@ -57,9 +49,9 @@ case "${out}" in
 esac
 
 # --- lint-shell: the degrading half -----------------------------------------
-out="$("${NOSC}" make -C "${ENGINE}" lint-shell 2>&1)"
+out="$(make -C "${ENGINE}" lint-shell SHELLCHECK="${ABSENT}" 2>&1)"
 rc=0
-"${NOSC}" make -C "${ENGINE}" lint-shell >/dev/null 2>&1 || rc=$?
+make -C "${ENGINE}" lint-shell SHELLCHECK="${ABSENT}" >/dev/null 2>&1 || rc=$?
 assert_exit 0 "${rc}" "lint-shell succeeds without shellcheck"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
@@ -70,7 +62,7 @@ esac
 
 # lint-python needs nothing but python3, so it must run either way — it used to
 # be unreachable, sitting after the shellcheck guard in the same recipe.
-out="$("${NOSC}" make -C "${ENGINE}" lint-python 2>&1)"
+out="$(make -C "${ENGINE}" lint-python SHELLCHECK="${ABSENT}" 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
   *"python syntax OK"*) pass "lint-python runs with shellcheck absent" ;;

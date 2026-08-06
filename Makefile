@@ -47,16 +47,23 @@ help:
 #
 # Split three ways so neither entry point duplicates the other's commands, and
 # so lint-python — which needs nothing but python3 — runs in both cases.
+# Overridable so the degradation path can be tested by naming a binary that
+# isn't there, rather than by surgery on PATH: on Linux shellcheck lives in
+# /usr/bin, so removing the directory that holds it also removes make, python3,
+# sed and everything else — which is why the first version of that test passed
+# on macOS and failed on a Linux runner.
+SHELLCHECK ?= shellcheck
+
 lint: require-shellcheck lint-shell lint-python
 
 require-shellcheck:
-	@command -v shellcheck >/dev/null || { \
+	@command -v $(SHELLCHECK) >/dev/null || { \
 	  echo "shellcheck not installed — brew install shellcheck"; \
 	  echo "  (or run 'make test', which needs no extra tools)"; exit 1; }
 
 lint-shell:
-	@if command -v shellcheck >/dev/null; then \
-	  shellcheck -x $(SHELL_SOURCES) && echo "shellcheck clean"; \
+	@if command -v $(SHELLCHECK) >/dev/null; then \
+	  $(SHELLCHECK) -x $(SHELL_SOURCES) && echo "shellcheck clean"; \
 	else \
 	  echo "shellcheck: skipped — install shellcheck to enable (brew install shellcheck)"; \
 	fi

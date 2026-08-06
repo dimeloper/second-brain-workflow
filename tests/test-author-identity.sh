@@ -237,12 +237,32 @@ esac
 
 # --- init-vault --identity-email --------------------------------------------
 V="${SANDBOX}/v-init"
-"${ENGINE}/scripts/init-vault.sh" --path "${V}" --id work \
+# GIT_AUTHOR_* rather than whatever this machine happens to have configured:
+# `git var GIT_AUTHOR_IDENT` fails outright where no identity resolves, and a
+# fresh CI runner is exactly that machine — so asserting on "would be authored
+# as" without pinning it passes locally and fails there.
+GIT_AUTHOR_NAME="Work Worker" GIT_AUTHOR_EMAIL="${WANT}" \
+  "${ENGINE}/scripts/init-vault.sh" --path "${V}" --id work \
   --identity-email "${WANT}" >"${SANDBOX}/init.out" 2>&1
 assert_contains "${V}/vault.json" '"identity"' "init-vault --identity-email writes the identity block"
 assert_contains "${V}/vault.json" "${WANT}" "and records the address given"
-assert_contains "${SANDBOX}/init.out" "would be authored as" \
+assert_contains "${SANDBOX}/init.out" "would be authored as: ${WANT}" \
   "init-vault prints the identity a commit here would carry"
+
+# The other branch: no identity resolvable at all must still say something,
+# rather than printing an empty address or nothing.
+V2="${SANDBOX}/v-init-noident"
+env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u EMAIL \
+  HOME="${SANDBOX}/empty-home" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+  "${ENGINE}/scripts/init-vault.sh" --path "${V2}" --id work \
+  >"${SANDBOX}/init-noident.out" 2>&1
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(cat "${SANDBOX}/init-noident.out")" in
+  *"would be authored as"*|*"no resolvable author identity"*)
+    pass "and says so either way when no identity resolves" ;;
+  *) fail "and says so either way when no identity resolves" \
+       "$(cat "${SANDBOX}/init-noident.out")" ;;
+esac
 
 # Re-running must not rewrite a vault.json it didn't write this time.
 "${ENGINE}/scripts/init-vault.sh" --path "${V}" --id work --adopt \
