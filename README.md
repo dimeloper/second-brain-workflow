@@ -303,6 +303,34 @@ SKILLS_DIRS=~/.claude/skills ./scripts/sync-skills.sh
 VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-skills.sh
 ```
 
+### Removing them again
+
+```bash
+make uninstall            # print what would go, change nothing
+make uninstall YES=1      # actually remove
+```
+
+Previewing is the default and `--yes` is the only thing that acts, because the
+alternative is symlink archaeology: `sync-skills.sh` installs by name into
+directories that also hold other tools' installs, so "delete the ones that look
+like ours" is a guess. Each link is instead resolved to an absolute path and
+compared against this checkout — never matched on the text
+`second-brain-workflow`, which a relative link like
+`../../.agents/skills/find-skills` doesn't contain at all.
+
+It also removes links left **dangling** by a deleted checkout, which is the one
+state nothing else can clean up: the path they name is gone, so the only
+evidence is a target that no longer resolves plus this engine's skills layout.
+Run it from any checkout — it does not need to be the one the links point into.
+
+Never touched: a real directory (a hand-maintained skill), a link resolving
+anywhere outside this checkout (another tool's install, such as Railway's
+`use-railway`), the skills directories themselves, and a broken link that isn't
+ours. **It also does not remove your vault, your machine config, or the
+rendered rules in repos you onboarded** — delete `.cursor/rules`,
+`.claude/rules`, `AGENTS.md`, `CLAUDE.md` and `.sbw-version` per repo if you
+want those gone.
+
 ## Onboard a repo
 
 Say **onboard repo**. The agent follows `onboard-repo`: syncs rules, adds a thin

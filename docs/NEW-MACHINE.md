@@ -90,6 +90,12 @@ Installs into every directory in `SKILLS_DIRS` — by default both
 `~/.cursor/skills` and `~/.claude/skills`. It never overwrites a real directory
 or a symlink owned by another tool; it reports those and exits non-zero.
 
+To undo it — including starting this setup over — `make uninstall` previews and
+`make uninstall YES=1` acts. It removes only links it can account for, handles
+links left dangling by a checkout you already deleted, and leaves your vault,
+your config file and any onboarded repo's rendered rules alone. See the
+README's [Removing them again](../README.md#removing-them-again).
+
 ### 4. Create a vault
 
 ```bash

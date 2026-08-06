@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
-        vault-index-check sync-skills explain guard doctor audit verify-claude check
+        vault-index-check sync-skills uninstall explain guard doctor audit verify-claude check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
 # make cannot read the config file, so a fallback written here would ignore it
@@ -16,7 +16,8 @@ endif
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
-                 scripts/lib/resolve-vault.sh tests/lib.sh $(wildcard tests/test-*.sh)
+                 scripts/lib/resolve-vault.sh scripts/uninstall.sh \
+                 tests/lib.sh $(wildcard tests/test-*.sh)
 
 help:
 	@echo "make lint                shellcheck every shell script (needs shellcheck)"
@@ -24,6 +25,7 @@ help:
 	@echo "make vault-index         regenerate <vault>/practices/INDEX.md"
 	@echo "make vault-index-check   fail if the index is stale"
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
+	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make doctor              report gaps: commit-guard hook, skill parity, submodule drift"
@@ -109,6 +111,11 @@ vault-index-check:
 
 sync-skills:
 	@./scripts/sync-skills.sh
+
+# Preview by default; --yes is the script's own gate, so `make uninstall` can
+# never remove anything on its own.
+uninstall:
+	@./scripts/uninstall.sh $(if $(YES),--yes,)
 
 # `render.py --explain` also enforces the scoping invariant: a glob-scoped rule
 # must never render into an always-loaded file. Per-repo rule drift is checked

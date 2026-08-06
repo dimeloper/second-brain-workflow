@@ -19,6 +19,20 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- `make uninstall` / `scripts/uninstall.sh`: removes the skills this engine
+  installed, from every directory in `SKILLS_DIRS`. Previewing is the default
+  and `--yes` is the only thing that acts (`--dry-run` says the default
+  explicitly). Links are identified by resolving each one to an absolute path
+  and comparing it against this checkout, never by matching the text
+  `second-brain-workflow` — a relative link such as
+  `../../.agents/skills/find-skills` contains no such substring. It also
+  removes links left **dangling** by a deleted checkout, the one state nothing
+  else can clean up, and works from any checkout rather than the one the links
+  point into. It never touches a real directory, a link resolving outside this
+  checkout (another tool's install, e.g. Railway's `use-railway`), a broken
+  link that isn't ours, the skills directories themselves, any vault, the
+  machine config, or rendered rules in onboarded repos.
+
 - `init-vault.sh` writes this machine's config (`SBW_VAULT` +
   `SBW_EXPECTED_VAULT_ID`) when no config file exists, and prints exactly what
   it wrote. The vault's id and the machine's expected id have to agree, and
