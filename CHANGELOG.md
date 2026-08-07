@@ -17,6 +17,21 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-07
+
+### Fixed
+- **The daily-note template `init-vault.sh` writes did not mention the `#repo/`
+  tag v0.6.0 introduced.** The skill documented it and this vault's own template
+  was updated by hand, but a vault created from the engine got a `## Follow-ups`
+  section described without it — so an item typed straight into Obsidian would
+  have been the only kind that never groups, in every new vault. The template now
+  says what the skill says: tag the repo the item is *about* rather than the one
+  you were working in, and leave the tag off entirely when the item belongs to no
+  repo. Asserted by a test, since a convention is only worth having if all three
+  places that state it agree. Existing vaults are unaffected — `write_if_absent`
+  never rewrites a template its owner may have edited, which is the documented
+  no-automatic-upgrade path; add the comment by hand if you want it.
+
 ## [0.6.0] - 2026-08-07
 
 ### Added
@@ -609,7 +624,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.2...v0.5.0
