@@ -17,6 +17,21 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-07
+
+### Fixed
+- **A note's context repo ignored the `## Built (<repo>: …)` label**, which is
+  where a multi-stream daily note actually names its repos — `note_context_repo`
+  skipped every `## ` heading, so the most deliberate statement of a repo in the
+  note was the one thing it could not read. A day whose repo appeared only in a
+  label got no context; worse, a day with three labels naming three repos was
+  left with one incidental body mention as its sole hit and returned a
+  **confident wrong answer** precisely where declining was the point. On a real
+  vault that filed seven prod-credential and marketplace-listing items under the
+  *vault* repo. The label is now read first, and a note whose labels disagree
+  declines as documented. No action needed; re-run the audit to see the
+  corrected grouping.
+
 ## [0.6.1] - 2026-08-07
 
 ### Fixed
@@ -624,7 +639,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.0...v0.5.1
