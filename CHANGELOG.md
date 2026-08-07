@@ -17,6 +17,33 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-07
+
+### Added
+- **`check-followups.py --recent [N]`: the `check-follow-ups` window, in the
+  script.** The N most recent notes that exist (default 4), today included,
+  chosen by note count and never by age — so a weekend or a vacation gap costs
+  nothing. This is what "one shared implementation" was supposed to mean: until
+  now the skill and the audit agreed on what an *item* is while the skill
+  hand-rolled its own note selection in prose. Reports the real date span, and
+  says when fewer notes exist than were asked for rather than presenting a short
+  window as a full one.
+
+### Fixed
+- **The skill could not find its own script.** `SKILL.md` named
+  `scripts/check-followups.py` as a bare relative path, and an installed skill
+  directory contains only `SKILL.md` — so the script resolved to nothing, and the
+  skill fell back to reading the notes by hand. Every other skill here already
+  used the absolute `~/second-brain-workflow/scripts/…` form. Now it does too,
+  plus a `readlink`-based way to locate a checkout that lives elsewhere.
+- **`--stale-days` cannot express "including today", so the skill had no correct
+  command to run.** It reports items *strictly* older than its argument, which
+  means `--stale-days 0` omits the current day's note. Use `--recent`; the flag's
+  help and `docs/AUDIT.md` now say so explicitly. On the real vault the
+  difference was 28 items versus 12.
+- `--recent 0` exits 2 like any other argument error, rather than 1, which is
+  what a genuine finding uses.
+
 ## [0.6.2] - 2026-08-07
 
 ### Fixed
@@ -639,7 +666,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.1...v0.6.0
