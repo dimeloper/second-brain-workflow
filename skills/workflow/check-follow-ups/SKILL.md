@@ -94,11 +94,40 @@ Attribute each item by, strongest signal first:
 None of those hit? It goes under **No repo identified** — that is a real answer,
 not a failure.
 
-`scripts/check-followups.py` implements all of this (`--repo`,
-`--no-repo-grouping`), and `scripts/lib/followups.py` is the shared
-implementation. Prefer running the script over reimplementing the matching by
-hand, so the long-range audit and this skill can't drift apart on what an item
-is or where it belongs.
+### Run the script rather than re-implementing this
+
+All of the above is already implemented. **This skill directory contains only
+`SKILL.md`** — the script lives in the engine checkout, not next to this file, so
+a relative `scripts/...` path will not resolve:
+
+```bash
+~/second-brain-workflow/scripts/check-followups.py --recent
+~/second-brain-workflow/scripts/check-followups.py --recent --repo NAME
+~/second-brain-workflow/scripts/check-followups.py --recent --no-repo-grouping
+~/second-brain-workflow/scripts/check-followups.py --recent 8      # look further back
+```
+
+**`--recent` is this skill's window**, implemented in the script rather than
+described here: the 4 most recent notes that exist, today included, selected by
+note count and never by age. Use it, not `--stale-days` — that flag is the
+long-range audit's age cutoff, it reports items *strictly* older than its
+argument, and so even `--stale-days 0` silently drops today's note, which is
+usually the one you most need. The output states the window and its real date
+span, and says so when fewer notes exist than were asked for.
+
+If that path doesn't exist, the engine is checked out somewhere else. Resolve it
+from this skill's own install link rather than guessing:
+
+```bash
+ENGINE="$(cd "$(dirname "$(readlink ~/.claude/skills/check-follow-ups)")/../.." && pwd)"
+"${ENGINE}/scripts/check-followups.py" --recent
+```
+
+Reading the notes by hand is the last resort, not the default. Prefer the script:
+a hand count and the script disagreeing is a real failure mode — it happened, off
+by two, because items had been added between the two readings. If you do fall
+back, **say so in the report**, since the numbers are then yours rather than the
+tool's.
 
 ## What to do
 

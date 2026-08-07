@@ -277,4 +277,85 @@ case "${out_detect}" in
   *) fail "the repo is detected from origin, not from the directory name" "${out_detect}" ;;
 esac
 
+# --- --recent: the skill's window, notes-back rather than days-back ------
+# The fixture vault's notes: 2026-01-01, 01-02, 01-03, 01-04, 01-05, 02-15,
+# 06-01 (no Follow-ups section), 07-20. AS_OF is 2026-08-03.
+
+# The trap this flag exists to remove: --stale-days reports items *strictly*
+# older than its argument, so even 0 drops the current day. A skill whose whole
+# job is the recent window cannot be built on that.
+out_today="$("${CHECK}" --vault "${FVAULT}" --as-of 2026-07-20 --stale-days 0 \
+  --no-repo-grouping 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_today}" in
+  *"Recent thing"*) fail "--stale-days 0 excludes the as-of day itself" "unexpectedly listed" ;;
+  *) pass "--stale-days 0 excludes the as-of day itself — why --recent exists" ;;
+esac
+
+out_recent_today="$("${CHECK}" --vault "${FVAULT}" --as-of 2026-07-20 --recent 1 \
+  --no-repo-grouping 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent_today}" in
+  *"Recent thing"*) pass "--recent includes the as-of day, which is the point" ;;
+  *) fail "--recent includes the as-of day, which is the point" "${out_recent_today}" ;;
+esac
+
+# Notes back, not days back: --recent 2 from 2026-08-03 takes 07-20 and 06-01 —
+# 44 and 63 days old — because they are the two that exist. No age filter.
+out_recent2="$("${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" --recent 2 \
+  --no-repo-grouping 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent2}" in
+  *"in the last 2 notes (2026-06-01..2026-07-20)"*)
+    pass "--recent counts notes that exist, spanning whatever calendar gap that is" ;;
+  *) fail "--recent counts notes that exist, spanning whatever calendar gap that is" "${out_recent2}" ;;
+esac
+
+# 2026-06-01 has no `## Follow-ups` heading at all, and must not error.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent2}" in
+  *"in the last 2 notes"*": 1"*) pass "a note with no Follow-ups section contributes nothing, quietly" ;;
+  *) fail "a note with no Follow-ups section contributes nothing, quietly" "${out_recent2}" ;;
+esac
+
+# Asking for more notes than exist is reported, not silently presented as a full
+# window — a short window and a quiet vault look identical otherwise.
+out_recent99="$("${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" --recent 99 \
+  --no-repo-grouping 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent99}" in
+  *"only "*" exist within 90 days"*) pass "asking for more notes than exist says so" ;;
+  *) fail "asking for more notes than exist says so" "${out_recent99}" ;;
+esac
+
+# The 90-day search cap: from 2026-08-03 the 01-01..02-15 notes are out of reach,
+# so --recent 99 must not reach back to the 214-day-old item.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent99}" in
+  *"Renew TLS cert"*) fail "--recent stops at the 90-day search cap" "reached a 214-day-old note" ;;
+  *) pass "--recent stops at the 90-day search cap" ;;
+esac
+
+# A future-dated note is not "recent" — it is ahead of as-of, and including it
+# would report an item as negatively aged.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent_today}" in
+  *"(-"*" days open"*) fail "--recent never includes a note dated after as-of" "${out_recent_today}" ;;
+  *) pass "--recent never includes a note dated after as-of" ;;
+esac
+
+# Grouping composes with the window, and the buckets still sum to the total.
+out_recent_grouped="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 \
+  --recent 99 --repo alpha-service 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_recent_grouped}" in
+  *"in the last "*" notes"*"This repo — alpha-service"*)
+    pass "--recent and repo grouping compose" ;;
+  *) fail "--recent and repo grouping compose" "${out_recent_grouped}" ;;
+esac
+
+# --recent 0 is a nonsense window; refuse rather than report an empty one.
+"${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" --recent 0 >/dev/null 2>&1
+assert_exit 2 "$?" "--recent 0 is refused, not silently an empty report"
+
 finish

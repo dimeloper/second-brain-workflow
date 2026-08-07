@@ -79,7 +79,15 @@ current repo, then the note's `## Built` context.
 ```bash
 ./scripts/check-followups.py --repo housemaster-backend   # group as another repo
 ./scripts/check-followups.py --no-repo-grouping           # one flat list
+./scripts/check-followups.py --recent                     # the skill's window instead
 ```
+
+`--recent [N]` swaps the age cutoff for the `check-follow-ups` skill's window —
+the N most recent notes that exist (default 4), today included, chosen by note
+count and never by age, so a vacation-length gap costs nothing. It is the same
+selection the skill describes, implemented here so the two cannot drift. Note
+that `--stale-days` reports items *strictly* older than its argument, so even
+`--stale-days 0` omits today; `--recent` is the only way to include it.
 
 An item with no repo identified is a normal result, not a gap to close — plenty
 of follow-ups (an email awaiting a reply, a key to revoke in a console) belong
