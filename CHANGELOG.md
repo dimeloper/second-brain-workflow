@@ -17,8 +17,18 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
-### Changed
+## [0.5.0] - 2026-08-07
 
+### Major
+- **If your `vault.json` has an `identity` block with a misspelled key, commits
+  into that vault are now blocked.** Before, an unrecognised key read as "no
+  identity declared" and the check silently didn't run; it now fails closed.
+  **Action:** run `make doctor`. It names the offending key, and the fix is the
+  spelling — the only keys read are `email`, `name` and `email_pattern`. A
+  vault with no `identity` block, or a deliberately empty one, is unaffected;
+  the check remains opt-in.
+
+### Changed
 - **Printed remediations match how the tool was invoked.** The README shows
   `make uninstall YES=1`; `uninstall.sh` printed *"Re-run with `--yes`"* —
   both right at their own layer, and neither any use to a reader who followed
@@ -30,7 +40,6 @@ write release notes, not two to keep in sync by hand.
   `init-vault.sh` began refusing unedited placeholders it was a command that
   failed by design. The test now runs the command it prints rather than
   matching its text, which is what let the placeholder sit there.
-
 - **The vault's remote is compared as host, owner and repo rather than as a
   literal string**, in every consumer of `scripts/lib/vault-identity.sh` — the
   commit guard and `init-vault.sh --adopt`. It did not normalise anything
@@ -55,7 +64,6 @@ write release notes, not two to keep in sync by hand.
   normalises.
 
 ### Added
-
 - **`init-vault.sh` refuses a `--remote` another vault on this machine already
   claims.** Following the Quickstart on a machine that already had a work vault
   produced two vaults recording the same remote — `id: personal` alongside
@@ -76,7 +84,6 @@ write release notes, not two to keep in sync by hand.
   still compares different.
 
 ### Fixed
-
 - **Skills installed outside the current `SKILLS_DIRS` were invisible to every
   tool here at once.** `sync-skills.sh` runs during the Quickstart *before* a
   machine config exists, so it installs into the built-in default — both
@@ -91,7 +98,6 @@ write release notes, not two to keep in sync by hand.
   `uninstall`'s preview and counted on its own line — `--yes` never widens
   what it deletes without having shown it — and `doctor` warns, naming the
   directory and both ways out.
-
 - **`git commit --allow-empty` skipped the commit-author check entirely** — a
   bypass that didn't even need `--no-verify`. The guard returned early on an
   empty diff, before the author check, reporting *"nothing staged — nothing to
@@ -103,7 +109,6 @@ write release notes, not two to keep in sync by hand.
   tier as well — the tier that exists precisely because `--no-verify` can skip
   the local one. That is fixed by the same change, and the "nothing staged"
   message now names which half was skipped.
-
 - **An `identity` block with a misspelled key pinned nothing, silently.** Only
   `email`, `name` and `email_pattern` are read; anything else fell through to
   the same "nothing was declared" path as a vault with no block at all, so the
@@ -118,7 +123,6 @@ write release notes, not two to keep in sync by hand.
   declares nothing as an absent one. Same consequence, different fix.
 
 ### Added
-
 - **`init-vault.sh` refuses an unedited placeholder** — `VAULT_ID`,
   `YOUR_ACCOUNT`, an empty `--id`, or a `--path` still holding one — naming
   the two-line Quickstart block to go back and edit. The Quickstart's prose
@@ -150,7 +154,6 @@ write release notes, not two to keep in sync by hand.
 ## [0.4.2] - 2026-08-06
 
 ### Fixed
-
 - **The shipped CI templates pinned engines that predate the checks they are
   meant to run.** `docs/vault-ci/guard.yml` shipped `ENGINE_REF: v0.2.0` and
   `audit.yml` `v0.1.0`, so a vault repo copying them got a push-time guard
@@ -538,7 +541,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.3.0...v0.4.0
