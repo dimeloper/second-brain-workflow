@@ -46,6 +46,27 @@ case "${out}" in
   *) fail "names the missing hook" "${out}" ;;
 esac
 
+# The remediation names the vault's own id, not the literal "VAULT_ID" it used
+# to print. That was always a copy-paste hazard; since init-vault.sh started
+# refusing unedited placeholders it is a command that fails by design.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"--id VAULT_ID"*) fail "the fix command names the real id, not a placeholder" "${out}" ;;
+  *"--id work --adopt"*) pass "the fix command names the real id, not a placeholder" ;;
+  *) fail "the fix command names the real id, not a placeholder" "${out}" ;;
+esac
+
+# And it runs. Asserting the string alone would have passed just as happily on
+# the placeholder version, which is what let it sit there.
+fix_cmd="$(printf '%s\n' "${out}" | sed -n 's/.*— run: \(\.\/scripts\/init-vault\.sh .*\)$/\1/p' | head -1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -n "${fix_cmd}" ] && ( cd "${ENGINE}" && eval "${fix_cmd}" ) >/dev/null 2>&1; then
+  pass "and the printed fix command actually runs"
+else
+  fail "and the printed fix command actually runs" "${fix_cmd:-no command found in: ${out}}"
+fi
+assert_file "${V}/.git/hooks/pre-commit" "and installs the hook it was supposed to"
+
 # --- a vault with a foreign hook ---------------------------------------------
 printf '#!/bin/sh\necho foreign\n' > "${V}/.git/hooks/pre-commit"
 chmod +x "${V}/.git/hooks/pre-commit"

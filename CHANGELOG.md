@@ -19,6 +19,18 @@ write release notes, not two to keep in sync by hand.
 
 ### Changed
 
+- **Printed remediations match how the tool was invoked.** The README shows
+  `make uninstall YES=1`; `uninstall.sh` printed *"Re-run with `--yes`"* —
+  both right at their own layer, and neither any use to a reader who followed
+  the README and is now told to run something it never mentioned. Run through
+  make, the message names the make form; run directly, the flag. Same for
+  `doctor`'s advice to sync skills or to clean up orphaned ones.
+- **`doctor`'s missing-hook remediation names the vault's own id** instead of
+  the literal `VAULT_ID`. That was always a copy-paste hazard, and since
+  `init-vault.sh` began refusing unedited placeholders it was a command that
+  failed by design. The test now runs the command it prints rather than
+  matching its text, which is what let the placeholder sit there.
+
 - **The vault's remote is compared as host, owner and repo rather than as a
   literal string**, in every consumer of `scripts/lib/vault-identity.sh` — the
   commit guard and `init-vault.sh --adopt`. It did not normalise anything
@@ -107,6 +119,21 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- **`init-vault.sh` refuses an unedited placeholder** — `VAULT_ID`,
+  `YOUR_ACCOUNT`, an empty `--id`, or a `--path` still holding one — naming
+  the two-line Quickstart block to go back and edit. The Quickstart's prose
+  warning was correct and three lines below the block, and the block still got
+  pasted verbatim: `YOUR_ACCOUNT` looked unfinished and was replaced,
+  `vault_id=personal` looked finished and was kept. So `vault_id` is now a
+  placeholder too, and `vault_path` derives from it. Also refuses an `--id`
+  that is really the next flag: `--id --no-hook` used to pass the slug rule
+  and create a vault genuinely called that.
+- **The Quickstart branches on whether the vault already exists**, with
+  `git clone` + `--adopt` shown for the second-machine case, and `--adopt` has
+  its own section in `docs/GUARD.md` cross-linked with the upgrade section.
+  `docs/NEW-MACHINE.md` opens by asking which case the reader is in.
+- `scripts/lib/invocation.sh`: one definition of "were we run from make",
+  used wherever a remediation is printed.
 - `scripts/lib/skill-links.sh`: one implementation of *where skills are
   installed* and *which links there are ours*, shared by `uninstall.sh` and
   `doctor.sh`. The two previously had one answer each, which is how they came

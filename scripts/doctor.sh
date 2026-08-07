@@ -34,6 +34,10 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${STANDARDS_DIR}/scripts/lib/author-identity.sh"
 # shellcheck source=scripts/lib/skill-links.sh
 . "${STANDARDS_DIR}/scripts/lib/skill-links.sh"
+# shellcheck source=scripts/lib/invocation.sh
+. "${STANDARDS_DIR}/scripts/lib/invocation.sh"
+# shellcheck source=scripts/lib/vault-identity.sh
+. "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
 ds_config_load
 skills_dirs_load
 
@@ -72,7 +76,15 @@ check_hook() {
 
   local hook="${VAULT}/.git/hooks/pre-commit"
   if [ ! -e "${hook}" ]; then
-    warn "no pre-commit hook in ${VAULT} — run: ./scripts/init-vault.sh --path ${VAULT} --id VAULT_ID --adopt"
+    # The vault's own id, not the literal "VAULT_ID" this used to print: a
+    # placeholder in a copy-paste remediation is a command that fails when
+    # pasted — and since init-vault.sh started refusing unedited placeholders,
+    # it fails by design. VS_STATE is `ready` here, so vault.json exists and
+    # the id is readable through the shared check.
+    local suggest_id="VAULT_ID"
+    vault_identity_check "${VAULT}" "" || true
+    [ -z "${VI_ID}" ] || suggest_id="${VI_ID}"
+    warn "no pre-commit hook in ${VAULT} — run: ./scripts/init-vault.sh --path ${VAULT} --id ${suggest_id} --adopt"
     return
   fi
   if grep -qF "${HOOK_MARKER}" "${hook}" 2>/dev/null; then
@@ -192,7 +204,7 @@ check_skills() {
 
     case "${target}" in
       "${STANDARDS_DIR}"/*)
-        warn "${name}: not installed in every configured skills dir — run ./scripts/sync-skills.sh"
+        warn "${name}: not installed in every configured skills dir — run $(say_remediation 'make sync-skills' './scripts/sync-skills.sh')"
         ;;
       *)
         while IFS= read -r dir; do
@@ -228,7 +240,7 @@ check_orphaned_skills() {
     clean=0
     warn "${n} of our skill link(s) in ${dir}, which is not in SKILLS_DIRS
         installed before the config narrowed it, and invisible to everything
-        that reads the config. Remove them with ./scripts/uninstall.sh (it
+        that reads the config. Remove them with $(say_remediation 'make uninstall' './scripts/uninstall.sh') (it
         looks here too, and shows them before it acts), or widen SKILLS_DIRS
         in $(ds_config_path) to include it."
   done <<EOF

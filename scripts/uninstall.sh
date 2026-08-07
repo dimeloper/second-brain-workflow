@@ -30,6 +30,8 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ds_config_load
 # shellcheck source=scripts/lib/skill-links.sh
 . "${STANDARDS_DIR}/scripts/lib/skill-links.sh"
+# shellcheck source=scripts/lib/invocation.sh
+. "${STANDARDS_DIR}/scripts/lib/invocation.sh"
 skills_dirs_load
 
 APPLY=0
@@ -125,7 +127,7 @@ fi
 
 if [ "${APPLY}" -eq 0 ]; then
   echo "${removed} link(s) to remove, ${kept} left alone."
-  echo "Re-run with --yes to remove them."
+  echo "Re-run with $(say_remediation 'YES=1 (make uninstall YES=1)' '--yes') to remove them."
   exit 0
 fi
 

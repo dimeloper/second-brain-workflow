@@ -22,6 +22,12 @@ setup_sandbox() {
   # that runs init-vault.sh no longer has "no config" afterwards — delete this
   # file if that is the state you mean to assert against.
   export SBW_CONFIG_FILE="${SANDBOX}/no-such-config"
+  # The tools phrase a printed remediation to match how they were invoked, and
+  # detect `make` by MAKELEVEL — which make exports into every recipe,
+  # including the one that runs this suite. Left set, a test asserting the
+  # script-form message passes when run by hand and fails under `make check`.
+  # Tests that mean to exercise the make form set it themselves.
+  unset MAKELEVEL
   isolate_home
   trap 'teardown_sandbox' EXIT INT TERM
 }

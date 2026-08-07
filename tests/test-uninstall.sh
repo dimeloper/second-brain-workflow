@@ -85,6 +85,23 @@ case "${out}" in
   *"Re-run with --yes"*) pass "and it says how to actually do it" ;;
   *) fail "and it says how to actually do it" "${out}" ;;
 esac
+
+# The README shows `make uninstall YES=1`; the tool printed "Re-run with --yes".
+# Both are right at their own layer, and neither helps a reader who followed
+# the README and is being told to run something it never mentioned. MAKELEVEL
+# is what make exports into every recipe, so it is how the script knows.
+out_make="$(MAKELEVEL=1 "${E1}/scripts/uninstall.sh" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_make}" in
+  *"YES=1"*) pass "run through make, it names the make form instead" ;;
+  *) fail "run through make, it names the make form instead" "${out_make}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_make}" in
+  *"Re-run with --yes"*)
+    fail "and does not offer the flag the reader has no way to pass" "${out_make}" ;;
+  *) pass "and does not offer the flag the reader has no way to pass" ;;
+esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
   *"REMOVE  alpha"*"keep    hand-written"*)
