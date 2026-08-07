@@ -80,6 +80,7 @@ current repo, then the note's `## Built` context.
 ./scripts/check-followups.py --repo housemaster-backend   # group as another repo
 ./scripts/check-followups.py --no-repo-grouping           # one flat list
 ./scripts/check-followups.py --recent                     # the skill's window instead
+./scripts/check-followups.py --recent --brief             # this repo in full, others tallied
 ```
 
 `--recent [N]` swaps the age cutoff for the `check-follow-ups` skill's window —
@@ -88,6 +89,14 @@ count and never by age, so a vacation-length gap costs nothing. It is the same
 selection the skill describes, implemented here so the two cannot drift. Note
 that `--stale-days` reports items *strictly* older than its argument, so even
 `--stale-days 0` omits today; `--recent` is the only way to include it.
+
+`--brief` is for the common case of standing in one repo: this repo's items in
+full, every other repo as a single count line. Still not a filter — the total is
+unchanged and the counts say how many exist — with one exception that survives
+collapsing, because its urgency has nothing to do with where you are standing:
+an item the note calls **blocking**, or a **live credential** to rotate or revoke,
+is listed in full whatever repo it belongs to and keeps its repo name. Flags are
+markers *in place* in the full report, never a second listing of the same item.
 
 An item with no repo identified is a normal result, not a gap to close — plenty
 of follow-ups (an email awaiting a reply, a key to revoke in a console) belong

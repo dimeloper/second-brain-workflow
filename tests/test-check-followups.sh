@@ -19,8 +19,10 @@ run() {
   "${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" --no-repo-grouping "$@"
 }
 
-# Grouping runs against its own fixture vault, so adding an attribution case
-# here never shifts the exact counts the window tests assert.
+# Grouping runs against its own fixture vault, so an attribution case added here
+# never shifts the counts the window tests above assert. It does shift the ones
+# *below*: adding a fixture to a shared vault is an edit to every test that reads
+# it, which has now cost two rounds of count updates. Check both when you add one.
 run_repos() {
   "${CHECK}" --vault "${RVAULT}" --as-of "${AS_OF}" "$@"
 }
@@ -124,19 +126,19 @@ out_repo="$(run_repos --repo alpha-service 2>/dev/null)"
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_repo}" in
-  *"Open follow-ups older than 30 days: 8"*)
+  *"Open follow-ups older than 30 days: 12"*)
     pass "the count precedes any grouping and counts every open item" ;;
   *) fail "the count precedes any grouping and counts every open item" "${out_repo}" ;;
 esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 mine="$(printf '%s\n' "${out_repo}" | grep -c '\[repo named in the item\]\|\[this note.s ## Built section')"
-elsewhere="$(printf '%s\n' "${out_repo}" | grep -c '\[beta-app —\|\[gamma-tool —')"
+elsewhere="$(printf '%s\n' "${out_repo}" | grep -c '\[beta-app\|\[gamma-tool')"
 unattributed="$(printf '%s\n' "${out_repo}" | grep -c 'Ambiguous day\|labels name two different repos')"
-if [ "$((mine + elsewhere + unattributed))" = "8" ]; then
-  pass "the three buckets account for all 8 items — grouping never drops one"
+if [ "$((mine + elsewhere + unattributed))" = "12" ]; then
+  pass "the three buckets account for all 12 items — grouping never drops one"
 else
-  fail "the three buckets account for all 8 items — grouping never drops one" \
+  fail "the three buckets account for all 12 items — grouping never drops one" \
     "mine=${mine} elsewhere=${elsewhere} unattributed=${unattributed}"
 fi
 
@@ -149,16 +151,16 @@ esac
 # A `#repo/` tag is the recorded signal and outranks everything else.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_repo}" in
-  *"Tagged item belongs elsewhere"*"[beta-app — #repo tag]"*)
-    pass "a #repo/ tag attributes the item and says so" ;;
-  *) fail "a #repo/ tag attributes the item and says so" "${out_repo}" ;;
+  *"Tagged item belongs elsewhere"*"[beta-app]"*)
+    pass "a #repo/ tag attributes the item to its repo" ;;
+  *) fail "a #repo/ tag attributes the item to its repo" "${out_repo}" ;;
 esac
 
 # A repo the vault has never recorded is still honored when tagged — an
 # unfamiliar name means a new repo, not a typo to second-guess.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_repo}" in
-  *"[gamma-tool — #repo tag]"*)
+  *"[gamma-tool]"*)
     pass "a tag naming an unrecorded repo is honored, not discarded" ;;
   *) fail "a tag naming an unrecorded repo is honored, not discarded" "${out_repo}" ;;
 esac
@@ -214,13 +216,13 @@ esac
 out_beta="$(run_repos --repo beta-app 2>/dev/null)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_beta}" in
-  *"This repo — beta-app (3)"*) pass "the same backlog regroups when run from another repo" ;;
+  *"This repo — beta-app (6)"*) pass "the same backlog regroups when run from another repo" ;;
   *) fail "the same backlog regroups when run from another repo" "${out_beta}" ;;
 esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_beta}" in
-  *"Open follow-ups older than 30 days: 8"*)
+  *"Open follow-ups older than 30 days: 12"*)
     pass "and the total is identical from either repo" ;;
   *) fail "and the total is identical from either repo" "${out_beta}" ;;
 esac
@@ -231,8 +233,8 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_flat}" in
   *"This repo"*|*"No repo identified"*|*"Grouped by repo"*)
     fail "--no-repo-grouping prints one flat list" "${out_flat}" ;;
-  *"Open follow-ups older than 30 days: 8"*)
-    pass "--no-repo-grouping prints one flat list, same 8 items" ;;
+  *"Open follow-ups older than 30 days: 12"*)
+    pass "--no-repo-grouping prints one flat list, same 12 items" ;;
   *) fail "--no-repo-grouping prints one flat list" "${out_flat}" ;;
 esac
 
@@ -257,9 +259,9 @@ esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nogit}" in
-  *"Open follow-ups older than 30 days: 8"*)
-    pass "and still reports all 8 items" ;;
-  *) fail "and still reports all 8 items" "${out_nogit}" ;;
+  *"Open follow-ups older than 30 days: 12"*)
+    pass "and still reports all 12 items" ;;
+  *) fail "and still reports all 12 items" "${out_nogit}" ;;
 esac
 
 # Detection prefers the origin URL over the directory name, because a checkout
@@ -357,5 +359,114 @@ esac
 # --recent 0 is a nonsense window; refuse rather than report an empty one.
 "${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" --recent 0 >/dev/null 2>&1
 assert_exit 2 "$?" "--recent 0 is refused, not silently an empty report"
+
+# --- --brief: this repo in full, other repos as counts -------------------
+# 2026-01-06 holds four items, none for alpha-service: one blocked, one
+# credential, one that only *mentions* blocking, one ordinary.
+brief() {
+  "${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 --brief "$@"
+}
+out_brief="$(brief --repo alpha-service 2>/dev/null)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"in the last 1 notes (2026-01-06): 4"*)
+    pass "--brief states the same unchanged total — it collapses, it does not filter" ;;
+  *) fail "--brief states the same unchanged total — it collapses, it does not filter" "${out_brief}" ;;
+esac
+
+# The whole point: other repos become a tally, not a list of items.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"beta-app 3 · gamma-tool 1"*) pass "--brief tallies other repos instead of listing them" ;;
+  *) fail "--brief tallies other repos instead of listing them" "${out_brief}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"Ordinary item with no urgency"*)
+    fail "--brief does not list an unflagged item from another repo" "${out_brief}" ;;
+  *) pass "--brief does not list an unflagged item from another repo" ;;
+esac
+
+# ...except the two kinds whose urgency isn't about which repo you're in.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"[blocked] Awaiting the vendor's reply"*"[beta-app]"*)
+    pass "a blocker survives collapsing, and keeps its repo name" ;;
+  *) fail "a blocker survives collapsing, and keeps its repo name" "${out_brief}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"[credential] Rotate the API key"*"[gamma-tool]"*)
+    pass "a live credential survives collapsing too" ;;
+  *) fail "a live credential survives collapsing too" "${out_brief}" ;;
+esac
+
+# The false positive that promoted a design question above a live key: "blocks"
+# in emphasis is the word being discussed, not a claim of being blocked.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"Change what the guard"*) fail "an emphasised *blocks* is not read as a blocker" "${out_brief}" ;;
+  *) pass "an emphasised *blocks* is not read as a blocker" ;;
+esac
+
+# A reader needs to know the collapsed counts and the lifted items overlap.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"Elsewhere (4) — 2 of them listed above"*)
+    pass "--brief reconciles its tally against the items it lifted out" ;;
+  *) fail "--brief reconciles its tally against the items it lifted out" "${out_brief}" ;;
+esac
+
+# An empty bucket says so rather than printing a bare heading.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"This repo — alpha-service (0)"*"(nothing open for this repo)"*)
+    pass "an empty this-repo bucket says so instead of showing a bare heading" ;;
+  *) fail "an empty this-repo bucket says so instead of showing a bare heading" "${out_brief}" ;;
+esac
+
+# --- flags are markers in place, never a second listing ------------------
+# The contract that broke in practice: a "blockers first" section followed by the
+# same items under their repos.
+out_full="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
+  --repo beta-app 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+listed="$(printf '%s\n' "${out_full}" | grep -c "Awaiting the vendor's reply")"
+if [ "${listed}" = "1" ]; then
+  pass "without --brief a flagged item is marked in place and listed once"
+else
+  fail "without --brief a flagged item is marked in place and listed once" \
+    "appeared ${listed} times"
+fi
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_full}" in
+  *"[blocked] Awaiting the vendor's reply"*) pass "and still carries its marker" ;;
+  *) fail "and still carries its marker" "${out_full}" ;;
+esac
+
+# --- the #repo/ tag is machinery, not content ----------------------------
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_brief}" in
+  *"#repo/"*) fail "the #repo/ tag is stripped from the item text it is read from" "${out_brief}" ;;
+  *) pass "the #repo/ tag is stripped from the item text it is read from" ;;
+esac
+
+# A recorded tag needs no annotation; an inferred attribution does.
+out_mine="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
+  --brief --repo beta-app 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_mine}" in
+  *"[#repo tag]"*) fail "a recorded tag is not annotated on this repo's own items" "${out_mine}" ;;
+  *) pass "a recorded tag is not annotated on this repo's own items" ;;
+esac
+
+# --brief is relative to a repo, so it cannot combine with --no-repo-grouping.
+"${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 --brief \
+  --no-repo-grouping >/dev/null 2>&1
+assert_exit 2 "$?" "--brief and --no-repo-grouping are refused together"
 
 finish

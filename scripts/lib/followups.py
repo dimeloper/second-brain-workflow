@@ -42,6 +42,57 @@ REPO_TAG_RE = re.compile(r'(?:^|\s)#repo/([A-Za-z0-9._-]+)')
 def _mention_re(repo):
     return re.compile(r'(?<![\w-])' + re.escape(repo) + r'(?![\w-])')
 
+
+# Items whose urgency has nothing to do with which repo they are in, and which
+# therefore must survive any collapsing of the other-repo groups. Two kinds,
+# because two kinds actually showed up: something the note itself calls blocking,
+# and a credential that is live until someone acts.
+#
+# Keyword matching, deliberately, with the asymmetry stated: a false positive
+# costs one extra line in a short list, a false negative hides a live key or the
+# thing the whole day was waiting on. The reason is always printed, so a wrong
+# flag is visible and arguable rather than silent.
+FLAG_PATTERNS = (
+    ("blocked", (
+        r'pause point', r'\bblocked\b', r'\bblocker\b',
+        r'\bawaiting\b', r'waiting on',
+        # "blocks" and "gates" only when asserted, not when quoted. An item
+        # saying "it changes what the guard *blocks*" is discussing the word, not
+        # claiming to be blocked — and that false positive is what promoted a
+        # second-brain-workflow design question above a live credential.
+        r'(?<![*`])\bblocks\b(?![*`])', r'(?<![*`])\bgates\b(?![*`])',
+    )),
+    ("credential", (
+        r'\brotate\b', r'\brevoke[ds]?\b', r'api key', r'\bsecrets?\b',
+        r'\bcredentials?\b', r'\btokens?\b', r'\bpasswords?\b',
+        r'pasted into chat', r'\bleaked\b', r'\bexposed\b',
+    )),
+)
+_FLAG_RES = tuple((name, tuple(re.compile(p, re.IGNORECASE) for p in pats))
+                  for name, pats in FLAG_PATTERNS)
+
+
+def display(item):
+    """The item as a reader wants it: without the `#repo/` machinery.
+
+    The tag exists to be matched on, and once it has been, echoing it back on
+    every line is noise — worse on the current repo's own list, where it repeats
+    identically all the way down.
+    """
+    return REPO_TAG_RE.sub("", item).rstrip()
+
+
+def flag_for(item):
+    """"blocked" / "credential" / None — why this item outranks its repo.
+
+    Checked in order, so an item that is both reports as blocked: that is the one
+    that says nothing else can start.
+    """
+    for name, regexes in _FLAG_RES:
+        if any(r.search(item) for r in regexes):
+            return name
+    return None
+
 # `scripts/foo.py`, `foo.py`, `path/to/bar.sh` — a filename with an extension,
 # or a slashed path. Matched inside backticks only: unquoted prose produces
 # false hits on ordinary sentences, and every item that names a real file in

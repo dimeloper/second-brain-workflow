@@ -53,11 +53,26 @@ service, an ops task, a decision about the vault itself. Twenty items in one
 undifferentiated list, when three of them are about the repo the user is
 standing in, reads as noise and gets skimmed.
 
-So when invoked from inside a git repo, **order the report by repo**:
+So when invoked from inside a git repo, the default is **this repo in full, every
+other repo as a count**:
 
-1. **This repo** first, oldest first within it
-2. **Other repos**, one line each — the item's own text, no elaboration
-3. **No repo identified**, same
+1. **This repo** — every item, oldest first, in full
+2. **Elsewhere** — one line: `housemaster-ingestion 3 · vaitsi-psychology 3 ·
+   no repo identified 4`. Not one line *per item*: one line total.
+3. Expand any of those only when asked ("what's in the others?", "show
+   everything").
+
+**Two things survive the collapsing**, listed in full above your repo's items
+whatever repo they belong to, because their urgency is not about where you are
+standing:
+
+- **a blocker** — the note calls it blocking, or a pause point
+- **a live credential** — a key to rotate or revoke, a secret pasted somewhere
+
+Ask about **this repo's** items when you offer to tick anything off. The reader
+asked from a repo; a closing question spanning four repos' worth of items hands
+back the exact undifferentiated list the grouping just removed. Offer the rest
+separately, in one sentence.
 
 **Group, never filter.** Every item in the window appears exactly once, and the
 total is stated before any grouping. This is not a style preference: an item's
@@ -101,11 +116,17 @@ All of the above is already implemented. **This skill directory contains only
 a relative `scripts/...` path will not resolve:
 
 ```bash
-~/second-brain-workflow/scripts/check-followups.py --recent
+~/second-brain-workflow/scripts/check-followups.py --recent --brief   # the default
+~/second-brain-workflow/scripts/check-followups.py --recent           # expand everything
 ~/second-brain-workflow/scripts/check-followups.py --recent --repo NAME
-~/second-brain-workflow/scripts/check-followups.py --recent --no-repo-grouping
-~/second-brain-workflow/scripts/check-followups.py --recent 8      # look further back
+~/second-brain-workflow/scripts/check-followups.py --recent 8         # look further back
 ```
+
+**Run it with `--brief` first.** It computes exactly the shape described above —
+this repo in full, others tallied, flagged items lifted out — so the collapsing is
+a command's output rather than a summarisation you perform, which is what kept
+drifting back into thirteen fully-described items from three other repos. Drop
+`--brief` when the user asks for everything.
 
 **`--recent` is this skill's window**, implemented in the script rather than
 described here: the 4 most recent notes that exist, today included, selected by
@@ -139,11 +160,13 @@ tool's.
 3. Report **oldest first**, grouped by repo per the section above — that
    surfaces what's been sitting longest, in the repo the user is actually in.
    Lead with the date span from step 1 and the total.
-4. **An explicit blocker outranks repo grouping.** An item the note marks as
-   blocking or as a pause point ("**This is the pause point for the session**",
-   "blocks rollout") leads the report whatever repo it belongs to — being in
-   another repo does not make it less blocked. One line, at the top, then the
-   normal grouping.
+4. **Mark a blocker in place; never list it twice.** An item the note calls
+   blocking, or a live credential, gets a `[blocked]` / `[credential]` marker on
+   its own line where it already sits. It is lifted to the top *only* when its
+   group is collapsed and it would otherwise vanish into a count. A "blockers
+   first" section followed by the same items under their repos produces exactly
+   the `12. Same as (1) and (2), carried forward` line that broke the
+   appears-exactly-once contract in practice.
 5. If nothing is unchecked anywhere in the window, say so plainly rather than
    printing an empty report.
 6. If the user confirms an item is done during the conversation, edit that
