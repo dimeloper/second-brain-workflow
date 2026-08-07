@@ -35,7 +35,11 @@ vault_remote_key() {
   local url="$1"
   case "${url}" in
     *://*) url="${url#*://}"; url="${url#*@}" ;;
-    *@*:*) url="${url#*@}"; url="${url/:/\/}" ;;
+    # The scp-style separator becomes a "/" by prefix/suffix trimming, not by
+    # ${url/:/\/} — bash 3.2 keeps the backslash in a replacement string, so
+    # that spelling produced "host\/owner/repo" there and every ssh-vs-https
+    # comparison read as a repoint.
+    *@*:*) url="${url#*@}"; url="${url%%:*}/${url#*:}" ;;
   esac
   while [ -n "${url}" ] && [ "${url%/}" != "${url}" ]; do url="${url%/}"; done
   url="${url%.git}"
