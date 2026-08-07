@@ -21,6 +21,17 @@ done
 assert_file "${V}/vault.json"                      "writes vault.json"
 assert_file "${V}/_templates/practice-note.md"     "writes the practice template"
 assert_file "${V}/_templates/daily-note.md"        "writes the daily template"
+
+# The #repo/ tag is written by update-second-brain, but an item typed straight
+# into Obsidian has only the template to learn the convention from — and an
+# untagged item is the one that groups under "no repo identified" forever.
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q '#repo/' "${V}/_templates/daily-note.md"; then
+  pass "the daily template documents the #repo/ follow-up tag"
+else
+  fail "the daily template documents the #repo/ follow-up tag" \
+    "$(cat "${V}/_templates/daily-note.md")"
+fi
 assert_file "${V}/00-maps/promotion-candidates.md" "writes the promotion query"
 assert_file "${V}/practices/INDEX.md"              "generates the index"
 assert_contains "${V}/vault.json" '"id": "work"'   "records the vault id"

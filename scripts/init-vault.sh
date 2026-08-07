@@ -290,7 +290,19 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
 - [ ]
 
 <!-- Open items you'd otherwise forget by next week. `- [ ]` pending,
-     `- [x]` done — check-follow-ups reads these, nothing else. -->
+     `- [x]` done — check-follow-ups reads these, nothing else.
+
+     End each item with `#repo/<name>` for the repo it belongs to, spelled the
+     way practice notes' `repos:` field spells it:
+       - [ ] Revoke the stale API key once the merge lands #repo/acme-backend
+     check-follow-ups groups on that tag, so the repo you are working in comes
+     first. Tag the repo the item is ABOUT, not the one you happened to be in
+     when you wrote it.
+
+     Leave the tag OFF when the item belongs to no repo — an email to send, a
+     key to revoke in a console, a decision to make. Those group under "no repo
+     identified" and are still reported in full; a wrong tag is worse than none,
+     because it files the item somewhere you will not look. -->
 
 ## Practices followed
 -
