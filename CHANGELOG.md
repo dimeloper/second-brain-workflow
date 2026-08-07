@@ -17,6 +17,59 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-07
+
+### Added
+- **`check-follow-ups` leads with the repo you're in.** One day's follow-ups
+  routinely span several — a backend, an ingestion service, an ops task, a
+  decision about the vault itself — and twenty items in one undifferentiated
+  list, where three are about the repo in front of you, gets skimmed. Now
+  ordered: **this repo**, then **other repos**, then **no repo identified**.
+  An item the note marks as blocking still leads the whole report, whatever
+  repo it belongs to; being elsewhere doesn't make it less blocked.
+- **`update-second-brain` tags each new follow-up with its repo**
+  (`#repo/<name>`, matching how `repos:` frontmatter already spells it). It runs
+  inside the working repo, so it knows for certain — where the read side, a day
+  or a week later, has only prose to go on. Omitted deliberately for an item
+  that belongs to no repo (an email to send, a key to revoke in a console);
+  untagged is a supported state, not a gap. Its Step 3 also never documented
+  `## Follow-ups` at all, so the section the read side depends on had no
+  write-side contract — it does now.
+- `scripts/check-followups.py` groups the long-range audit the same way, with
+  `--repo NAME` to group as another repo and `--no-repo-grouping` for one flat
+  list. `scripts/lib/followups.py` is the shared implementation, so the audit
+  and the skill can't drift on what an item is or where it belongs — same
+  reasoning as `lib/vault-identity.sh` for the guard/init-vault pair.
+
+### Changed
+- **Grouping never filters.** The total is printed before any heading and every
+  item appears exactly once, whatever repo it belongs to. A repo *filter* was
+  the obvious version of this feature and is the wrong one: an item's repo is
+  metadata about the item, attribution is best-effort, and the items with no
+  repo to infer are the ones that sit open longest — so a filter would fail
+  precisely where this skill's one job matters, with no way for the reader to
+  know the count was ever higher.
+- Attribution reads, strongest first: a `#repo/` tag (honored even for a repo
+  the vault has never recorded — an unfamiliar name means a new repo, not a typo
+  to second-guess); a repo named in the item, matched against a closed
+  vocabulary of names the vault already uses, so hyphenated prose can't invent
+  one; a backticked file tracked in the current repo; and last the single repo
+  the note's `## Built` section is about, reported as the context guess it is. A
+  note naming two repos declines to guess rather than picking one.
+
+### Fixed
+- **A follow-up item was read as its first line only.** These items are prose
+  and routinely run to three or four lines, so the audit printed them truncated
+  mid-sentence — and attribution missed any repo named after the first line,
+  which is roughly half of them. Wrapped lines are now joined into the item they
+  belong to.
+- A repo name following a `/` didn't count as a mention, so an item about
+  `~/vaults/second-brain` read as naming no repo. The guard is bounded on word
+  characters and `-` only, which still keeps `housemaster-backend` from matching
+  a repo named `backend`.
+- A `repos:` value that isn't a repo name (this vault had a `local-mac
+  (2026-07-28)`) no longer enters the vocabulary prose is matched against.
+
 ## [0.5.1] - 2026-08-07
 
 ### Fixed
@@ -556,7 +609,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.1...v0.4.2
