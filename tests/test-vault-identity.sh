@@ -140,4 +140,36 @@ key_ne "https://github.com/ORG/brain" "https://github.com/ORG/other-brain" \
 key_ne "https://github.com/ORG/brain" "https://gitlab.com/ORG/brain" \
   "a different host is still a different remote"
 
+# --- the comparison itself, not just the key --------------------------------
+# The key function being right is no use if vault_identity_check doesn't call
+# it. This is the actual failure that shipped: actions/checkout writes an HTTPS
+# origin, vault.json conventionally records the SSH form, and every CI run
+# reported a repoint on a correctly configured vault — worked around in
+# guard.yml by rewriting origin, which only ever worked for GitHub-hosted
+# vaults.
+remote_case() { # $1 vault.json remote, $2 actual origin, $3 want-rc, $4 name
+  local dir="${SANDBOX}/rc-$$-${RANDOM}"
+  mkdir -p "${dir}"
+  git -C "${dir}" init -q
+  git -C "${dir}" remote add origin "$2"
+  printf '{\n  "id": "work",\n  "remote": "%s",\n  "schema_version": 1\n}\n' "$1" \
+    > "${dir}/vault.json"
+  local rc=0
+  vault_identity_check "${dir}" "work" || rc=$?
+  assert_exit "$3" "${rc}" "$4"
+}
+
+remote_case "git@github.com:ORG/brain.git" "https://github.com/ORG/brain" 0 \
+  "ssh in vault.json against an https origin is not a repoint"
+remote_case "https://github.com/ORG/brain" "https://github.com/ORG/brain.git" 0 \
+  "nor is a trailing .git on one side only"
+remote_case "git@github.com:ORG/brain.git" "git@github.com:ORG/brain.git" 0 \
+  "identical remotes still pass"
+remote_case "git@github.com:ORG/brain.git" "https://github.com/OTHER/brain.git" 1 \
+  "a different owner is still caught as a repoint"
+remote_case "git@github.com:ORG/brain.git" "git@github.com:ORG/other-brain.git" 1 \
+  "so is a different repo in the same org"
+remote_case "git@github.com:ORG/brain.git" "https://gitlab.com/ORG/brain.git" 1 \
+  "so is the same path on a different host"
+
 finish

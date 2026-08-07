@@ -258,4 +258,56 @@ case "${out}" in
 esac
 assert_file "${CLAIM}/mismatch/vault.json" "but still creates the vault — it is a warning"
 
+# --- the recorded remote has one form --------------------------------------
+# Two manifests recording the same repository as ".../work-brain" and
+# ".../work-brain.git" is what made the duplicate above invisible to anything
+# comparing strings. What is passed varies; what is written down should not.
+CANON="${SANDBOX}/canon"
+mkdir -p "${CANON}"
+SBW_CONFIG_FILE="${CANON}/cfg" "${INIT}" --path "${CANON}/a" --id a \
+  --remote "https://github.com/ORG/a.git" --no-hook --no-config >/dev/null 2>&1
+SBW_CONFIG_FILE="${CANON}/cfg" "${INIT}" --path "${CANON}/b" --id b \
+  --remote "https://github.com/ORG/b/" --no-hook --no-config >/dev/null 2>&1
+assert_contains "${CANON}/a/vault.json" '"remote": "https://github.com/ORG/a"' \
+  "a trailing .git is not recorded"
+assert_contains "${CANON}/b/vault.json" '"remote": "https://github.com/ORG/b"' \
+  "nor is a trailing slash"
+
+# Transport is left exactly as given: it is still a clone URL, and the
+# comparison no longer cares which spelling it is.
+SBW_CONFIG_FILE="${CANON}/cfg" "${INIT}" --path "${CANON}/c" --id c \
+  --remote "git@github.com:ORG/c.git" --no-hook --no-config >/dev/null 2>&1
+assert_contains "${CANON}/c/vault.json" '"remote": "git@github.com:ORG/c"' \
+  "the ssh form stays the ssh form"
+
+# The recorded form and the origin it sets must agree, or the vault fails its
+# own identity check on the first commit — the reason this could not ship
+# before the comparison normalised.
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "$(git -C "${CANON}/c" remote get-url origin)" = "git@github.com:ORG/c" ]; then
+  pass "and origin is set to the same string that was recorded"
+else
+  fail "and origin is set to the same string that was recorded" \
+    "$(git -C "${CANON}/c" remote get-url origin)"
+fi
+
+# The case the recording change actually depends on, and the one it would have
+# broken on its own: a vault cloned first, so origin already exists and keeps
+# the ".git" git put there, then adopted. vault.json records the stripped form
+# against an origin that doesn't — which only passes because the comparison
+# stopped being literal.
+# shellcheck source=scripts/lib/vault-identity.sh
+. "${ENGINE}/scripts/lib/vault-identity.sh"
+CLONED="${CANON}/cloned"
+mkdir -p "${CLONED}"
+git -C "${CLONED}" init -q
+git -C "${CLONED}" remote add origin "https://github.com/ORG/cloned.git"
+SBW_CONFIG_FILE="${CANON}/cfg" "${INIT}" --path "${CLONED}" --id cloned \
+  --remote "https://github.com/ORG/cloned.git" --adopt --no-hook --no-config >/dev/null 2>&1
+assert_contains "${CLONED}/vault.json" '"remote": "https://github.com/ORG/cloned"' \
+  "an adopted clone records the canonical form"
+rc=0
+vault_identity_check "${CLONED}" "cloned" || rc=$?
+assert_exit 0 "${rc}" "and still passes its own identity check against the origin git wrote"
+
 finish

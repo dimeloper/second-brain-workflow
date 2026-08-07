@@ -67,6 +67,15 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# One recorded form, whatever spelling was passed: a trailing "/" or ".git"
+# off, transport untouched. A real setup produced two manifests recording the
+# same repository as ".../work-brain" and ".../work-brain.git", which read as
+# two different remotes to anything comparing strings. Safe to do only because
+# vault_identity_check now compares on vault_remote_key rather than literally —
+# recording a stripped form against an origin that keeps .git would otherwise
+# fail that check on the vault's very first commit.
+[ -z "${REMOTE}" ] || REMOTE="$(vault_remote_canonical "${REMOTE}")"
+
 [ -n "${PATH_ARG}" ] || { echo "Missing --path" >&2; exit 2; }
 [ -n "${ID}" ] || { echo "Missing --id" >&2; exit 2; }
 case "${ID}" in

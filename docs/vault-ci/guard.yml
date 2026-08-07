@@ -38,17 +38,17 @@ jobs:
           path: vault
           fetch-depth: 0   # need the pre-push commit, not just the new tip
 
-      # actions/checkout sets origin to an HTTPS URL
-      # (https://github.com/owner/repo); vault.json conventionally records
-      # the SSH form (git@github.com:owner/repo.git) — same repo, different
-      # scheme, which the identity check's remote comparison reads as a
-      # mismatch otherwise. Rebuilt from github.repository (what GitHub
-      # itself says this workflow is running in), not from vault.json — so
-      # this still catches a real repoint, it just stops flagging a URL
-      # scheme difference as one. GitHub-hosted vaults only.
-      - name: Normalize the vault's origin to vault.json's URL scheme
-        run: git -C vault remote set-url origin "git@github.com:${{ github.repository }}.git"
-
+      # No origin-rewriting step here any more. actions/checkout sets origin to
+      # an HTTPS URL while vault.json conventionally records the SSH form, and
+      # this workflow used to rebuild origin from github.repository so the
+      # identity check wouldn't read that as a repoint. The engine now compares
+      # host, owner and repo rather than the literal URL, so the two spellings
+      # agree on their own — and dropping the step also drops its one
+      # limitation, that it only worked for GitHub-hosted vaults.
+      #
+      # This needs an engine that normalises, i.e. at least the ENGINE_REF
+      # pinned above. Both are versioned together, so a template copied from a
+      # release always has the engine that matches it.
       - name: Check out the engine
         uses: actions/checkout@v4
         with:

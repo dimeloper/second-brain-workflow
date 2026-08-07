@@ -17,6 +17,31 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+
+- **The vault's remote is compared as host, owner and repo rather than as a
+  literal string**, in every consumer of `scripts/lib/vault-identity.sh` — the
+  commit guard and `init-vault.sh --adopt`. It did not normalise anything
+  before, so `git@github.com:ORG/brain.git` in `vault.json` against an
+  `https://github.com/ORG/brain` origin reported a repoint on a correctly
+  configured vault, as did a bare trailing `.git` on either side. Only
+  transport and that suffix are normalised; a different host, owner or repo
+  name is still a repoint, and the message now says which is which.
+- **`init-vault.sh` records the remote in one form** — trailing `/` or `.git`
+  removed, transport untouched, so it remains a usable clone URL. Two vaults
+  created at different times from the same repository now record the same
+  string, which is what made a duplicate invisible to string comparison. This
+  could only ship together with the change above: recording a stripped form
+  against a cloned origin that keeps `.git` would otherwise fail the vault's
+  own identity check on its first commit.
+- **`docs/vault-ci/guard.yml` no longer rewrites the vault's origin.** The step
+  existed only to make `actions/checkout`'s HTTPS origin match `vault.json`'s
+  SSH form, and rebuilt the URL from `github.repository` to do it — which
+  worked, for GitHub-hosted vaults only. The comparison handles it now, so the
+  step and its limitation are both gone. Templates are versioned with the
+  engine, so a workflow copied from a release always pins an engine that
+  normalises.
+
 ### Added
 
 - **`init-vault.sh` refuses a `--remote` another vault on this machine already

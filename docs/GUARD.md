@@ -28,6 +28,17 @@ anything. It only ever adds missing fixed scaffold files though — never
 arbitrary content, never an overwrite, never a delete — so it doesn't need
 the guard's path/size/secret checks, only the identity check.
 
+**Remotes are compared as host, owner and repo**, not as literal strings.
+`git@github.com:ORG/brain.git` and `https://github.com/ORG/brain` are one
+repository written two ways, and the two sides of this comparison are written
+by different hands — a human into `vault.json`, `git clone` or
+`actions/checkout` into `origin` — so they disagree about transport and a
+trailing `.git` routinely. Reading that as a repoint is a false alarm on a
+correct setup, which is the fastest way to teach someone the check is noise.
+Nothing else is normalised: a different host, owner or repo name is still a
+repoint. `init-vault.sh` records the remote with a trailing `/` or `.git`
+removed for the same reason, leaving transport exactly as given.
+
 ## The commit guard
 
 **The vault is the isolation boundary, not the rule set.** Rules flow outward

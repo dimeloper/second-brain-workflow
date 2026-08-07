@@ -42,6 +42,16 @@ vault_remote_key() {
   printf '%s' "${url}"
 }
 
+# The form a remote is *recorded* in. Still a usable clone URL — transport is
+# left exactly as given — with only a trailing "/" or ".git" removed, so two
+# vaults created at different times from the same repository record the same
+# string. vault_remote_key is for comparing; this is for writing down.
+vault_remote_canonical() {
+  local url="$1"
+  while [ -n "${url}" ] && [ "${url%/}" != "${url}" ]; do url="${url%/}"; done
+  printf '%s' "${url%.git}"
+}
+
 vault_identity_check() {
   local vault="$1" expect_id="${2:-}"
   local vjson="${vault}/vault.json"
@@ -65,14 +75,22 @@ vault_identity_check() {
     return 1
   fi
 
+  # Compared as keys, not as strings. The two sides are written by different
+  # hands — a human into vault.json, `git clone` or actions/checkout into
+  # origin — and they routinely disagree about transport and a trailing .git
+  # while naming the same repository. A string comparison called that a
+  # repoint, which is a false alarm on a correct setup, and the fastest way to
+  # teach someone that this check is noise.
   if [ -n "${VI_REMOTE}" ]; then
     local actual
     actual="$(git -C "${vault}" remote get-url origin 2>/dev/null || echo "")"
-    if [ -n "${actual}" ] && [ "${actual}" != "${VI_REMOTE}" ]; then
+    if [ -n "${actual}" ] && \
+       [ "$(vault_remote_key "${actual}")" != "$(vault_remote_key "${VI_REMOTE}")" ]; then
       VI_ERROR="remote mismatch for vault '${VI_ID}':
        vault.json says  ${VI_REMOTE}
        origin points at ${actual}
-       This vault may have been repointed."
+       This vault may have been repointed. (Host, owner and repo are compared;
+       transport and a trailing .git are not, so this is a real difference.)"
       return 1
     fi
   fi
