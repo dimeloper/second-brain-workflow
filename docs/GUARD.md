@@ -147,6 +147,32 @@ had been cleared.
 `make doctor` reports the same mismatch against the identity a commit *would*
 be made with, so it surfaces at setup time instead of at the first commit.
 
+## Adopting an existing vault
+
+**New machine, vault already on a remote** — the common second-machine case,
+and the one that goes wrong quietly if you follow the creation path instead.
+Clone first, then adopt the clone:
+
+```bash
+git clone "git@github.com:YOUR_ACCOUNT/work-brain.git" ~/vaults/work-brain
+./scripts/init-vault.sh --path ~/vaults/work-brain --id work --adopt
+```
+
+`--adopt` allows a non-empty directory and adds only what is missing —
+directories, templates, the cross-cutting operating notes, the pre-commit hook.
+It never edits or overwrites a file that already exists, `vault.json` included.
+Before adding anything it runs the same identity check the commit guard runs,
+so adopting the *wrong* vault fails rather than silently mixing two.
+
+Creating instead of adopting is the mistake worth naming: you get a second
+vault whose `vault.json` claims the first one's remote, and two vaults sharing
+a remote is how one vault's notes get pushed over another's. `init-vault.sh`
+refuses a `--remote` already claimed by the vault this machine's config points
+at, naming the conflict.
+
+What `--adopt` will *not* do is upgrade a manifest — that is the next section,
+and the two halves of the same story.
+
 ## Upgrading an existing vault
 
 **A vault only has the `vault.json` keys that existed when it was created.**
@@ -154,11 +180,11 @@ Every capability added since — the `identity` block above is the first, and
 won't be the last — applies to vaults made after it shipped. There is no
 automatic migration, and the two things that look like one aren't:
 
-- **`init-vault.sh --adopt` fills scaffold *files* only.** It adds missing
-  directories, templates and cross-cutting notes, and it never edits an
-  existing `vault.json`, because its one invariant is that it doesn't rewrite
-  content it didn't write. So it will not add an `identity` block, and re-running
-  it will not upgrade a manifest.
+- **[`init-vault.sh --adopt`](#adopting-an-existing-vault) fills scaffold
+  *files* only.** It adds missing directories, templates and cross-cutting
+  notes, and it never edits an existing `vault.json`, because its one invariant
+  is that it doesn't rewrite content it didn't write. So it will not add an
+  `identity` block, and re-running it will not upgrade a manifest.
 - **`--identity-email` only writes into a `vault.json` it creates.** Passed
   against a vault that already has one, it prints the JSON to add and changes
   nothing.

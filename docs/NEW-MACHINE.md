@@ -1,12 +1,28 @@
 # Setting up a new machine
 
-Two paths. Pick one deliberately — they differ in what arrives with you.
+**Two questions before anything else.** Both change what you run, and getting
+the second one wrong creates a duplicate vault rather than using the one you
+have.
+
+**1. Which rules arrive with you?** Pick deliberately.
 
 - **[Fresh start](#fresh-start)** — the engine, none of someone else's
   conventions. This is what an adopter does, and what a work machine should do
   when its stack differs from your personal one.
 - **[Carry your rules](#carry-your-rules)** — a second machine for the same
   person and the same stack.
+
+**2. Does this vault already exist on a remote?**
+
+- **No — it is the first machine for this vault.** `init-vault.sh` creates it,
+  and you create the (private, empty) repo first.
+- **Yes — a second machine, or a rebuild of one you had.** `git clone` it
+  first, then `init-vault.sh --adopt` against the clone. This is the common
+  case for a second machine, and it is the one that goes wrong quietly:
+  creating instead of adopting gives you a second vault claiming the first
+  one's remote, which is how one vault's notes get pushed over another's.
+  `init-vault.sh` now refuses that outright — see
+  [Adopting an existing vault](GUARD.md#adopting-an-existing-vault).
 
 > **Get this one thing right.** The vault's `--id` and this machine's
 > `SBW_EXPECTED_VAULT_ID` must be the same string. Those two disagreeing is the

@@ -95,4 +95,53 @@ case "${out}" in
   *) pass "leaves angle brackets in prose and non-shell fences alone" ;;
 esac
 
+# --- the Quickstart offers both vault cases ---------------------------------
+# `--adopt` is the correct path for "new machine, vault already exists" — the
+# common second-machine case — and it used to be mentioned once, mid-paragraph,
+# in GUARD.md's scaffolding prose. The Quickstart, which is what a second
+# machine actually follows, said nothing about existing vaults, so following it
+# verbatim created a duplicate vault pointing at the existing one's remote.
+QS="$(awk '/^## Quickstart/{f=1} f{print} f && /^## /&&!/^## Quickstart/{exit}' "${ENGINE}/README.md")"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${QS}" in
+  *"--adopt"*) pass "the Quickstart shows --adopt, not only creation" ;;
+  *) fail "the Quickstart shows --adopt, not only creation" "no --adopt in the Quickstart" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${QS}" in
+  *"git clone \"git@github.com:YOUR_ACCOUNT"*)
+    pass "and shows cloning the existing vault before adopting it" ;;
+  *) fail "and shows cloning the existing vault before adopting it" "${QS}" ;;
+esac
+
+# Both branches, not just the adopt command sitting in the same block.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${QS}" in
+  *"A new vault"*"already exists on a remote"*)
+    pass "and labels the two cases as a choice between them" ;;
+  *) fail "and labels the two cases as a choice between them" "${QS}" ;;
+esac
+
+# --- the placeholder cannot be left alone -----------------------------------
+# `YOUR_ACCOUNT` was visibly a placeholder and got substituted; `vault_id=
+# personal` looked like a working default and got kept. Readers replace what
+# looks unfinished and keep what looks finished, so the value has to look
+# unfinished — same convention as YOUR_ACCOUNT, and refused by the script.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${QS}" in
+  *"vault_id=VAULT_ID"*) pass "the Quickstart's vault_id is a placeholder, not a default" ;;
+  *) fail "the Quickstart's vault_id is a placeholder, not a default" "${QS}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+# shellcheck disable=SC2016  # matching the literal text ${vault_id} in the
+# README, which must not expand here — that is the whole assertion.
+case "${QS}" in
+  *'vault_path=~/vaults/${vault_id}-brain'*)
+    pass "and vault_path is derived from it, so the two cannot disagree" ;;
+  *) fail "and vault_path is derived from it, so the two cannot disagree" "${QS}" ;;
+esac
+
 finish

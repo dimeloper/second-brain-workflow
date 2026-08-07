@@ -59,19 +59,40 @@ echo "latest = $latest"                       # empty means no release yet
 [ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
 git submodule update --init --recursive
 
-# This machine's role. Both lines are meant to be edited.
-vault_id=personal                             # personal, work, …
-vault_path=~/vaults/second-brain
+# This machine's role. VAULT_ID is a placeholder, like YOUR_ACCOUNT below.
+vault_id=VAULT_ID                             # personal | work | …
+vault_path=~/vaults/${vault_id}-brain         # derived, so the two can't disagree
+```
 
+Then **one** of the next two, depending on whether the vault exists yet:
+
+```bash
+# A. A new vault. Create the repo yourself first, private, and empty.
 ./scripts/init-vault.sh --path "$vault_path" --id "$vault_id" \
-  --remote "git@github.com:YOUR_ACCOUNT/second-brain.git"
+  --remote "git@github.com:YOUR_ACCOUNT/${vault_id}-brain.git"
+```
+
+```bash
+# B. A vault that already exists on a remote — a second machine, or a rebuild.
+git clone "git@github.com:YOUR_ACCOUNT/${vault_id}-brain.git" "$vault_path"
+./scripts/init-vault.sh --path "$vault_path" --id "$vault_id" --adopt
+```
+
+```bash
 ./scripts/sync-skills.sh
 ```
 
-Edit `vault_id`/`vault_path` and substitute `YOUR_ACCOUNT`; the rest is
-paste-and-run. On a work machine those are `work` and `~/vaults/work-brain` —
-following this section verbatim there gets you a vault whose id says
-`personal`, which then has to be undone.
+Substitute `VAULT_ID` and `YOUR_ACCOUNT`; the rest is paste-and-run. Getting
+the branch wrong is not cosmetic: running **A** against a vault that already
+exists on a remote creates a *second* vault claiming the first one's remote,
+which is how one vault's notes get pushed over another's. `init-vault.sh`
+refuses that outright, and refuses an unedited `VAULT_ID`, rather than leaving
+either to be noticed later.
+
+Two vaults, so two runs of this, one per machine role — `personal` on a
+personal machine, `work` on a work one. Following it verbatim on the second
+machine is the mistake it is built to survive: an unreplaced placeholder now
+stops the run instead of quietly producing a vault whose id is wrong.
 
 **`vault_id` must match this machine's `SBW_EXPECTED_VAULT_ID`.** Those two
 disagreeing is the single most common way to end up with a setup that fails on
