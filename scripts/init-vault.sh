@@ -279,6 +279,13 @@ EOF
 write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
 # {{date}}
 
+<!-- Optional, and only worth writing when you are stopping mid-thread: a
+     "## Resume here" block ABOVE ## Built, for the session that picks this up.
+     Blocker first, then anything with a clock on it, then the rest by repo.
+     One per day, like the sections below. Point at the tool for the item list
+     rather than writing a count — a count in prose is right until the next
+     capture. -->
+
 ## Built
 -
 

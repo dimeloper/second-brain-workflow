@@ -32,6 +32,18 @@ else
   fail "the daily template documents the #repo/ follow-up tag" \
     "$(cat "${V}/_templates/daily-note.md")"
 fi
+
+# `## Resume here` was written into a real daily note before existing in any
+# template, which is how the next session that has never seen it either drops it
+# or opens a second one. A section in a note and in no template is not a
+# convention yet.
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q 'Resume here' "${V}/_templates/daily-note.md"; then
+  pass "the daily template describes the optional ## Resume here block"
+else
+  fail "the daily template describes the optional ## Resume here block" \
+    "$(cat "${V}/_templates/daily-note.md")"
+fi
 assert_file "${V}/00-maps/promotion-candidates.md" "writes the promotion query"
 assert_file "${V}/practices/INDEX.md"              "generates the index"
 assert_contains "${V}/vault.json" '"id": "work"'   "records the vault id"
