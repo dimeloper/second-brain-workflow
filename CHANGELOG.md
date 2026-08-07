@@ -19,6 +19,18 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- **`git commit --allow-empty` skipped the commit-author check entirely** — a
+  bypass that didn't even need `--no-verify`. The guard returned early on an
+  empty diff, before the author check, reporting *"nothing staged — nothing to
+  check"*: true of the diff, false of the commit, which still records an author
+  permanently. The checks are now split by what they read. Diff-derived ones
+  (path allowlist, size caps, `enforced`-note deletion, conflict markers,
+  secrets) still short-circuit; the author check runs first and always. **The
+  same early return gated `--range`**, so a pushed empty commit cleared the CI
+  tier as well — the tier that exists precisely because `--no-verify` can skip
+  the local one. That is fixed by the same change, and the "nothing staged"
+  message now names which half was skipped.
+
 - **An `identity` block with a misspelled key pinned nothing, silently.** Only
   `email`, `name` and `email_pattern` are read; anything else fell through to
   the same "nothing was declared" path as a vault with no block at all, so the

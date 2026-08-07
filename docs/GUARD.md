@@ -124,6 +124,15 @@ produced the commit is gone — and it is the only tier a local `--no-verify`
 can't skip. `tests/test-author-identity.sh` asserts each tier independently, so
 a check present in one path and absent in a parallel one fails the suite.
 
+**An empty diff does not skip this check.** Every other check here reads the
+diff and genuinely has nothing to examine without one, so the guard returns
+early — but a commit that changes nothing still records an author, permanently.
+Until that split existed, `git commit --allow-empty` was a bypass that didn't
+even need `--no-verify`, and because the same early return gated `--range`, a
+pushed empty commit cleared CI too. The "nothing staged" message now names
+which half it skipped, since the old wording read as though the commit itself
+had been cleared.
+
 `make doctor` reports the same mismatch against the identity a commit *would*
 be made with, so it surfaces at setup time instead of at the first commit.
 

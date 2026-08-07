@@ -15,6 +15,10 @@
 # revs (`git diff BASE..HEAD`); --rev checks a single commit against its
 # parent (`REV^..REV`). Same checks either way, just a different diff source.
 #
+# An empty diff skips the checks that read one, and only those: a commit that
+# changes nothing still records an author, so `git commit --allow-empty` is
+# checked rather than waved through — in both modes.
+#
 # The boundary between a personal and a work second brain is the *vault*, not
 # the rule set. Rules flow outward freely — your own conventions applied to an
 # employer's code is fine. The direction that must never happen is a practice
@@ -55,7 +59,7 @@ while [ $# -gt 0 ]; do
     --expect-id) EXPECT_ID="${2:?--expect-id needs a value}"; shift 2 ;;
     --range) RANGE="${2:?--range needs a BASE..HEAD value}"; shift 2 ;;
     --rev) REV="${2:?--rev needs a value}"; shift 2 ;;
-    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -76,9 +80,10 @@ case "${VS_STATE}" in
 esac
 
 # --- diff source: the staged index, or a commit range/single rev -----------
-# Every check below reads through diff_paths()/diff_body()/PRE_REF rather than
-# calling `git diff --cached` directly, so the same five checks run
-# unchanged regardless of where the diff comes from.
+# Every diff-derived check reads through diff_paths()/diff_body()/PRE_REF
+# rather than calling `git diff --cached` directly, so they run unchanged
+# regardless of where the diff comes from. The author check below takes
+# neither route — it is not derived from the diff at all.
 if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
   if [ -n "${REV}" ]; then
     BASE="${REV}^"
@@ -102,23 +107,93 @@ if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
   diff_paths() { git -C "${VAULT}" diff "${BASE}" "${NEW}" --name-only "$@"; }
   diff_numstat() { git -C "${VAULT}" diff "${BASE}" "${NEW}" --numstat; }
   diff_body() { git -C "${VAULT}" diff "${BASE}" "${NEW}"; }
-  nothing_msg="no changes in ${BASE}..${NEW} — nothing to check."
+  nothing_msg="no changes in ${BASE}..${NEW} — no diff to check, but the recorded commit authors were."
 else
   PRE_REF="HEAD"
   diff_paths() { git -C "${VAULT}" diff --cached --name-only "$@"; }
   diff_numstat() { git -C "${VAULT}" diff --cached --numstat; }
   diff_body() { git -C "${VAULT}" diff --cached; }
-  nothing_msg="nothing staged — nothing to check."
+  nothing_msg="nothing staged — no diff to check, but the commit author was."
 fi
 
+# --- 1. commit author identity ----------------------------------------------
+# First, and before the empty-diff short-circuit below, because this is the one
+# check here that is a property of *the commit* rather than of its diff. It
+# holds for a commit that changes nothing: `git commit --allow-empty` still
+# writes an author into the vault's history permanently, and until this ran
+# first it was a bypass that didn't even need --no-verify. The same early
+# return gated --range, so a pushed empty commit survived the CI tier too —
+# the tier that exists precisely because --no-verify can skip the local one.
+#
+# The mirror of the vault-identity check below, on the axis it doesn't cover.
+# Everything else here asks where content is going; this asks who the commit
+# claims to be from. The two are independent: a commit can satisfy every
+# destination check, push with the right credentials, and still carry a
+# personal identity into an employer-owned repo — which is exactly what
+# happened, silently, because nothing looked.
+#
+# This blocks rather than warns. A warning is what the machine already
+# effectively produced — the guard passed, everything looked fine, and the
+# wrong author is now permanent in someone else's history. Before the commit
+# the fix is one command; after the push it needs a history rewrite on a repo
+# you may not control. Since the whole check is opt-in per vault, blocking
+# only ever happens where someone declared they wanted it, so it can't become
+# the routine nuisance that teaches --no-verify — the one habit that would
+# genuinely weaken this guard. A vault that declares nothing is silent here;
+# `make doctor` is where "you haven't configured this" gets said.
+author_check() {
+  local email="$1" name="$2" prefix="$3" rc=0
+  author_identity_check "${VAULT}" "${email}" "${name}" || rc=$?
+  case "${rc}" in
+    0|2) return 0 ;;
+    *)   fail "${prefix}${AI_ERROR}" ;;
+  esac
+}
+
+if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
+  # The commits already exist, so their recorded authors are what matters —
+  # the local config that made them is long gone by the time CI runs. Driven by
+  # `git log`, not by the diff: a range whose net diff is empty can still carry
+  # commits, which is the whole of the --allow-empty case as CI sees it.
+  while IFS="$(printf '\t')" read -r c_sha c_name c_email; do
+    [ -n "${c_sha}" ] || continue
+    author_check "${c_email}" "${c_name}" "commit ${c_sha}: "
+  done <<EOF
+$(git -C "${VAULT}" log --no-merges --format='%h%x09%an%x09%ae' "${BASE}..${NEW}" 2>/dev/null)
+EOF
+else
+  # The identity this commit would actually be made with — `git var` resolves
+  # includeIf, the environment and every fallback, which reading user.email
+  # straight out of a config file would not.
+  author_ident="$(git -C "${VAULT}" var GIT_AUTHOR_IDENT 2>/dev/null || true)"
+  if [ -z "${author_ident}" ]; then
+    author_check "" "" ""
+  else
+    author_name="${author_ident%% <*}"
+    author_email="${author_ident#*<}"
+    author_email="${author_email%%>*}"
+    author_check "${author_email}" "${author_name}" ""
+  fi
+fi
+
+# --- everything below here reads the diff -------------------------------------
+# So an empty one genuinely has nothing to examine: no paths to match against
+# the allowlist, no lines to cap, no deletion to inspect, no body to scan. The
+# message says which half was skipped rather than "nothing to check", because
+# that wording is what made a real bypass read as correct behaviour.
 staged="$(diff_paths)"
 [ -n "${staged}" ] || { echo "guard: ${nothing_msg}"; exit 0; }
 
-# --- 1. vault identity -------------------------------------------------------
+# --- 2. vault identity -------------------------------------------------------
 # Catches the case that matters: a session configured for one vault committing
 # into another, or a clone repointed at someone else's remote. Shared with
 # init-vault.sh's --adopt check via scripts/lib/vault-identity.sh — one
 # implementation of "does this vault match what was expected."
+#
+# Deliberately below the short-circuit, unlike the author check: this one asks
+# where *content* is going, and an empty commit carries none. Running it above
+# would also make an unconfigured machine fail closed on a commit that writes
+# nothing — a widening of what the guard blocks that nothing here needs.
 #
 # An unconfigured expectation is not "nothing to check" — it is exactly the
 # state that would make the check circular if we let vault.json's own id
@@ -141,57 +216,7 @@ else
   esac
 fi
 
-# --- 1b. commit author identity ---------------------------------------------
-# The mirror of the check above, on the axis it doesn't cover. Everything else
-# here asks where content is going; this asks who the commit claims to be
-# from. The two are independent: a commit can satisfy every destination check,
-# push with the right credentials, and still carry a personal identity into an
-# employer-owned repo — which is exactly what happened, silently, because
-# nothing looked.
-#
-# This blocks rather than warns. A warning is what the machine already
-# effectively produced — the guard passed, everything looked fine, and the
-# wrong author is now permanent in someone else's history. Before the commit
-# the fix is one command; after the push it needs a history rewrite on a repo
-# you may not control. Since the whole check is opt-in per vault, blocking
-# only ever happens where someone declared they wanted it, so it can't become
-# the routine nuisance that teaches --no-verify — the one habit that would
-# genuinely weaken this guard. A vault that declares nothing is silent here;
-# `make doctor` is where "you haven't configured this" gets said.
-author_check() {
-  local email="$1" name="$2" prefix="$3" rc=0
-  author_identity_check "${VAULT}" "${email}" "${name}" || rc=$?
-  case "${rc}" in
-    0|2) return 0 ;;
-    *)   fail "${prefix}${AI_ERROR}" ;;
-  esac
-}
-
-if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
-  # The commits already exist, so their recorded authors are what matters —
-  # the local config that made them is long gone by the time CI runs.
-  while IFS="$(printf '\t')" read -r c_sha c_name c_email; do
-    [ -n "${c_sha}" ] || continue
-    author_check "${c_email}" "${c_name}" "commit ${c_sha}: "
-  done <<EOF
-$(git -C "${VAULT}" log --no-merges --format='%h%x09%an%x09%ae' "${BASE}..${NEW}" 2>/dev/null)
-EOF
-else
-  # The identity this commit would actually be made with — `git var` resolves
-  # includeIf, the environment and every fallback, which reading user.email
-  # straight out of a config file would not.
-  author_ident="$(git -C "${VAULT}" var GIT_AUTHOR_IDENT 2>/dev/null || true)"
-  if [ -z "${author_ident}" ]; then
-    author_check "" "" ""
-  else
-    author_name="${author_ident%% <*}"
-    author_email="${author_ident#*<}"
-    author_email="${author_email%%>*}"
-    author_check "${author_email}" "${author_name}" ""
-  fi
-fi
-
-# --- 2. staged paths ---------------------------------------------------------
+# --- 3. staged paths ---------------------------------------------------------
 # .github/workflows/*: infrastructure (docs/vault-ci/{audit,guard}.yml,
 # copied in once by a human, not written by update-second-brain), not
 # capture content — but it's still vault-repo content only this allowlist
@@ -210,7 +235,7 @@ done <<EOF
 ${staged}
 EOF
 
-# --- 3. size caps ------------------------------------------------------------
+# --- 4. size caps ------------------------------------------------------------
 n_files="$(printf '%s\n' "${staged}" | grep -c . || true)"
 n_lines="$(diff_numstat | awk '{a+=$1; d+=$2} END {print a+d+0}')"
 [ "${n_files}" -le "${MAX_FILES}" ] || \
@@ -218,7 +243,7 @@ n_lines="$(diff_numstat | awk '{a+=$1; d+=$2} END {print a+d+0}')"
 [ "${n_lines}" -le "${MAX_LINES}" ] || \
   fail "${n_lines} changed lines staged, cap is ${MAX_LINES} (GUARD_MAX_LINES to override)"
 
-# --- 4. no enforced note deleted --------------------------------------------
+# --- 5. no enforced note deleted --------------------------------------------
 # PRE_REF is HEAD in staged mode (the last commit, before the staged
 # deletion) or the range's BASE in --range/--rev mode (the state before the
 # range's changes) — same question either way: did this diff delete a note
@@ -234,7 +259,7 @@ done <<EOF
 ${deleted}
 EOF
 
-# --- 5. conflict markers and secrets ----------------------------------------
+# --- 6. conflict markers and secrets ----------------------------------------
 body="$(diff_body)"
 if printf '%s' "${body}" | grep -qE '^\+(<<<<<<< |>>>>>>> |=======$)'; then
   fail "conflict markers in the diff"

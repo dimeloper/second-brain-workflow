@@ -25,6 +25,18 @@ echo "guard-vault-commit.sh"
 "${GUARD}" --vault "${VAULT}" >/dev/null 2>&1
 assert_exit 0 $? "passes with nothing staged"
 
+# The message has to name which half was skipped. "nothing to check" was
+# accurate about the diff and wrong about the commit, and reading it is what
+# made `git commit --allow-empty` past the author check look like correct
+# behaviour rather than the bypass it was.
+out="$("${GUARD}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no diff to check, but the commit author was"*)
+    pass "and says what was still checked, rather than \"nothing to check\"" ;;
+  *) fail "and says what was still checked, rather than \"nothing to check\"" "${out}" ;;
+esac
+
 # --- a normal note edit -----------------------------------------------------
 cat > "${VAULT}/practices/backend/a-practice.md" <<'EOF'
 ---

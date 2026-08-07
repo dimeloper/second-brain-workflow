@@ -356,6 +356,40 @@ rc=0
 "${GUARD}" --vault "${V}" --expect-id work --range "HEAD~1..HEAD" >/dev/null 2>&1 || rc=$?
 assert_exit 1 "${rc}" "tier 3/3 --range: a recorded mismatched author is blocked"
 
+# --- and again for a commit that carries no diff at all ---------------------
+# `git commit --allow-empty` was a bypass that didn't even need --no-verify:
+# the guard returned early on an empty diff, before the author check, and said
+# "nothing to check" — which is true of the diff and false of the commit. The
+# same early return gated --range, so the tier that exists to survive
+# --no-verify let a pushed empty commit through as well.
+rc=0
+GIT_AUTHOR_EMAIL="${WRONG}" GIT_COMMITTER_EMAIL="${WRONG}" \
+  "${GUARD}" --vault "${V}" --expect-id work >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "empty diff, direct: a mismatched author is still blocked"
+
+rc=0
+SBW_EXPECTED_VAULT_ID=work GIT_AUTHOR_EMAIL="${WRONG}" GIT_COMMITTER_EMAIL="${WRONG}" \
+  git -C "${V}" commit -q --allow-empty -m "empty, wrong author" >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "empty diff, hook: --allow-empty with a mismatched author is blocked"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(git -C "${V}" log -1 --format=%s)" in
+  "empty, wrong author") fail "empty diff, hook: and no commit was created" "the empty commit landed" ;;
+  *) pass "empty diff, hook: and no commit was created" ;;
+esac
+
+# The other half: an empty commit by the declared author is ordinary and must
+# stay ordinary. A check that blocked both would pass the test above for the
+# wrong reason.
+rc=0
+SBW_EXPECTED_VAULT_ID=work git -C "${V}" commit -q --allow-empty -m "empty, right author" >/dev/null 2>&1 || rc=$?
+assert_exit 0 "${rc}" "empty diff, hook: --allow-empty by the declared author passes"
+
+GIT_AUTHOR_EMAIL="${WRONG}" GIT_COMMITTER_EMAIL="${WRONG}" \
+  git -C "${V}" commit -q --allow-empty --no-verify -m "empty, pushed" >/dev/null 2>&1
+rc=0
+"${GUARD}" --vault "${V}" --expect-id work --range "HEAD~1..HEAD" >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "empty diff, --range: a pushed empty commit is author-checked in CI"
+
 # --- init-vault --identity-email --------------------------------------------
 V="${SANDBOX}/v-init"
 # GIT_AUTHOR_* rather than whatever this machine happens to have configured:
