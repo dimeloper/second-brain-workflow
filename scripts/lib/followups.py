@@ -151,16 +151,25 @@ def note_context_repo(text, known_repos):
     right above them do name it ("`housemaster-backend`: finished …"). That
     makes the note a usable fallback for its own items.
 
-    Deliberately strict: returned only when the `## Built` section names exactly
-    one known repo. A day that touched three is precisely the day this would
-    guess wrong, and a wrong repo is worse than none — it files the item under
-    somewhere you will not look for it.
+    **The heading counts, and counts most.** A note that spans several work
+    streams labels each one `## Built (<repo>: what happened)`, so the label is
+    the most deliberate statement of a repo anywhere in the note. Reading only
+    the bullets threw that away and — worse — let a single incidental mention in
+    one body win on a day whose three labels named three different repos, which
+    is the exact wrong answer this function's strictness exists to avoid.
+
+    Deliberately strict: returned only when the `## Built` heading(s) and bullets
+    together name exactly one known repo. A day that touched three is precisely
+    the day this would guess wrong, and a wrong repo is worse than none — it
+    files the item under somewhere you will not look for it.
     """
     built = []
     in_built = False
     for line in text.splitlines():
         if line.startswith("## "):
             in_built = line.strip().startswith("## Built")
+            if in_built:
+                built.append(line)   # the label names the repo — keep it
             continue
         if in_built:
             built.append(line)

@@ -124,7 +124,7 @@ out_repo="$(run_repos --repo alpha-service 2>/dev/null)"
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_repo}" in
-  *"Open follow-ups older than 30 days: 6"*)
+  *"Open follow-ups older than 30 days: 8"*)
     pass "the count precedes any grouping and counts every open item" ;;
   *) fail "the count precedes any grouping and counts every open item" "${out_repo}" ;;
 esac
@@ -132,11 +132,11 @@ esac
 TESTS_RUN=$((TESTS_RUN + 1))
 mine="$(printf '%s\n' "${out_repo}" | grep -c '\[repo named in the item\]\|\[this note.s ## Built section')"
 elsewhere="$(printf '%s\n' "${out_repo}" | grep -c '\[beta-app —\|\[gamma-tool —')"
-unattributed="$(printf '%s\n' "${out_repo}" | grep -c 'Ambiguous day')"
-if [ "$((mine + elsewhere + unattributed))" = "6" ]; then
-  pass "the three buckets account for all 6 items — grouping never drops one"
+unattributed="$(printf '%s\n' "${out_repo}" | grep -c 'Ambiguous day\|labels name two different repos')"
+if [ "$((mine + elsewhere + unattributed))" = "8" ]; then
+  pass "the three buckets account for all 8 items — grouping never drops one"
 else
-  fail "the three buckets account for all 6 items — grouping never drops one" \
+  fail "the three buckets account for all 8 items — grouping never drops one" \
     "mine=${mine} elsewhere=${elsewhere} unattributed=${unattributed}"
 fi
 
@@ -180,6 +180,27 @@ case "${out_repo}" in
   *) fail "a single-repo note attributes its own untagged items, marked as context" "${out_repo}" ;;
 esac
 
+# The `## Built (<repo>: …)` label is the most deliberate statement of a repo in
+# the whole note, and reading only the bullets threw it away. Regression: v0.6.0
+# skipped the heading, so a note whose repo appears *only* in its label got no
+# context at all.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"Untagged item on a labelled single-stream day"*"[beta-app — this note's ## Built section"*)
+    pass "a repo named only in the ## Built label is read as the note's context" ;;
+  *) fail "a repo named only in the ## Built label is read as the note's context" "${out_repo}" ;;
+esac
+
+# The same bug's worse half: with the labels ignored, one incidental mention in
+# one body won on a day whose labels named several repos — a confident wrong
+# answer where declining was the whole point.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"No repo identified"*"labels name two different repos"*)
+    pass "two ## Built labels naming different repos decline, they don't pick one" ;;
+  *) fail "two ## Built labels naming different repos decline, they don't pick one" "${out_repo}" ;;
+esac
+
 # A day that touched two repos is exactly the day this would guess wrong.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_repo}" in
@@ -193,13 +214,13 @@ esac
 out_beta="$(run_repos --repo beta-app 2>/dev/null)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_beta}" in
-  *"This repo — beta-app (2)"*) pass "the same backlog regroups when run from another repo" ;;
+  *"This repo — beta-app (3)"*) pass "the same backlog regroups when run from another repo" ;;
   *) fail "the same backlog regroups when run from another repo" "${out_beta}" ;;
 esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_beta}" in
-  *"Open follow-ups older than 30 days: 6"*)
+  *"Open follow-ups older than 30 days: 8"*)
     pass "and the total is identical from either repo" ;;
   *) fail "and the total is identical from either repo" "${out_beta}" ;;
 esac
@@ -210,8 +231,8 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_flat}" in
   *"This repo"*|*"No repo identified"*|*"Grouped by repo"*)
     fail "--no-repo-grouping prints one flat list" "${out_flat}" ;;
-  *"Open follow-ups older than 30 days: 6"*)
-    pass "--no-repo-grouping prints one flat list, same 6 items" ;;
+  *"Open follow-ups older than 30 days: 8"*)
+    pass "--no-repo-grouping prints one flat list, same 8 items" ;;
   *) fail "--no-repo-grouping prints one flat list" "${out_flat}" ;;
 esac
 
@@ -236,9 +257,9 @@ esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nogit}" in
-  *"Open follow-ups older than 30 days: 6"*)
-    pass "and still reports all 6 items" ;;
-  *) fail "and still reports all 6 items" "${out_nogit}" ;;
+  *"Open follow-ups older than 30 days: 8"*)
+    pass "and still reports all 8 items" ;;
+  *) fail "and still reports all 8 items" "${out_nogit}" ;;
 esac
 
 # Detection prefers the origin URL over the directory name, because a checkout

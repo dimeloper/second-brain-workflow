@@ -85,9 +85,11 @@ Attribute each item by, strongest signal first:
 3. a backticked file path that exists in the current repo — confirms "this
    repo", can never name someone else's
 4. the single repo the note's own `## Built` section is about, when it names
-   exactly one. Weakest, and **say so** when it is what you used ("from the
-   note's context, not the item"). A day that touched three repos is exactly
-   the day this guesses wrong, so don't guess on one.
+   exactly one — **including the `## Built (<repo>: …)` label**, which is the
+   most deliberate statement of a repo in the note and the thing to read first.
+   Weakest signal overall, and **say so** when it is what you used ("from the
+   note's context, not the item"). A day that touched three repos is exactly the
+   day this guesses wrong, so when the labels disagree, don't pick one.
 
 None of those hit? It goes under **No repo identified** — that is a real answer,
 not a failure.
