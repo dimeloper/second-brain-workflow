@@ -22,7 +22,28 @@ setup_sandbox() {
   # that runs init-vault.sh no longer has "no config" afterwards — delete this
   # file if that is the state you mean to assert against.
   export SBW_CONFIG_FILE="${SANDBOX}/no-such-config"
+  isolate_home
   trap 'teardown_sandbox' EXIT INT TERM
+}
+
+# Point HOME at the sandbox, and mean it. Called by setup_sandbox, so every
+# test gets it — this is not something a test should have to remember.
+#
+# Setting SKILLS_DIRS to sandbox paths used to be enough to keep a test off the
+# developer's real directories. It no longer is: uninstall.sh and doctor.sh
+# deliberately union the configured directories with the *built-in* default
+# (~/.cursor/skills:~/.claude/skills), which is what makes an install predating
+# a narrowed config visible at all. Without a sandbox HOME, uninstall.sh walks
+# the developer's real ~/.cursor/skills and ~/.claude/skills and would remove
+# any link there it judged ours.
+#
+# It also makes every other HOME-derived default (SBW_VAULT among them) land
+# inside the sandbox, which is what the isolation at the top of this file
+# claimed all along. Tests needing a git identity must set one repo-locally:
+# there is no global git config in here.
+isolate_home() {
+  export HOME="${SANDBOX}/home"
+  mkdir -p "${HOME}"
 }
 
 teardown_sandbox() {

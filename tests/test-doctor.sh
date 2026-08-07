@@ -5,6 +5,9 @@
 # shellcheck source=tests/lib.sh
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 setup_sandbox
+# doctor reports our links found outside SKILLS_DIRS, and resolves that set
+# from the built-in default — which without this is the developer's own.
+isolate_home
 
 INIT="${ENGINE}/scripts/init-vault.sh"
 DOCTOR="${ENGINE}/scripts/doctor.sh"
@@ -150,9 +153,10 @@ git -c user.email=t@t.com -c user.name=t -C "${SUBMOD_UPSTREAM}" commit -q -m v2
 FAKE_ENGINE="${SANDBOX}/fake-engine"
 mkdir -p "${FAKE_ENGINE}/scripts/lib"
 cp "${ENGINE}/scripts/doctor.sh" "${FAKE_ENGINE}/scripts/doctor.sh"
-cp "${ENGINE}/scripts/lib/config.sh" "${FAKE_ENGINE}/scripts/lib/config.sh"
-cp "${ENGINE}/scripts/lib/vault-state.sh" "${FAKE_ENGINE}/scripts/lib/vault-state.sh"
-cp "${ENGINE}/scripts/lib/author-identity.sh" "${FAKE_ENGINE}/scripts/lib/author-identity.sh"
+# The whole lib directory, not a hand-listed subset: doctor.sh gains a
+# dependency now and then, and a list that has to be remembered is one that
+# silently goes stale — this fixture failed exactly that way once.
+cp "${ENGINE}"/scripts/lib/*.sh "${FAKE_ENGINE}/scripts/lib/"
 git -C "${FAKE_ENGINE}" init -q
 git -c protocol.file.allow=always -C "${FAKE_ENGINE}" \
   submodule add -q "file://${SUBMOD_UPSTREAM}" vendor/thing >/dev/null 2>&1

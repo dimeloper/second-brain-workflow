@@ -23,6 +23,11 @@ RENDER_TARGETS=cursor,claude-code,agents
 
 # Where skills get installed. Colon-separated, like PATH.
 # Default: ~/.cursor/skills:~/.claude/skills
+#
+# Narrowing this (a machine running only Claude Code, say) does not remove what
+# is already installed elsewhere — it just stops every tool here from looking
+# there. Run ./scripts/uninstall.sh before narrowing, or `make doctor`
+# afterwards, which reports links of ours left outside this list.
 SKILLS_DIRS=~/.cursor/skills:~/.claude/skills
 
 # Which upstream skills from vendor/obsidian-skills to install.

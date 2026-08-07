@@ -303,6 +303,13 @@ SKILLS_DIRS=~/.claude/skills ./scripts/sync-skills.sh
 VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-skills.sh
 ```
 
+**Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
+runs `sync-skills.sh` before a machine config exists, so the default applies and
+both directories get the links; a config written afterwards naming only one
+leaves the other install in place. `make doctor` reports links of ours found
+outside `SKILLS_DIRS`, and `make uninstall` looks there too — marking them, so
+what `YES=1` widens to reach is visible before it acts.
+
 ### Removing them again
 
 ```bash

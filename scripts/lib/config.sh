@@ -91,7 +91,11 @@ ds_config_load() {
   # Defaults, applied only when a key is genuinely unset.
   [ -n "${SBW_VAULT+set}" ] || SBW_VAULT="$HOME/vaults/second-brain"
   [ -n "${RENDER_TARGETS+set}" ]      || RENDER_TARGETS="cursor,claude-code,agents"
-  [ -n "${SKILLS_DIRS+set}" ]         || SKILLS_DIRS="$HOME/.cursor/skills:$HOME/.claude/skills"
+  # Named, not inlined: uninstall.sh and doctor.sh have to union the configured
+  # value against this to see installs that predate a narrowed config, and a
+  # second copy of the pair is exactly the drift that would reopen the hole.
+  SBW_SKILLS_DIRS_DEFAULT="$HOME/.cursor/skills:$HOME/.claude/skills"
+  [ -n "${SKILLS_DIRS+set}" ]         || SKILLS_DIRS="${SBW_SKILLS_DIRS_DEFAULT}"
   [ -n "${VENDOR_SKILLS+set}" ]       || VENDOR_SKILLS="obsidian-bases obsidian-markdown"
   [ -n "${SBW_RULES_DIR+set}" ] || SBW_RULES_DIR=""
   # Empty by design — there is no sensible default "expected id". A guard
@@ -99,4 +103,5 @@ ds_config_load() {
   # means "not configured yet," and callers that care must fail closed on it.
   [ -n "${SBW_EXPECTED_VAULT_ID+set}" ] || SBW_EXPECTED_VAULT_ID=""
   export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID
+  export SBW_SKILLS_DIRS_DEFAULT
 }

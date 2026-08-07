@@ -28,6 +28,27 @@ VENDOR_SRC="${STANDARDS_DIR}/vendor/obsidian-skills/skills"
 DRY_RUN=0
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=1
 
+# Which directories, and on whose authority. The Quickstart runs this *before*
+# a machine config exists, so the built-in default does the choosing — both
+# directories — and a config written afterwards may well name fewer. Whatever
+# was installed into the others stays there, invisible to every tool that reads
+# the config. Seeing the wider install happen is the difference between a
+# decision and a discovery three steps later.
+case "${SKILLS_DIRS_ORIGIN:-}" in
+  config|environment)
+    echo "Installing into ${SKILLS_DIRS}"
+    echo "  (from $(ds_origin_describe SKILLS_DIRS))"
+    ;;
+  *)
+    echo "!! No SKILLS_DIRS configured, so this is installing into the built-in"
+    echo "   default — BOTH of these directories:"
+    echo "     ${SKILLS_DIRS//:/$'\n     '}"
+    echo "   If you later set SKILLS_DIRS to fewer, what landed in the others"
+    echo "   stays there. 'make doctor' reports it; ./scripts/uninstall.sh removes it."
+    ;;
+esac
+echo
+
 [[ -d "${SKILLS_SRC}" ]] || { echo "Missing ${SKILLS_SRC}" >&2; exit 1; }
 
 run() { if [[ $DRY_RUN -eq 1 ]]; then echo "    would: $*"; else "$@"; fi; }

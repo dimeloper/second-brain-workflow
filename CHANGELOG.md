@@ -19,6 +19,21 @@ write release notes, not two to keep in sync by hand.
 
 ### Fixed
 
+- **Skills installed outside the current `SKILLS_DIRS` were invisible to every
+  tool here at once.** `sync-skills.sh` runs during the Quickstart *before* a
+  machine config exists, so it installs into the built-in default — both
+  `~/.cursor/skills` and `~/.claude/skills` — and a config written afterwards
+  naming one of them orphans the other install silently. `make uninstall`
+  listed 7 links while 14 existed, and `make doctor` reported *"only one skills
+  directory configured — nothing to compare across"*. Worst case: delete the
+  checkout and those become dangling links that the documented recovery path
+  cannot find either, and that path was sold as the one thing able to clean up
+  that state. Both tools now walk the union of `SKILLS_DIRS` and the built-in
+  default. Anything found outside the configured set is marked in
+  `uninstall`'s preview and counted on its own line — `--yes` never widens
+  what it deletes without having shown it — and `doctor` warns, naming the
+  directory and both ways out.
+
 - **`git commit --allow-empty` skipped the commit-author check entirely** — a
   bypass that didn't even need `--no-verify`. The guard returned early on an
   empty diff, before the author check, reporting *"nothing staged — nothing to
@@ -46,6 +61,12 @@ write release notes, not two to keep in sync by hand.
 
 ### Added
 
+- `scripts/lib/skill-links.sh`: one implementation of *where skills are
+  installed* and *which links there are ours*, shared by `uninstall.sh` and
+  `doctor.sh`. The two previously had one answer each, which is how they came
+  to share a blind spot. `sync-skills.sh` now also names the directories it
+  installs into, and says so loudly when that set came from the built-in
+  default because no config was found.
 - `tests/test-author-identity.sh` asserts the author check independently in
   each of its three tiers — staged index invoked directly, the same through the
   pre-commit hook `init-vault.sh` installs, and `--range` against a recorded

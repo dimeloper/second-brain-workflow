@@ -32,7 +32,10 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${STANDARDS_DIR}/scripts/lib/vault-state.sh"
 # shellcheck source=scripts/lib/author-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/author-identity.sh"
+# shellcheck source=scripts/lib/skill-links.sh
+. "${STANDARDS_DIR}/scripts/lib/skill-links.sh"
 ds_config_load
+skills_dirs_load
 
 VAULT="${SBW_VAULT}"
 VAULT_ORIGIN="$(ds_origin_describe SBW_VAULT)"
@@ -203,6 +206,38 @@ check_skills() {
   [ "${clean}" -eq 1 ] && ok "every installed skill is present in all configured skills directories"
 }
 
+# Our links in a directory SKILLS_DIRS no longer names. Separate from the
+# parity check above on purpose: parity asks whether the *configured* set
+# agrees with itself, and folding an unconfigured directory into that
+# comparison would report every skill in it as a gap to fill — the opposite of
+# the advice wanted, which is to clean it up.
+#
+# How it happens is ordinary. sync-skills.sh runs during the Quickstart before
+# a machine config exists, so it installs into the built-in default, meaning
+# both directories; the config written afterwards narrows SKILLS_DIRS to one.
+# From then on the wider install is invisible to every tool that reads the
+# config — including `make uninstall`, which is the documented way out of the
+# dangling-link state a deleted checkout leaves. A warning, not an error:
+# nothing is broken, but nothing else will ever mention it.
+check_orphaned_skills() {
+  local dir n clean=1
+  while IFS= read -r dir; do
+    [ -n "${dir}" ] || continue
+    n="$(skill_links_ours_in "${dir}" "${STANDARDS_DIR}")"
+    [ "${n}" -gt 0 ] || continue
+    clean=0
+    warn "${n} of our skill link(s) in ${dir}, which is not in SKILLS_DIRS
+        installed before the config narrowed it, and invisible to everything
+        that reads the config. Remove them with ./scripts/uninstall.sh (it
+        looks here too, and shows them before it acts), or widen SKILLS_DIRS
+        in $(ds_config_path) to include it."
+  done <<EOF
+${SKILLS_DIRS_UNCONFIGURED}
+EOF
+  [ "${clean}" -eq 1 ] && ok "no skills of ours are installed outside SKILLS_DIRS"
+  return 0
+}
+
 # Not vault-specific — vendor/obsidian-skills is pinned in this engine
 # checkout, not the vault. `git submodule status` prefixes each line with
 # ' ' (in sync), '+' (checked out commit doesn't match what the superproject
@@ -242,6 +277,7 @@ echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
 check_author
 check_skills
+check_orphaned_skills
 check_submodules
 
 echo
