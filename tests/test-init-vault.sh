@@ -190,6 +190,46 @@ assert_exit 1 $? "refuses a non-empty directory without --adopt"
 "${INIT}" --path "${SANDBOX}/bad" --id "Work Vault" >/dev/null 2>&1
 assert_exit 2 $? "rejects an id that is not a slug"
 
+# --- an unedited placeholder stops the run ----------------------------------
+# The Quickstart's prose warning was correct and three lines below the block,
+# and the block still got pasted unedited: YOUR_ACCOUNT looked unfinished and
+# was replaced, `vault_id=personal` looked finished and was kept. So the value
+# is a placeholder now, and the script refuses it rather than producing a vault
+# whose id is wrong and has to be undone.
+for bad_id in VAULT_ID vault_id YOUR_ACCOUNT VAULT_NAME; do
+  out="$("${INIT}" --path "${SANDBOX}/ph-${bad_id}" --id "${bad_id}" --no-hook 2>&1)"
+  rc=0
+  "${INIT}" --path "${SANDBOX}/ph2-${bad_id}" --id "${bad_id}" --no-hook >/dev/null 2>&1 || rc=$?
+  assert_exit 2 "${rc}" "refuses the unedited placeholder --id ${bad_id}"
+  assert_no_file "${SANDBOX}/ph-${bad_id}/vault.json" "and creates nothing for ${bad_id}"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  case "${out}" in
+    *"two-line block in the Quickstart"*"vault_id=VAULT_ID"*)
+      pass "and names the block to edit for ${bad_id}" ;;
+    *) fail "and names the block to edit for ${bad_id}" "${out}" ;;
+  esac
+done
+
+rc=0
+"${INIT}" --path "${SANDBOX}/empty-id" --id "" --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 2 "${rc}" "refuses an empty --id"
+
+rc=0
+"${INIT}" --path "${SANDBOX}/ph-path" --id work --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 0 "${rc}" "a real id is unaffected"
+
+rc=0
+"${INIT}" --path "${SANDBOX}/vaults/VAULT_NAME" --id work --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 2 "${rc}" "refuses a --path still holding a placeholder"
+
+# `--id --no-hook` used to take the next flag as the value, and "--no-hook"
+# passes the slug rule — lowercase letters and hyphens — so it created a vault
+# genuinely called that.
+rc=0
+"${INIT}" --path "${SANDBOX}/flagid" --id --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 2 "${rc}" "refuses an --id that is actually the next flag"
+assert_no_file "${SANDBOX}/flagid/vault.json" "and creates no vault named after a flag"
+
 "${INIT}" --path "${SANDBOX}/noid" >/dev/null 2>&1
 assert_exit 2 $? "requires --id"
 

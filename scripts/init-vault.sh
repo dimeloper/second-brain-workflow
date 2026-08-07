@@ -52,11 +52,32 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${STANDARDS_DIR}/scripts/lib/config.sh"
 ds_config_load
 
+# The Quickstart's warning about editing these was correct, three lines below
+# the block, and still got followed verbatim — because `vault_id=personal`
+# looked like a working default while YOUR_ACCOUNT visibly did not, and readers
+# replace what looks unfinished and keep what looks finished. Prose can't fix
+# that; refusing the unedited value can. Every message here names the block to
+# go back and edit rather than describing the constraint in the abstract.
+unedited() {
+  echo "init-vault: $1" >&2
+  echo "       Go back to the two-line block in the Quickstart and edit it:" >&2
+  echo "           vault_id=VAULT_ID           # personal | work | …" >&2
+  echo "           vault_path=~/vaults/\${vault_id}-brain" >&2
+  echo "       The id is recorded in vault.json and in this machine's config," >&2
+  echo "       and the commit guard compares the two on every commit." >&2
+  exit 2
+}
+
 PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0; IDENTITY_EMAIL=""; NO_CONFIG=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --path)     PATH_ARG="${2:?--path needs a value}"; shift 2 ;;
-    --id)       ID="${2:?--id needs a value}"; shift 2 ;;
+    # ${2-} rather than ${2:?...} for these two: an *empty* value is the
+    # unedited-placeholder case, which deserves the message below naming the
+    # block to fix, not a shell diagnostic quoting a parameter number.
+    --path)     [ $# -ge 2 ] || unedited "--path needs a value."
+                PATH_ARG="$2"; shift 2 ;;
+    --id)       [ $# -ge 2 ] || unedited "--id needs a value."
+                ID="$2"; shift 2 ;;
     --remote)   REMOTE="${2:?--remote needs a value}"; shift 2 ;;
     --adopt)    ADOPT=1; shift ;;
     --no-hook)  NO_HOOK=1; shift ;;
@@ -76,8 +97,24 @@ done
 # fail that check on the vault's very first commit.
 [ -z "${REMOTE}" ] || REMOTE="$(vault_remote_canonical "${REMOTE}")"
 
+
 [ -n "${PATH_ARG}" ] || { echo "Missing --path" >&2; exit 2; }
-[ -n "${ID}" ] || { echo "Missing --id" >&2; exit 2; }
+[ -n "${ID}" ] || unedited "--id is empty."
+# Named placeholders, checked before the slug rule so the reader is told to
+# edit the block rather than lectured about lowercase.
+case "${ID}" in
+  VAULT_ID|vault_id|YOUR_*|VAULT_NAME)
+    unedited "--id is still the placeholder '${ID}'." ;;
+  -*)
+    # `--id --no-hook` otherwise swallows the next flag as the value, and
+    # "--no-hook" passes the slug rule below — lowercase letters and hyphens —
+    # so it would create a vault genuinely named that.
+    unedited "--id got '${ID}', which is a flag: the value after --id is missing." ;;
+esac
+case "${PATH_ARG}" in
+  *VAULT_ID*|*VAULT_NAME*|*YOUR_*)
+    unedited "--path still contains a placeholder: ${PATH_ARG}" ;;
+esac
 case "${ID}" in
   *[!a-z0-9-]*) echo "--id must be lowercase letters, digits and hyphens: ${ID}" >&2; exit 2 ;;
 esac
