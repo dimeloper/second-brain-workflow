@@ -21,6 +21,27 @@
 # Call directly (not inside `$(...)`) so VI_ID/VI_REMOTE/VI_ERROR land in the
 # caller's shell — they are set as a side effect, not printed.
 
+# A comparison key for a remote URL: host, owner and repo, with the transport
+# and any trailing ".git" or "/" removed.
+#
+#   git@github.com:ORG/brain.git  ->  github.com/ORG/brain
+#   https://github.com/ORG/brain  ->  github.com/ORG/brain
+#
+# Only transport and suffix are normalised. A different host, owner or repo
+# name still compares different, so a genuine repoint is still caught — the
+# point is that two spellings of the same repository stop reading as two
+# repositories, not that comparison gets looser about what matters.
+vault_remote_key() {
+  local url="$1"
+  case "${url}" in
+    *://*) url="${url#*://}"; url="${url#*@}" ;;
+    *@*:*) url="${url#*@}"; url="${url/:/\/}" ;;
+  esac
+  while [ -n "${url}" ] && [ "${url%/}" != "${url}" ]; do url="${url%/}"; done
+  url="${url%.git}"
+  printf '%s' "${url}"
+}
+
 vault_identity_check() {
   local vault="$1" expect_id="${2:-}"
   local vjson="${vault}/vault.json"

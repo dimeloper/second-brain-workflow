@@ -17,6 +17,27 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+
+- **`init-vault.sh` refuses a `--remote` another vault on this machine already
+  claims.** Following the Quickstart on a machine that already had a work vault
+  produced two vaults recording the same remote — `id: personal` alongside
+  `id: work`, both pointing at `work-brain` — with nothing to say so. That is
+  never intentional, and it is how one vault's notes end up pushed over
+  another's. The vault this machine's config points at is consulted, and the
+  error names it and its path. Creation only: `--adopt` against a vault that
+  already records the remote is the correct way to use an existing vault.
+- **A warning when `--id` doesn't appear in the remote's repository name.**
+  Not a refusal — "brain" and "notes" are legitimate names for a vault called
+  anything — but `--id personal` against a `work-brain` remote is the
+  Quickstart-followed-verbatim mistake, and it is worth one line.
+- `vault_remote_key` in `scripts/lib/vault-identity.sh`: a comparison key for
+  a remote URL — host, owner and repo, with transport and any trailing `.git`
+  or `/` removed. The two manifests in the real case differed only by `.git`,
+  so a string comparison would have missed the duplicate entirely. Only
+  transport and suffix are normalised; a different host, owner or repo name
+  still compares different.
+
 ### Fixed
 
 - **Skills installed outside the current `SKILLS_DIRS` were invisible to every

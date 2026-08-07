@@ -193,4 +193,69 @@ assert_exit 2 $? "rejects an id that is not a slug"
 "${INIT}" --path "${SANDBOX}/noid" >/dev/null 2>&1
 assert_exit 2 $? "requires --id"
 
+# --- a remote another vault already claims ----------------------------------
+# Following the Quickstart on a machine that already had a work vault created a
+# second vault pointing at the first one's remote, silently. Two vaults, one
+# remote, is how one vault's notes end up pushed over another's.
+CLAIM="${SANDBOX}/claim"
+mkdir -p "${CLAIM}"
+CFG="${CLAIM}/config"
+FIRST="${CLAIM}/work-brain"
+SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${FIRST}" --id work \
+  --remote "https://github.com/ORG/work-brain.git" --no-hook >/dev/null 2>&1
+assert_contains "${CFG}" "SBW_VAULT=${FIRST}" "the first vault is what the machine config points at"
+
+out="$(SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${CLAIM}/second-brain" --id personal \
+       --remote "https://github.com/ORG/work-brain" --no-hook 2>&1)"
+rc=0
+SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${CLAIM}/second-brain2" --id personal \
+  --remote "https://github.com/ORG/work-brain" --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "refuses a --remote the configured vault already claims"
+assert_no_file "${CLAIM}/second-brain/vault.json" "and creates nothing when it refuses"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"already claimed by the vault 'work' at ${FIRST}"*)
+    pass "and names the conflicting vault and where it is" ;;
+  *) fail "and names the conflicting vault and where it is" "${out}" ;;
+esac
+
+# The two spellings that produced the real case differ only by ".git", so a
+# string comparison would have missed it. So would the ssh form of the same
+# repository.
+rc=0
+SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${CLAIM}/ssh-form" --id personal \
+  --remote "git@github.com:ORG/work-brain.git" --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 1 "${rc}" "and catches the same repository written as an ssh remote"
+
+# A genuinely different remote is not a conflict, and says nothing.
+out="$(SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${CLAIM}/personal-brain" --id personal \
+       --remote "https://github.com/ORG/personal-brain.git" --no-hook 2>&1)"
+assert_file "${CLAIM}/personal-brain/vault.json" "a different remote creates normally"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"already claimed"*) fail "and says nothing about claims" "${out}" ;;
+  *) pass "and says nothing about claims" ;;
+esac
+
+# --adopt against the vault that records the remote is the correct path, not a
+# conflict — refusing it would break the case this is meant to steer people to.
+rc=0
+SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${FIRST}" --id work \
+  --remote "https://github.com/ORG/work-brain.git" --adopt --no-hook >/dev/null 2>&1 || rc=$?
+assert_exit 0 "${rc}" "--adopt against the claiming vault itself is not a conflict"
+
+# --- id that contradicts the remote's name ----------------------------------
+# A warning, not a refusal: "brain" or "notes" are legitimate names for a vault
+# called anything. But `vault_id=personal` kept from the Quickstart next to a
+# work remote is the mistake this catches.
+out="$(SBW_CONFIG_FILE="${CFG}" "${INIT}" --path "${CLAIM}/mismatch" --id personal \
+       --remote "https://github.com/ORG/team-notes.git" --no-hook 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"warning"*"'personal' does not appear in the remote's name 'team-notes'"*)
+    pass "warns when the id does not appear in the remote's name" ;;
+  *) fail "warns when the id does not appear in the remote's name" "${out}" ;;
+esac
+assert_file "${CLAIM}/mismatch/vault.json" "but still creates the vault — it is a warning"
+
 finish

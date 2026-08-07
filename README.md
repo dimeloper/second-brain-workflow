@@ -94,6 +94,14 @@ See [Versioning](#versioning) for the bump policy and how to pin or roll back
 to a specific tag instead of the newest. `--remote` is only recorded, not
 pushed to — create that repo yourself, private, first.
 
+Two checks run on it at creation. A `--remote` already recorded by the vault
+this machine's config points at is **refused**, because two vaults sharing a
+remote is how one vault's notes get pushed over another's; the check compares
+host, owner and repo, so `.git` and `ssh`/`https` spellings of one repository
+don't slip past as two. And an `--id` that doesn't appear in the repository's
+name **warns** — usually the sign of a Quickstart followed verbatim, keeping
+`vault_id=personal` next to a work remote.
+
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
 [docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) for the full walkthrough,

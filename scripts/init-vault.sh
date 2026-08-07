@@ -42,11 +42,15 @@ set -euo pipefail
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/vault-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
-# For ds_config_path only — one definition of where the config lives, not a
-# second copy of the XDG logic here. ds_config_load is deliberately not called:
-# this script writes the config, it does not resolve one.
+# ds_config_path gives one definition of where the config lives, rather than a
+# second copy of the XDG logic here. ds_config_load is called for exactly one
+# reason — to learn which vault this machine currently points at, so a second
+# vault cannot be created claiming the same remote. This script still writes
+# the config rather than obeying it: nothing below reads a resolved value to
+# decide what to scaffold.
 # shellcheck source=scripts/lib/config.sh
 . "${STANDARDS_DIR}/scripts/lib/config.sh"
+ds_config_load
 
 PATH_ARG=""; ID=""; REMOTE=""; ADOPT=0; NO_HOOK=0; IDENTITY_EMAIL=""; NO_CONFIG=0
 while [ $# -gt 0 ]; do
@@ -95,6 +99,56 @@ if [ -f "${VAULT}/vault.json" ] && ! vault_identity_check "${VAULT}" "${ID}"; th
   echo "init-vault: ${VI_ERROR}" >&2
   echo "init-vault: refusing to adopt — this looks like a different vault." >&2
   exit 1
+fi
+
+# --- is this remote already claimed by another vault on this machine? -------
+# Following the Quickstart on a machine that already had a work vault produced
+# two vaults recording the same remote, with nothing to say so. That is never
+# intentional, and it is how one vault's notes end up pushed over another's.
+#
+# Only the vault this machine's config points at is consulted: it is the one
+# other vault we can find without guessing, and the one a session on this
+# machine will actually be writing to. Compared on vault_remote_key, so the
+# two spellings that produced the real case — one with .git, one without —
+# don't read as two different remotes.
+#
+# Creation only. --adopt against a vault that already records this remote is
+# the correct way to use an existing vault, not a conflict.
+if [ -n "${REMOTE}" ] && [ ! -f "${VAULT}/vault.json" ]; then
+  current="${SBW_VAULT:-}"
+  if [ -n "${current}" ] && [ "${current}" != "${VAULT}" ] && [ -f "${current}/vault.json" ]; then
+    vault_identity_check "${current}" "" || true
+    if [ -n "${VI_REMOTE}" ] && \
+       [ "$(vault_remote_key "${VI_REMOTE}")" = "$(vault_remote_key "${REMOTE}")" ]; then
+      echo "init-vault: --remote is already claimed by the vault '${VI_ID:-?}' at ${current}" >&2
+      echo "       this --remote  ${REMOTE}" >&2
+      echo "       ${current}/vault.json  ${VI_REMOTE}" >&2
+      echo "       Two vaults sharing one remote is how one vault's notes get pushed" >&2
+      echo "       over another's. To use the existing vault on this machine, clone it" >&2
+      echo "       and run --adopt against the clone. To create a genuinely new vault," >&2
+      echo "       give it its own remote." >&2
+      exit 1
+    fi
+  fi
+fi
+
+# The pairing of id and repository name is a strong signal, and a mismatch is
+# usually the Quickstart followed verbatim — `vault_id=personal` kept because
+# it looked like a working default, next to a work remote that was edited.
+# A warning, not a refusal: "brain" and "notes" are legitimate names for a
+# vault called anything, and refusing a naming convention nobody agreed to
+# would be the tool inventing policy.
+if [ -n "${REMOTE}" ]; then
+  remote_base="$(vault_remote_key "${REMOTE}")"
+  remote_base="${remote_base##*/}"
+  case "${remote_base}" in
+    *"${ID}"*) ;;
+    *)
+      echo "init-vault: warning: --id '${ID}' does not appear in the remote's name '${remote_base}'." >&2
+      echo "       If the id is wrong, stop now: it is recorded in vault.json and in this" >&2
+      echo "       machine's config, and the guard compares the two on every commit." >&2
+      ;;
+  esac
 fi
 
 created=0

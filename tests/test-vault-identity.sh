@@ -103,4 +103,41 @@ EOF
 vault_identity_check "${V}" "work"
 assert_exit 0 $? "an empty vault.json remote is not checked against origin"
 
+# --- remote comparison keys -------------------------------------------------
+# One repository has several spellings, and a real setup recorded two of them
+# in two manifests: .../work-brain in one, .../work-brain.git in the other.
+# Compared as strings that is two remotes; compared as keys it is one.
+key_eq() {
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if [ "$(vault_remote_key "$1")" = "$(vault_remote_key "$2")" ]; then
+    pass "$3"
+  else
+    fail "$3" "$(vault_remote_key "$1") != $(vault_remote_key "$2")"
+  fi
+}
+key_ne() {
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if [ "$(vault_remote_key "$1")" != "$(vault_remote_key "$2")" ]; then
+    pass "$3"
+  else
+    fail "$3" "both keyed as $(vault_remote_key "$1")"
+  fi
+}
+
+key_eq "https://github.com/ORG/brain.git" "https://github.com/ORG/brain" \
+  "a trailing .git is not a different remote"
+key_eq "git@github.com:ORG/brain.git" "https://github.com/ORG/brain" \
+  "ssh and https spellings of one repo compare equal"
+key_eq "ssh://git@github.com/ORG/brain.git" "https://github.com/ORG/brain/" \
+  "so do the ssh:// form and a trailing slash"
+
+# The half that matters more: normalising transport must not normalise away
+# the things a repoint would change.
+key_ne "https://github.com/ORG/brain" "https://github.com/OTHER/brain" \
+  "a different owner is still a different remote"
+key_ne "https://github.com/ORG/brain" "https://github.com/ORG/other-brain" \
+  "a different repo name is still a different remote"
+key_ne "https://github.com/ORG/brain" "https://gitlab.com/ORG/brain" \
+  "a different host is still a different remote"
+
 finish
