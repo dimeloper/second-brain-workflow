@@ -38,9 +38,11 @@ points at.
 - **Never lose a follow-up** — `check-follow-ups` scans recent daily notes'
   `Follow-ups` sections and reports what's still open, walking back to the
   last notes that actually exist rather than a fixed number of calendar days
-  — so it survives a weekend, a holiday, or a vacation gap the same way.
-  Anything still open *outside* that window is `make audit`'s job. See
-  [Review loop](#review-loop).
+  — so it survives a weekend, a holiday, or a vacation gap the same way. Items
+  for the repo you're in come first; the rest are grouped below rather than
+  filtered out, because a task with no repo to infer is usually the one that's
+  been open longest. Anything still open *outside* that window is `make audit`'s
+  job. See [Review loop](#review-loop).
 - **One rule set, every agent** — write short imperative rules once
   (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
   `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
@@ -173,7 +175,7 @@ Three skills own the vault, and the read/write split is deliberate:
 |-------|------|
 | `obsidian-knowledge-base` | **read only** — find applicable notes, score work against them |
 | `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
-| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes |
+| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first |
 
 Say **update second brain** at the end of a session to capture and publish it,
 or **check my tasks** any morning to see what's still open. "Recent" is
@@ -192,8 +194,8 @@ A daily note (`2026-08-03.md`) and a practice note it might produce, in full:
 - Added a request timeout to the payments client
 
 ## Follow-ups
-- [ ] Add a test that fails without the timeout, per PR feedback
-- [x] Bumped the client's retry count to match
+- [ ] Add a test that fails without the timeout, per PR feedback #repo/payments-service
+- [x] Bumped the client's retry count to match #repo/payments-service
 
 ## Practices followed
 - bound-every-outbound-call-with-a-timeout
@@ -236,8 +238,13 @@ outage held requests open for minutes.
 - [[probe-health-with-a-route-that-does-no-work]]
 ````
 
-`check-follow-ups` would report the one open item above; `update-second-brain`
-is what writes the practice note once a pattern like this repeats.
+`check-follow-ups` would report the one open item above — under **this repo**
+when run from `payments-service`, under **other repos** anywhere else, and never
+hidden either way. The `#repo/` tag is written by `update-second-brain`, which
+knows the repo because it runs inside it; omit it for an item that belongs to no
+repo (an email to send, a key to revoke in a console) rather than guessing.
+`update-second-brain` is also what writes the practice note once a pattern like
+this repeats.
 
 ### A vault per machine
 

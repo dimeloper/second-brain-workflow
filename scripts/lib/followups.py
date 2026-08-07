@@ -1,0 +1,303 @@
+"""Reading `## Follow-ups` items, and attributing each one to a repo.
+
+Two consumers, one implementation — the check-follow-ups skill (recent notes,
+interactive) and check-followups.py (every note, long-range). They must agree
+about what an item *is* and which repo it belongs to, or the same backlog reads
+differently depending on which one you asked. Same reasoning as
+lib/vault-identity.sh for the guard/init-vault pair.
+
+    from lib.followups import open_followups, attribute, group_for_repo
+
+Attribution is best-effort by design, and the honest outcome is three-valued:
+this repo, another repo, or unknown. Callers **group** on that; they never
+filter on it. An open item is a thing you have not done, and its repo is
+metadata about it — dropping the item because the metadata is missing loses the
+item, and the ones with no repo to infer (an email to send, a dashboard to
+check, a decision to make) are exactly the ones that rot longest.
+
+Read-only. Stdlib only.
+"""
+
+import re
+import subprocess
+from pathlib import Path
+
+from lib.frontmatter import parse_frontmatter
+
+FOLLOWUP_ITEM_RE = re.compile(r'^-\s\[ \]\s+(.*)$')
+FOLLOWUP_DONE_RE = re.compile(r'^-\s\[x\]\s+(.*)$', re.IGNORECASE)
+
+# The recorded form: a trailing `#repo/<name>` tag, written by
+# update-second-brain, which knows the repo because it is running inside it.
+# Inference below is the fallback for items written before the convention (and
+# for anything hand-typed into Obsidian); this is the exact signal.
+REPO_TAG_RE = re.compile(r'(?:^|\s)#repo/([A-Za-z0-9._-]+)')
+
+# A bare repo name mentioned in prose, in any of the forms these items actually
+# use: backticked, bare, or as a path segment (`~/vaults/second-brain`). Bounded
+# on both sides by word characters and `-` only — that is what keeps
+# `housemaster-backend` from matching a repo named `backend`, and
+# `second-brain-workflow` from matching one named `second-brain`, while still
+# matching a name that happens to follow a `/`.
+def _mention_re(repo):
+    return re.compile(r'(?<![\w-])' + re.escape(repo) + r'(?![\w-])')
+
+# `scripts/foo.py`, `foo.py`, `path/to/bar.sh` — a filename with an extension,
+# or a slashed path. Matched inside backticks only: unquoted prose produces
+# false hits on ordinary sentences, and every item that names a real file in
+# this vault's notes backticks it.
+FILE_REF_RE = re.compile(r'`([^`\s]*[\w-]+\.[A-Za-z0-9]{1,6}|[^`\s]*/[^`\s]+)`')
+
+
+def open_followups(text):
+    """Text of every `- [ ]` item under `## Follow-ups`, in order, unwrapped.
+
+    A `- [x]` item is done and never reported. A note with no `## Follow-ups`
+    heading yields nothing rather than erroring — notes written before the
+    section existed are still perfectly good notes.
+
+    **Wrapped lines are joined into the item they belong to.** These items are
+    prose and routinely run to three or four lines; reading only the first was
+    both a truncated report and a broken attribution, since the repo name is as
+    likely to sit on the second line as the first. A continuation is an indented
+    line under an item — including an indented sub-bullet, which belongs to the
+    item above it rather than being an item of its own.
+    """
+    items = []
+    current = None
+
+    def flush():
+        nonlocal current
+        if current is not None:
+            items.append(" ".join(current).strip())
+            current = None
+
+    in_section = False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            flush()
+            in_section = line.strip() == "## Follow-ups"
+            continue
+        if not in_section:
+            continue
+
+        if FOLLOWUP_ITEM_RE.match(line):
+            flush()
+            current = [FOLLOWUP_ITEM_RE.match(line).group(1).strip()]
+        elif FOLLOWUP_DONE_RE.match(line) or line[:1] == "-":
+            flush()  # a done item, or any other top-level bullet: ends this one
+        elif current is not None and line[:1].isspace() and line.strip():
+            current.append(line.strip())
+        elif not line.strip():
+            flush()  # a blank line closes the item; wrapped lines never contain one
+    flush()
+    return items
+
+
+REPO_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
+
+
+def vault_repos(vault):
+    """Repo names this vault already knows — the vocabulary prose is matched on.
+
+    Two sources, both things the vault already records rather than anything
+    invented here:
+
+    - practice notes' `repos:` frontmatter, which has been naming the repos a
+      practice was observed in since long before this, consistently spelled
+    - `#repo/<name>` tags already written into daily notes, so the write-side
+      convention teaches this side new repo names as a side effect of being used
+
+    Matching against a closed vocabulary is what stops inference from turning
+    ordinary hyphenated prose into a repo. The cost is that a repo the vault has
+    never mentioned reads as unattributed until one item carries its tag — which
+    is the honest answer, and self-correcting from the first tagged item on.
+    """
+    names = set()
+    vault = Path(vault)
+
+    def add(value):
+        value = (value or "").strip()
+        # `repos:` is free text and has picked up the occasional non-repo note
+        # ("local-mac (2026-07-28)"). A repo name has no spaces.
+        if value and REPO_NAME_RE.match(value):
+            names.add(value)
+
+    practices = vault / "practices"
+    if practices.is_dir():
+        for note in practices.rglob("*.md"):
+            data, _ = parse_frontmatter(note.read_text(encoding="utf-8", errors="replace"))
+            if not data:
+                continue
+            repos = data.get("repos")
+            if isinstance(repos, list):
+                for r in repos:
+                    add(r)
+            elif isinstance(repos, str):
+                add(repos)
+
+    for note in vault.glob("*.md"):
+        for m in REPO_TAG_RE.finditer(note.read_text(encoding="utf-8", errors="replace")):
+            add(m.group(1))
+
+    return names
+
+
+def note_context_repo(text, known_repos):
+    """The one repo a whole daily note is about, from its `## Built` section(s).
+
+    Most follow-ups are written in the middle of a day's work and never repeat
+    the repo, because in context it was obvious — while the `## Built` bullets
+    right above them do name it ("`housemaster-backend`: finished …"). That
+    makes the note a usable fallback for its own items.
+
+    Deliberately strict: returned only when the `## Built` section names exactly
+    one known repo. A day that touched three is precisely the day this would
+    guess wrong, and a wrong repo is worse than none — it files the item under
+    somewhere you will not look for it.
+    """
+    built = []
+    in_built = False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            in_built = line.strip().startswith("## Built")
+            continue
+        if in_built:
+            built.append(line)
+    blob = "\n".join(built)
+    hits = {r for r in known_repos if _mention_re(r).search(blob)}
+    return hits.pop() if len(hits) == 1 else None
+
+
+def current_repo(start=None):
+    """(name, basis) for the repo a caller is standing in, or (None, reason).
+
+    Name is the origin URL's final path segment when there is an origin, else
+    the toplevel directory's name — origin first because that is what the vault
+    records, and a local checkout is routinely cloned into a differently named
+    directory. `basis` is returned so a report can say what it matched on
+    instead of leaving a surprising grouping unexplained.
+    """
+    cwd = str(start) if start else None
+
+    def git(*args):
+        try:
+            out = subprocess.run(("git", *args), cwd=cwd, capture_output=True,
+                                 text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return out.stdout.strip() if out.returncode == 0 else None
+
+    if git("rev-parse", "--is-inside-work-tree") != "true":
+        return None, "not inside a git repository"
+
+    url = git("remote", "get-url", "origin")
+    if url:
+        name = url.rstrip("/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
+        if name.endswith(".git"):
+            name = name[:-4]
+        if name:
+            return name, "origin URL"
+
+    top = git("rev-parse", "--show-toplevel")
+    if top:
+        return Path(top).name, "checkout directory name (no origin)"
+    return None, "not inside a git repository"
+
+
+def attribute(item, known_repos, current=None, repo_files=None, context=None):
+    """(repo, basis) for one follow-up item, or (None, None) if unattributable.
+
+    Signals, strongest first — an explicit tag beats a guess, a guess from the
+    item's own words beats one from its surroundings, and every basis is
+    returned so a report can show its work instead of asserting a grouping:
+
+    1. a `#repo/<name>` tag, whatever `known_repos` says — it was recorded by
+       something that knew, and an unfamiliar name means a new repo, not a typo
+       to second-guess
+    2. a known repo name appearing in the item's prose
+    3. a backticked file path tracked in `repo_files`, which resolves to
+       `current` — the caller's own checkout is the only one whose files can be
+       listed, so this signal can confirm "mine" and never names someone else's
+    4. `context`, the single repo the item's note is about (see
+       note_context_repo) — the weakest, and the only one that can be right
+       about the day while wrong about the item
+    """
+    m = REPO_TAG_RE.search(item)
+    if m:
+        return m.group(1), "#repo tag"
+
+    hits = sorted(r for r in known_repos if _mention_re(r).search(item))
+    if len(hits) == 1:
+        return hits[0], "repo named in the item"
+    if len(hits) > 1:
+        # Two repos named in one item. Longest wins only when it *contains* the
+        # others (`housemaster-backend` over `backend`); genuinely distinct
+        # repos in one item mean the item spans both, and picking one would be
+        # a coin flip presented as a fact.
+        longest = max(hits, key=len)
+        if all(h == longest or h in longest for h in hits):
+            return longest, "repo named in the item"
+        return None, None
+
+    if current and repo_files:
+        for ref in FILE_REF_RE.findall(item):
+            if ref.lstrip("./") in repo_files:
+                return current, "file tracked in this repo"
+
+    if context:
+        return context, "this note's ## Built section, not the item itself"
+    return None, None
+
+
+def repo_file_index(root, limit=20000):
+    """Tracked paths in a repo, as a set, for matching a backticked file ref.
+
+    Tracked only: an untracked build artefact is not evidence an item belongs
+    here. Bounded, because this runs interactively and a monorepo should cost a
+    truncated index rather than a hang — a miss degrades to "unattributed",
+    which the caller still reports.
+    """
+    try:
+        out = subprocess.run(("git", "ls-files"), cwd=str(root), capture_output=True,
+                             text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    if out.returncode != 0:
+        return set()
+    paths = set()
+    for line in out.stdout.splitlines()[:limit]:
+        line = line.strip()
+        if not line:
+            continue
+        paths.add(line)
+        paths.add(line.rsplit("/", 1)[-1])  # basename, for `guard-vault-commit.sh`
+    return paths
+
+
+def group_for_repo(items, repo, known_repos, repo_files=None, text=None, context=None):
+    """Split items into (mine, elsewhere, unknown), preserving input order.
+
+    Every input item lands in exactly one bucket and none are discarded — the
+    caller is expected to print all three, because the total is the number the
+    reader came for. `mine` is empty when `repo` is None; nothing is "mine"
+    when we don't know where we are.
+
+    `items` may be plain strings or richer records; pass `text` to pull the item
+    text out of a record, and the record itself is what comes back. Each element
+    is returned as (item, basis) so a report can attribute its own guess rather
+    than presenting a grouping as if it were recorded fact. `context` is a
+    callable from record to that note's context repo, for the weakest signal.
+    """
+    get = text or (lambda i: i)
+    ctx = context or (lambda i: None)
+    mine, elsewhere, unknown = [], [], []
+    for item in items:
+        found, basis = attribute(get(item), known_repos, repo, repo_files, ctx(item))
+        if found is None:
+            unknown.append((item, None))
+        elif repo and found == repo:
+            mine.append((item, basis))
+        else:
+            elsewhere.append((item, f"{found} — {basis}"))
+    return mine, elsewhere, unknown

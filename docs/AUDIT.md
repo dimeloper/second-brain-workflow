@@ -67,6 +67,25 @@ few, reporting an open follow-up whose note is older than `--stale-days`
 (default 30). Same shape as the stale-claim and thin-evidence findings
 above — a backlog to notice, so it always exits 0.
 
+Findings are grouped by repo when run from inside one, `This repo` first, then
+`Other repos`, then `No repo identified` — the same ordering the skill uses, and
+the same shared implementation (`scripts/lib/followups.py`), so the two can't
+drift apart on what an item is or where it belongs. Grouping only: the count
+comes before any heading and every item is listed exactly once, whatever repo it
+belongs to. Attribution reads a `#repo/<name>` tag first, then the item's own
+prose against the repo names the vault already uses, then a file path in the
+current repo, then the note's `## Built` context.
+
+```bash
+./scripts/check-followups.py --repo housemaster-backend   # group as another repo
+./scripts/check-followups.py --no-repo-grouping           # one flat list
+```
+
+An item with no repo identified is a normal result, not a gap to close — plenty
+of follow-ups (an email awaiting a reply, a key to revoke in a console) belong
+to no repo at all. Tagging happens on the write side, in `update-second-brain`,
+where the repo is known for certain.
+
 ## Rule token budget
 
 `make audit` also runs `rule-budget.py`, estimating the always-on rule set's

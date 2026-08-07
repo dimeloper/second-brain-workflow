@@ -9,10 +9,20 @@ setup_sandbox
 
 CHECK="${ENGINE}/scripts/check-followups.py"
 FVAULT="${FIXTURES}/followups/vault"
+RVAULT="${FIXTURES}/followups/repos-vault"
 AS_OF="2026-08-03"
 
+# --no-repo-grouping for the window/staleness assertions below: without it the
+# output shape depends on whether the suite happens to be running inside a git
+# repo, which is the developer's checkout and not something a test may assume.
 run() {
-  "${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" "$@"
+  "${CHECK}" --vault "${FVAULT}" --as-of "${AS_OF}" --no-repo-grouping "$@"
+}
+
+# Grouping runs against its own fixture vault, so adding an attribution case
+# here never shifts the exact counts the window tests assert.
+run_repos() {
+  "${CHECK}" --vault "${RVAULT}" --as-of "${AS_OF}" "$@"
 }
 
 echo "check-followups.py"
@@ -103,6 +113,147 @@ case "${out_missing}" in
   *"no such path"*"came from the --vault flag"*)
     pass "a missing vault names itself and which knob produced the path" ;;
   *) fail "a missing vault names itself and which knob produced the path" "${out_missing}" ;;
+esac
+
+# --- repo grouping -------------------------------------------------------
+# Every assertion here is about *which group* an item lands in. None is about
+# an item disappearing, because none ever should: the contract is that grouping
+# reorders and never filters, so the total below is checked first and the
+# buckets must add up to it.
+out_repo="$(run_repos --repo alpha-service 2>/dev/null)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"Open follow-ups older than 30 days: 6"*)
+    pass "the count precedes any grouping and counts every open item" ;;
+  *) fail "the count precedes any grouping and counts every open item" "${out_repo}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+mine="$(printf '%s\n' "${out_repo}" | grep -c '\[repo named in the item\]\|\[this note.s ## Built section')"
+elsewhere="$(printf '%s\n' "${out_repo}" | grep -c '\[beta-app —\|\[gamma-tool —')"
+unattributed="$(printf '%s\n' "${out_repo}" | grep -c 'Ambiguous day')"
+if [ "$((mine + elsewhere + unattributed))" = "6" ]; then
+  pass "the three buckets account for all 6 items — grouping never drops one"
+else
+  fail "the three buckets account for all 6 items — grouping never drops one" \
+    "mine=${mine} elsewhere=${elsewhere} unattributed=${unattributed}"
+fi
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"This repo — alpha-service (2)"*) pass "the current repo's own items are grouped first" ;;
+  *) fail "the current repo's own items are grouped first" "${out_repo}" ;;
+esac
+
+# A `#repo/` tag is the recorded signal and outranks everything else.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"Tagged item belongs elsewhere"*"[beta-app — #repo tag]"*)
+    pass "a #repo/ tag attributes the item and says so" ;;
+  *) fail "a #repo/ tag attributes the item and says so" "${out_repo}" ;;
+esac
+
+# A repo the vault has never recorded is still honored when tagged — an
+# unfamiliar name means a new repo, not a typo to second-guess.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"[gamma-tool — #repo tag]"*)
+    pass "a tag naming an unrecorded repo is honored, not discarded" ;;
+  *) fail "a tag naming an unrecorded repo is honored, not discarded" "${out_repo}" ;;
+esac
+
+# The regression that made attribution look broken on real notes: items are
+# prose and wrap, and the repo is as likely to sit on the second line.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"Item that wraps across two lines and only names \`beta-app\` on the second"*)
+    pass "a wrapped item is joined, so a repo named on a later line still counts" ;;
+  *) fail "a wrapped item is joined, so a repo named on a later line still counts" "${out_repo}" ;;
+esac
+
+# Weakest signal, and labelled as the guess it is.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"Neither named nor tagged"*"[this note's ## Built section, not the item itself]"*)
+    pass "a single-repo note attributes its own untagged items, marked as context" ;;
+  *) fail "a single-repo note attributes its own untagged items, marked as context" "${out_repo}" ;;
+esac
+
+# A day that touched two repos is exactly the day this would guess wrong.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"No repo identified"*"Ambiguous day, unattributable item"*)
+    pass "a note naming two repos declines to guess, rather than picking one" ;;
+  *) fail "a note naming two repos declines to guess, rather than picking one" "${out_repo}" ;;
+esac
+
+# Grouping is relative to where you are: the same item moves buckets when the
+# current repo changes, and nothing else about the report does.
+out_beta="$(run_repos --repo beta-app 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_beta}" in
+  *"This repo — beta-app (2)"*) pass "the same backlog regroups when run from another repo" ;;
+  *) fail "the same backlog regroups when run from another repo" "${out_beta}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_beta}" in
+  *"Open follow-ups older than 30 days: 6"*)
+    pass "and the total is identical from either repo" ;;
+  *) fail "and the total is identical from either repo" "${out_beta}" ;;
+esac
+
+# --no-repo-grouping is the escape hatch, and must produce no headings at all.
+out_flat="$(run_repos --no-repo-grouping 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_flat}" in
+  *"This repo"*|*"No repo identified"*|*"Grouped by repo"*)
+    fail "--no-repo-grouping prints one flat list" "${out_flat}" ;;
+  *"Open follow-ups older than 30 days: 6"*)
+    pass "--no-repo-grouping prints one flat list, same 6 items" ;;
+  *) fail "--no-repo-grouping prints one flat list" "${out_flat}" ;;
+esac
+
+# A `repos:` value that isn't a repo name ("local-mac (2026-07-28)" is in the
+# fixture's frontmatter) must not become something prose is matched against.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_repo}" in
+  *"local-mac"*) fail "a non-repo \`repos:\` entry never enters the vocabulary" "${out_repo}" ;;
+  *) pass "a non-repo \`repos:\` entry never enters the vocabulary" ;;
+esac
+
+# Nowhere to compare against is a stated fallback, not a silent one.
+NOGIT="${SANDBOX}/not-a-repo"
+mkdir -p "${NOGIT}"
+out_nogit="$(cd "${NOGIT}" && "${CHECK}" --vault "${RVAULT}" --as-of "${AS_OF}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nogit}" in
+  *"not grouping by repo"*"not inside a git repository"*)
+    pass "run outside a repo, it says why it is not grouping" ;;
+  *) fail "run outside a repo, it says why it is not grouping" "${out_nogit}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nogit}" in
+  *"Open follow-ups older than 30 days: 6"*)
+    pass "and still reports all 6 items" ;;
+  *) fail "and still reports all 6 items" "${out_nogit}" ;;
+esac
+
+# Detection prefers the origin URL over the directory name, because a checkout
+# is routinely cloned into a differently named directory and the vault records
+# the remote's name.
+CLONE="${SANDBOX}/differently-named-dir"
+mkdir -p "${CLONE}"
+git -C "${CLONE}" init -q 2>/dev/null
+git -C "${CLONE}" remote add origin "git@github.com:someone/alpha-service.git"
+out_detect="$(cd "${CLONE}" && "${CHECK}" --vault "${RVAULT}" --as-of "${AS_OF}" 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_detect}" in
+  *"This repo is \`alpha-service\` (from origin URL)"*)
+    pass "the repo is detected from origin, not from the directory name" ;;
+  *) fail "the repo is detected from origin, not from the directory name" "${out_detect}" ;;
 esac
 
 finish

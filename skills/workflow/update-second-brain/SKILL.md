@@ -77,19 +77,56 @@ Today's note is `<vault>/<YYYY-MM-DD>.md`. The daily note is the documented
 **exception** to propose-then-approve — write it without asking. Create it from
 `_templates/daily-note.md` if missing.
 
-Sections: `## Built`, `## Practices followed`, `## Drift / gaps`,
+Sections: `## Built`, `## Follow-ups`, `## Practices followed`, `## Drift / gaps`,
 `## Vault candidates`, `## Vault writes (approved)`, `## Vault writes (declined)`.
 Omit empty sections.
 
 - **One header per section per day.** Append bullets under the existing header;
   never add a second `## Built`. A labelled `## Built (label)` block is allowed
   only for a genuinely distinct work stream.
+- `## Follow-ups` records what is left open — `- [ ]` pending, `- [x]` done. See
+  the repo tag below; this is the only section another skill reads back.
 - `## Practices followed` links existing notes as `[[wikilink]]` with a short
   note on how each was applied.
 - `## Drift / gaps` records where reality diverged from a practice, or gaps with
   no note yet — raw material for new candidates.
 - `## Vault candidates` lists proposals; `(approved)` / `(declined)` record the
   outcome after Step 4.
+
+### Tag every follow-up with its repo
+
+End each new `- [ ]` item with `#repo/<name>`, where `<name>` is the repo the
+item belongs to — the last path segment of `git remote get-url origin` in the
+working repo, matching how the vault's `repos:` frontmatter already spells it.
+
+```markdown
+## Follow-ups
+- [ ] Revoke the stale CRM key once the merge lands #repo/housemaster-ingestion
+- [ ] Ask Stripe support to set `default_account_tax_ids`
+```
+
+**Why here and not on the read side.** You are running inside the repo, so you
+know the answer for free; `check-follow-ups` reads these notes a day or a week
+later with nothing but prose to go on, and one day's items routinely span
+several repos. Inferring it there works maybe four times in five, which for a
+task list is the worst place to be — so record it once, at the moment it is
+certain.
+
+Rules:
+
+- **The repo the item is about, not the repo you were invoked from.** A session
+  in the backend that leaves an ingestion-service task tags the ingestion
+  service.
+- **Omit the tag when there is genuinely no repo** — an email to send, a
+  dashboard to check, a decision to make, a key to revoke in a console. Do not
+  invent one, and do not reach for the current repo as a default: a wrong tag
+  files the item somewhere the user will not look, which is worse than no tag.
+  Untagged is a supported state and reports as "No repo identified".
+- **One tag per item.** An item spanning two repos wants splitting into two
+  items, or the tag left off.
+- Tag only items you are **adding**. Never retrofit tags onto existing items
+  while writing today's note — that is a rewrite of a past note's content
+  disguised as a formatting fix.
 
 ## Step 4 — Propose practice-note changes (approval required)
 
