@@ -17,6 +17,47 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-08-07
+
+### Added
+- **`check-followups.py --brief`, and it is now the skill's default shape**: the
+  repo you are standing in listed in full, every other repo as a single count
+  line (`housemaster-ingestion 3 · vaitsi-psychology 3 · no repo identified 4`).
+  Still not a filter — the total is unchanged, the counts say how many exist, and
+  dropping `--brief` expands everything. Run from a repo, thirteen
+  fully-described items from three other repos is the noise the grouping was
+  supposed to remove.
+- **Two kinds of item survive the collapsing**, listed in full whatever repo they
+  belong to and keeping their repo name, because that urgency has nothing to do
+  with where you are standing: an item the note calls **blocking** or a pause
+  point, and a **live credential** to rotate or revoke. Matched on keywords, with
+  the trade stated in the code — a false positive costs one line, a false negative
+  hides a live key — and the reason (`[blocked]` / `[credential]`) always printed,
+  so a wrong flag is arguable rather than silent.
+
+### Changed
+- **A flag is a marker in place, never a second listing.** The previous
+  instruction — blockers lead the report, then the normal grouping — duplicated
+  every blocked item, and a real run said so in its own output: *"12. Same as (1)
+  and (2), carried forward."* That contradicted the appears-exactly-once contract
+  the whole design rests on. Items are lifted to the top only when their group is
+  collapsed and they would otherwise vanish into a count.
+- **The closing offer is scoped to this repo.** Asked from one repo and answered
+  with "tell me which of these 28 are done", the report hands back the
+  undifferentiated list it just finished organising. The skill now offers to tick
+  off *this repo's* items and mentions the rest in a sentence.
+- The `#repo/` tag is stripped from displayed item text — it exists to be matched
+  on, and echoing it back on every line is noise. A **recorded** tag no longer
+  annotates each of this repo's items with an identical `[#repo tag]`; an
+  **inferred** attribution still prints its basis, since that is the one worth
+  arguing with.
+
+### Fixed
+- `blocks` and `gates` in emphasis or backticks are no longer read as blocking.
+  *"it changes what the guard `*blocks*`"* is discussing the word, not claiming to
+  be blocked — and that false positive promoted a design question above an exposed
+  API key on its first real run.
+
 ## [0.7.0] - 2026-08-07
 
 ### Added
@@ -666,7 +707,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.0...v0.6.1
