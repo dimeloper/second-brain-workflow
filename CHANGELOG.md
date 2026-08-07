@@ -17,6 +17,20 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-08-07
+
+### Fixed
+- **The daily-note template did not describe `## Resume here`**, the optional
+  hand-off block a session writes above `## Built` when it stops mid-thread. It
+  had been used in a real vault and existed in no template — the same shape as
+  v0.6.1's missing `#repo/` tag, one release later, and the thing
+  `keep-one-header-per-section-in-daily-notes` exists to prevent: a section the
+  next session has never seen gets dropped, or opened a second time. Now described
+  as optional, above `## Built`, one per day, and pointing at
+  `check-followups.py` for the item list rather than stating a count that goes
+  stale. Existing vaults are unaffected (`write_if_absent` never rewrites a
+  template its owner may have edited); add the comment by hand if you want it.
+
 ## [0.8.0] - 2026-08-07
 
 ### Added
@@ -707,7 +721,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.1...v0.6.2
