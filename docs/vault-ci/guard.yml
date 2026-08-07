@@ -26,7 +26,7 @@ env:
   # — pinning one of those silently gives you a CI backstop that does not check
   # authorship at all, which is most of the reason this workflow exists.
   # tests/test-release-consistency.sh keeps this in step with VERSION.
-  ENGINE_REF: v0.5.0
+  ENGINE_REF: v0.5.1
 
 jobs:
   guard:

@@ -17,6 +17,21 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-08-07
+
+### Fixed
+- **On macOS's bash 3.2, v0.5.0's remote comparison called every correct
+  ssh-vs-https setup a repoint** — the false alarm that release set out to
+  remove. `vault_remote_key` mapped the scp-style separator with
+  `${url/:/\/}`, and bash 3.2 keeps the backslash in a replacement string, so
+  `git@github.com:ORG/brain` normalised to `github.com\/ORG/brain` and never
+  matched the `https://` spelling of the same repository. Two consequences:
+  a commit into a vault whose `vault.json` and `origin` disagree about
+  transport was blocked with a repoint warning, and `init-vault.sh` stopped
+  recognising an ssh remote as one another vault already claims. Same
+  normalisation now done by prefix/suffix trimming, which behaves the same on
+  3.2 and 5.x. No action needed beyond upgrading; bash 5 was never affected.
+
 ## [0.5.0] - 2026-08-07
 
 ### Major
@@ -541,7 +556,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.4.0...v0.4.1
