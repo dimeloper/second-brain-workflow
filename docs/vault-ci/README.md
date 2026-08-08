@@ -100,7 +100,8 @@ deliberate — a weekly automated run should surface a backlog to work
 through, not page anyone for something that isn't actually broken.
 
 One nuance worth knowing: an unparseable vault-derived threshold (a reworded
-or missing `promotion-candidates.md`) is *also* a hard, non-zero exit from
+or missing `promotion-candidates.md`) and a rules set where no rule declares a
+`source:` at all are *also* hard, non-zero exits from
 `check-lineage.py` — same exit code as an orphaned rule, because both are
 "the check couldn't do its job," not "the check ran and found nothing." That
 means a broken threshold source will also turn this job red, not just

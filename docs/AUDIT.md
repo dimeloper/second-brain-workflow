@@ -44,9 +44,25 @@ match exactly is still counted as thin evidence *and* named separately as a
 near-miss, so a typo can't silently cost a note its exemption). If that
 threshold can't be read unambiguously — the file is missing, reworded past
 recognition, or states two different numbers — the script exits with a
-named, specific error rather than silently skipping the check. Otherwise
-exits 1 only for orphaned rules — that's the one finding that means a rule
-is actively citing evidence that no longer exists; everything else is a
+named, specific error rather than silently skipping the check.
+
+Both lineage directions are computed from the rules that declare a `source:`,
+which makes their coverage worth stating explicitly:
+
+- **No rule declares one.** Both directions go vacuous — every `enforced` note
+  reads as unpromoted because nothing claims it, and no rule reads as orphaned
+  because nothing is ever looked up. The script reports coverage as
+  undetermined, names the rules directory it read, prints neither count, and
+  exits 1. Thin evidence, near-miss markers and stale claims still print: they
+  come from the notes alone and stay valid. A count reachable by the code path
+  that learned nothing is worse than no count.
+- **Some do, some don't.** The unpromoted count is labelled as computed against
+  only the sourced rules, and says how many were excluded — a note listed there
+  may be covered by a rule that simply never recorded it, so the number is an
+  upper bound.
+
+Otherwise exits 1 only for orphaned rules — that's the one finding that means a
+rule is actively citing evidence that no longer exists; everything else is a
 visible backlog, not a block.
 
 ## Stale follow-ups

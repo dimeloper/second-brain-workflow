@@ -17,6 +17,22 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`check-lineage.py` reported both lineage directions as findings when it
+  had computed neither.** Both are derived from the rules that declare a
+  `source:`; with none declaring one the sourced-slug set is empty, so every
+  `enforced` note fell out as unpromoted (nothing claimed it) and no rule fell
+  out as orphaned (nothing was ever looked up). Against a real vault that
+  printed "20 unpromoted, 0 orphaned" — specific, plausible, and wrong in the
+  direction that generates work, since at least one of those rules demonstrably
+  did cover notes on the list. Coverage is now reported as undetermined: no
+  counts, the rules directory named, exit 1. Thin evidence, near-miss markers
+  and stale claims still print, being computed from the notes alone. Partial
+  coverage labels the unpromoted count as an upper bound and says how many
+  rules were excluded. Same principle the unparseable-threshold check already
+  applied in v0.6.0 — distinguish "parsed and matched" from "parsed nothing and
+  therefore didn't disagree."
+
 ## [0.8.1] - 2026-08-07
 
 ### Fixed

@@ -33,9 +33,11 @@ reported separately — this script never guesses one.
 Usage:
   check-lineage.py [--vault PATH] [--rules-dir PATH] [--stale-months N] [--as-of YYYY-MM-DD]
 
-Exit status: 1 if any rule is orphaned, else 0 — orphaned rules are the one
-finding that means a rule is actively claiming evidence that no longer
-exists. Everything else is a backlog to notice, not a reason to block.
+Exit status: 1 if any rule is orphaned, or if coverage is undetermined
+(no rule declares a `source:` at all, so neither lineage direction can be
+computed) — else 0. Both mean the same class of thing: a rule claiming
+evidence that isn't there, or a check that couldn't run. Everything else is
+a backlog to notice, not a reason to block.
 
 If the idea->trialing->enforced threshold can't be read unambiguously from
 promotion-candidates.md (file missing, pattern not found, or more than one
@@ -190,22 +192,42 @@ def audit(vault, rules_dir, stale_months, as_of):
     rules, rule_problems = load_rules(rules_dir)
 
     notes_by_slug = {n["slug"]: n for n in notes}
-    sourced_slugs = {r["source"] for r in rules if r["source"]}
 
-    unpromoted = [
-        n for n in notes if n["maturity"] == "enforced" and n["slug"] not in sourced_slugs
-    ]
+    # Both lineage directions are computed from the rules that declare a
+    # `source:`. If none does, `sourced_slugs` is empty and both go vacuous:
+    # every enforced note reads as unpromoted (nothing claims it) and no rule
+    # reads as orphaned (nothing is ever looked up). Those numbers are
+    # artefacts of missing metadata, not findings — and the unpromoted count
+    # is the dangerous one, being specific, plausible, and wrong in the
+    # direction that generates work. Same principle as an unparseable
+    # threshold: a check that couldn't do its job says so and exits non-zero,
+    # rather than printing a count it never earned. Distinguish "parsed and
+    # matched" from "parsed nothing and therefore didn't disagree."
+    sourced_rules = [r for r in rules if r["source"]]
+    no_source = [r for r in rules if not r["source"]]
+    if not sourced_rules:
+        coverage = "none"
+    elif no_source:
+        coverage = "partial"
+    else:
+        coverage = "full"
 
-    orphaned, no_source = [], []
-    for r in rules:
-        if not r["source"]:
-            no_source.append(r)
-            continue
-        note = notes_by_slug.get(r["source"])
-        if note is None:
-            orphaned.append((r, f"source '{r['source']}' not found in practices/"))
-        elif note["maturity"] != "enforced":
-            orphaned.append((r, f"source '{r['source']}' is {note['maturity']}, not enforced"))
+    if coverage == "none":
+        # None, not [] — an undetermined result must not be reachable by any
+        # code path that formats a count.
+        unpromoted, orphaned = None, None
+    else:
+        sourced_slugs = {r["source"] for r in sourced_rules}
+        unpromoted = [
+            n for n in notes if n["maturity"] == "enforced" and n["slug"] not in sourced_slugs
+        ]
+        orphaned = []
+        for r in sourced_rules:
+            note = notes_by_slug.get(r["source"])
+            if note is None:
+                orphaned.append((r, f"source '{r['source']}' not found in practices/"))
+            elif note["maturity"] != "enforced":
+                orphaned.append((r, f"source '{r['source']}' is {note['maturity']}, not enforced"))
 
     stale_cutoff_days = stale_months * 30
     stale = []
@@ -228,6 +250,8 @@ def audit(vault, rules_dir, stale_months, as_of):
     near_miss = [n for n in thin if n["preference_near_miss"]]
 
     return {
+        "coverage": coverage,
+        "sourced_rules": len(sourced_rules),
         "unpromoted": unpromoted,
         "orphaned": orphaned,
         "no_source": no_source,
@@ -243,15 +267,37 @@ def audit(vault, rules_dir, stale_months, as_of):
 def report(result, vault, rules_dir, stale_months):
     lines = [f"second-brain-workflow lineage audit — vault: {vault}  rules: {rules_dir}", ""]
 
-    lines.append(f"Unpromoted notes (enforced, no covering rule): {len(result['unpromoted'])}")
-    for n in result["unpromoted"]:
-        lines.append(f"  - {n['slug']}")
-    lines.append("")
+    if result["coverage"] == "none":
+        # No count, in either direction — see audit(). The categories below
+        # are computed from the notes alone and stay valid, so they still run.
+        lines.append(
+            f"Coverage undetermined: no rule in {rules_dir} declares a `source:`, "
+            "so neither unpromoted notes nor orphaned rules can be computed."
+        )
+        lines.append("")
+    else:
+        if result["coverage"] == "partial":
+            lines.append(
+                "Unpromoted notes (enforced, no covering rule among the "
+                f"{result['sourced_rules']} rule(s) that declare a source): "
+                f"{len(result['unpromoted'])}"
+            )
+            lines.append(
+                f"  upper bound — {len(result['no_source'])} rule(s) declare no "
+                "source and were excluded; a note listed here may be covered by one"
+            )
+        else:
+            lines.append(
+                f"Unpromoted notes (enforced, no covering rule): {len(result['unpromoted'])}"
+            )
+        for n in result["unpromoted"]:
+            lines.append(f"  - {n['slug']}")
+        lines.append("")
 
-    lines.append(f"Orphaned rules (source note gone or demoted): {len(result['orphaned'])}")
-    for r, why in result["orphaned"]:
-        lines.append(f"  - {r['file']}: {why}")
-    lines.append("")
+        lines.append(f"Orphaned rules (source note gone or demoted): {len(result['orphaned'])}")
+        for r, why in result["orphaned"]:
+            lines.append(f"  - {r['file']}: {why}")
+        lines.append("")
 
     lines.append(f"Rules with no recorded source: {len(result['no_source'])}")
     for r in result["no_source"]:
@@ -313,7 +359,7 @@ def main():
 
     print(report(result, vault, rules_dir, args.stale_months))
 
-    return 1 if result["orphaned"] else 0
+    return 1 if result["coverage"] == "none" or result["orphaned"] else 0
 
 
 if __name__ == "__main__":
