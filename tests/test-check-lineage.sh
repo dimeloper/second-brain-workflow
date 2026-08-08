@@ -223,13 +223,9 @@ cp "${LRULES}/no-source-rule.md" "${NOSRC_R}/"
 out_nosrc="$("${CHECK}" --vault "${NOSRC_V}" --rules-dir "${NOSRC_R}" --as-of "${AS_OF}" 2>/dev/null)"
 rc_nosrc=$?
 assert_exit 1 "${rc_nosrc}" "no rule declaring a source fails closed"
-# Matched on the trailing path segment, not "${NOSRC_R}": TMPDIR carries a
-# trailing slash on macOS, so $SANDBOX holds a "T//..." that pathlib collapses
-# to "T/..." on the way out. A shell-side absolute path can never string-match
-# the script's printed one.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nosrc}" in
-  *"Coverage undetermined"*"/no-source-rules declares"*) pass "undetermined coverage names the rules dir it read" ;;
+  *"Coverage undetermined"*"${NOSRC_R} declares"*) pass "undetermined coverage names the rules dir it read" ;;
   *) fail "undetermined coverage names the rules dir it read" "${out_nosrc}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -447,16 +443,16 @@ case "${out_dup}" in
   *"Duplicate note slug 'covered'"*) pass "the duplicate slug is named" ;;
   *) fail "the duplicate slug is named" "${out_dup}" ;;
 esac
-# Suffix-matched for the TMPDIR reason noted above. Both paths must appear:
-# naming only the survivor would leave you hunting for the other one.
+# Both paths must appear in full: naming only the survivor would leave you
+# hunting for the other one.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_dup}" in
-  *"/dup-vault/practices/cross-cutting/covered.md"*) pass "the first colliding path is named in full" ;;
+  *"${DUP_V}/practices/cross-cutting/covered.md"*) pass "the first colliding path is named in full" ;;
   *) fail "the first colliding path is named in full" "${out_dup}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_dup}" in
-  *"/dup-vault/practices/frontend/covered.md"*) pass "the second colliding path is named in full" ;;
+  *"${DUP_V}/practices/frontend/covered.md"*) pass "the second colliding path is named in full" ;;
   *) fail "the second colliding path is named in full" "${out_dup}" ;;
 esac
 

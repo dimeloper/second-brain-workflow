@@ -16,7 +16,13 @@ TESTS_FAILED=0
 SANDBOX=""
 
 setup_sandbox() {
-  SANDBOX="$(mktemp -d "${TMPDIR:-/tmp}/second-brain-workflow-test.XXXXXX")"
+  # Strip the trailing slash macOS puts on TMPDIR before handing it to mktemp.
+  # Left on, $SANDBOX holds a "T//..." that pathlib silently collapses to
+  # "T/..." on its way through the Python scripts — so a test asserting that a
+  # printed path matches a shell-side one compares two different strings and
+  # fails for a reason that has nothing to do with what it was testing.
+  local base="${TMPDIR:-/tmp}"
+  SANDBOX="$(mktemp -d "${base%/}/second-brain-workflow-test.XXXXXX")"
   # Never resolve real user config during a test run. Note that this path is
   # where init-vault.sh *writes* a machine config when none exists, so a test
   # that runs init-vault.sh no longer has "no config" afterwards — delete this

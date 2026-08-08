@@ -52,6 +52,11 @@ write release notes, not two to keep in sync by hand.
   paths. The comment asserting slugs were "already unique vault-wide" said so
   of Obsidian's link namespace, which is flat regardless of foldering — the
   uniqueness it inferred was never enforced; now it is, at load.
+- **Tests could not assert on a path a Python script printed.** `mktemp` was
+  handed `$TMPDIR` verbatim, and macOS ends it with a slash, so the sandbox
+  path held a `T//...` that `pathlib` silently collapsed on the way out — a
+  shell-side absolute path could never string-match a printed one, and a test
+  that tried failed for a reason unrelated to what it was testing.
 
 ## [0.8.1] - 2026-08-07
 
