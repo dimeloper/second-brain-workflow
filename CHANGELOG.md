@@ -32,6 +32,13 @@ write release notes, not two to keep in sync by hand.
   rules were excluded. Same principle the unparseable-threshold check already
   applied in v0.6.0 — distinguish "parsed and matched" from "parsed nothing and
   therefore didn't disagree."
+- **Two notes with the same filename in different `practices/` subdirectories
+  silently overwrote each other** in `check-lineage.py`. Notes are keyed on the
+  basename while `practices/` is foldered, so the survivor decided whether a
+  rule read as orphaned or correctly sourced. Now a hard error naming both
+  paths. The comment asserting slugs were "already unique vault-wide" said so
+  of Obsidian's link namespace, which is flat regardless of foldering — the
+  uniqueness it inferred was never enforced; now it is, at load.
 
 ## [0.8.1] - 2026-08-07
 

@@ -61,6 +61,11 @@ which makes their coverage worth stating explicitly:
   may be covered by a rule that simply never recorded it, so the number is an
   upper bound.
 
+Two notes sharing a filename in different `practices/` subdirectories is also a
+hard error naming both paths. Rules reference notes by slug alone, so a
+collision would otherwise let whichever note loaded last decide whether a rule
+read as orphaned.
+
 Otherwise exits 1 only for orphaned rules — that's the one finding that means a
 rule is actively citing evidence that no longer exists; everything else is a
 visible backlog, not a block.

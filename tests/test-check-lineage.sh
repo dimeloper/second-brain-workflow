@@ -323,4 +323,35 @@ case "${out_ambig}" in
   *) fail "conflicting thresholds are named, not silently resolved to the first match" "${out_ambig}" ;;
 esac
 
+# --- a duplicate slug is a hard error, not last-write-wins -------------------
+# notes_by_slug is keyed on the basename while practices/ is foldered, so two
+# same-named notes in different subdirectories used to overwrite each other —
+# and the survivor decided whether a rule read as orphaned or correctly
+# sourced. Wrong quietly, in a way nothing else would catch.
+DUP_V="${SANDBOX}/dup-vault"
+mkdir -p "${DUP_V}/practices/cross-cutting" "${DUP_V}/practices/frontend" "${DUP_V}/00-maps"
+cp "${LVAULT}/00-maps/promotion-candidates.md" "${DUP_V}/00-maps/"
+cp "${LVAULT}/practices/cross-cutting/covered.md" "${DUP_V}/practices/cross-cutting/"
+cp "${LVAULT}/practices/cross-cutting/covered.md" "${DUP_V}/practices/frontend/"
+out_dup="$("${CHECK}" --vault "${DUP_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+rc_dup=$?
+assert_exit 1 "${rc_dup}" "a duplicate note slug fails loudly"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_dup}" in
+  *"Duplicate note slug 'covered'"*) pass "the duplicate slug is named" ;;
+  *) fail "the duplicate slug is named" "${out_dup}" ;;
+esac
+# Suffix-matched for the TMPDIR reason noted above. Both paths must appear:
+# naming only the survivor would leave you hunting for the other one.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_dup}" in
+  *"/dup-vault/practices/cross-cutting/covered.md"*) pass "the first colliding path is named in full" ;;
+  *) fail "the first colliding path is named in full" "${out_dup}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_dup}" in
+  *"/dup-vault/practices/frontend/covered.md"*) pass "the second colliding path is named in full" ;;
+  *) fail "the second colliding path is named in full" "${out_dup}" ;;
+esac
+
 finish

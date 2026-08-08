@@ -27,8 +27,13 @@ This reports four things, none of which anything else currently checks:
 Rules trace back to a note via a `source:` frontmatter field naming the
 note's slug (its filename, no extension — the same identifier every
 `[[wikilink]]` in the vault already uses, since Obsidian's link namespace is
-flat and slugs are already unique vault-wide). A rule with no `source:` is
-reported separately — this script never guesses one.
+flat regardless of how notes are foldered). `practices/` itself is *not*
+flat — notes sit in per-domain subdirectories — so slug uniqueness is
+enforced when notes are loaded rather than assumed from the layout: two
+notes with the same filename in different subdirectories are a hard error,
+not a last-write-wins overwrite that would silently decide whether a rule
+reads as orphaned. A rule with no `source:` is reported separately — this
+script never guesses one.
 
 Usage:
   check-lineage.py [--vault PATH] [--rules-dir PATH] [--stale-months N] [--as-of YYYY-MM-DD]
@@ -84,10 +89,25 @@ def load_notes(vault):
         sys.exit(f"No practices/ directory in {vault}")
 
     notes, problems = [], []
+    # Slugs key `notes_by_slug`, which decides whether a rule's `source:`
+    # resolves — so a collision doesn't just lose a note, it silently changes
+    # a lineage verdict. practices/ is foldered, so basenames can collide;
+    # uniqueness is enforced here rather than assumed. Hard error, same class
+    # as an unparseable threshold: never last-write-wins.
+    seen_slugs = {}
     for path in sorted(practices.rglob("*.md")):
         if path.name == "INDEX.md":
             continue
         rel = path.relative_to(practices)
+        if path.stem in seen_slugs:
+            sys.exit(
+                f"Duplicate note slug '{path.stem}' — a slug must identify exactly "
+                f"one note, since rules reference notes by slug alone:\n"
+                f"  {seen_slugs[path.stem]}\n"
+                f"  {path}\n"
+                "Rename one of them."
+            )
+        seen_slugs[path.stem] = path
         text = path.read_text(encoding="utf-8")
         fm, warnings = parse_frontmatter(text)
         if fm is None:
