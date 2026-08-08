@@ -17,6 +17,27 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Major
+- **Add `source:` to every rule, or `make audit` and the vault-CI audit job
+  will go red and stay red.** `check-lineage.py` used to exit 0 when no rule
+  declared a `source:`, printing an unpromoted count and an orphan count that
+  were both artefacts of the missing field rather than findings. It now reports
+  coverage as undetermined and exits 1, which is a non-zero exit in a state
+  that previously passed — the audit is the only thing affected, but it fails
+  from the first run after upgrading.
+
+  Rendering, syncing and onboarding are untouched: `source:` has never reached
+  `.mdc` or `.claude/rules/*.md` output, and a rule without it still renders
+  exactly as before. Nothing in an onboarded repo changes.
+
+  To clear it, add `source:` to each rule in your rules directory, naming the
+  practice note or notes it was distilled from by slug. `check-rules.py` (new,
+  below) names every rule still missing one, and `rule.md.example` documents
+  the field. Partial coverage is not an error — while some rules declare a
+  source and some don't, the audit runs and labels its unpromoted count an
+  upper bound. Only *zero* declared sources fails closed, because that is the
+  state where neither lineage direction can be computed at all.
+
 ### Added
 - **`check-rules.py`** — validates rule frontmatter against the shape the rest
   of the system reads, and joins `make audit` as its fourth check. The failure
