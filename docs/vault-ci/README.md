@@ -4,8 +4,9 @@ Two independent templates, two different jobs. Neither runs anywhere until
 you copy it into your vault repo — the engine's own CI can't run either one
 itself, since CI here has no vault.
 
-- **`audit.yml`** — the review side (`check-lineage.py` + `rule-budget.py`),
-  weekly, reporting to a tracking issue. See [Audit](#audit-audityml) below.
+- **`audit.yml`** — the review side (`check-lineage.py`, `check-rules.py` and
+  `rule-budget.py`), weekly, reporting to a tracking issue. See
+  [Audit](#audit-audityml) below.
 - **`guard.yml`** — the same checks `guard-vault-commit.sh` runs locally
   before every commit, run again against every push — the one layer a local
   `--no-verify` cannot skip. See [Guard](#guard-guardyml) below.
@@ -15,10 +16,11 @@ repo, and adjust there — not here.
 
 ## Audit (`audit.yml`)
 
-`check-lineage.py` and `rule-budget.py` are the review side of this system:
-does an `enforced` note actually have a rule, is that rule's evidence still
-real, is the always-on rule set still within budget. Both are read-only and
-both run fine locally — but a target you have to remember to run is a target
+`check-lineage.py`, `check-rules.py` and `rule-budget.py` are the review side
+of this system: does an `enforced` note actually have a rule, is that rule's
+evidence still real, does its frontmatter say what its author believed, is the
+always-on rule set still within budget. All are read-only and all run fine
+locally — but a target you have to remember to run is a target
 that quietly stops getting run, which is exactly the problem the capture side
 (`update-second-brain`) doesn't have, since it's automated.
 
@@ -35,11 +37,12 @@ that quietly stops getting run, which is exactly the problem the capture side
 3. **Point it at a rules directory — this is not optional.** Read this
    before assuming a partial audit is possible without one:
 
-   `check-lineage.py` and `rule-budget.py` both exit immediately if their
-   rules directory doesn't resolve to a real directory (`sys.exit`, not a
-   warning). Neither script has a "vault-only" partial mode — an orphaned
-   rule check, a rule-budget estimate, all of it needs the actual `rules/`
-   content to compare against. If the workflow can't reach a rules
+   `check-lineage.py`, `check-rules.py` and `rule-budget.py` all exit
+   immediately if their rules directory doesn't resolve to a real directory
+   (`sys.exit`, not a warning). None of them has a "vault-only" partial
+   mode — an orphaned rule check, a frontmatter check, a rule-budget
+   estimate, all of it needs the actual `rules/` content to compare against.
+   If the workflow can't reach a rules
    directory, **the audit does not run at all**, full stop; there's no
    softened output to fall back to. The template's "Rules directory not
    configured" step exists to make that failure clear and immediate rather
@@ -91,11 +94,12 @@ that quietly stops getting run, which is exactly the problem the capture side
 Only `check-lineage.py`'s own exit code decides whether the job goes red: `1`
 means an orphaned rule was found — a rule actively citing evidence that no
 longer exists, the one finding that script itself treats as a real block.
-Everything else from both scripts — unpromoted notes, stale claims, thin
-evidence (including a near-miss preference marker), an over-budget rule
-set — is folded into a single tracking issue (opened once, updated in place
+Everything else from the other scripts — unpromoted notes, stale claims, thin
+evidence (including a near-miss preference marker), a rule whose frontmatter
+doesn't say what its author thought, an over-budget rule set — is folded into
+a single tracking issue (opened once, updated in place
 on every run, labeled `audit`) rather than a build break. That's narrower
-than local `make audit`, which fails on either script; the difference is
+than local `make audit`, which fails on any of them; the difference is
 deliberate — a weekly automated run should surface a backlog to work
 through, not page anyone for something that isn't actually broken.
 

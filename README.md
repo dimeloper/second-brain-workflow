@@ -285,7 +285,8 @@ setup.
 Practice notes are the source: when one reaches `maturity: enforced`, a human
 distills it into a rule, and `source:` in the rule's frontmatter records the
 lineage. `make audit` is the review side of that — orphaned rules, stale
-claims, thin evidence, an over-budget always-on rule set, and a follow-up
+claims, thin evidence, rule frontmatter that doesn't say what its author
+thought, an over-budget always-on rule set, and a follow-up
 commitment still open past the recent window `check-follow-ups` already
 covers — all read-only, none blocking except an orphaned rule. See
 [docs/AUDIT.md](docs/AUDIT.md) for what each check does and the CI template

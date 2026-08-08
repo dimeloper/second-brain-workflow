@@ -1,0 +1,42 @@
+---
+# Which files this rule applies to, as a YAML list — Claude Code's native
+# shape. Cursor's comma-separated `globs` is derived from it at render time,
+# never authored here.
+#
+# Omit `paths` entirely to make the rule always-on: loaded on every turn, for
+# every agent, whether or not it's relevant. There is no `alwaysApply` field,
+# because "scoped *and* always-on" is a contradictory state that shouldn't be
+# expressible. Always-on rules are charged against the ceiling `rule-budget.py`
+# enforces, so reach for `paths` first.
+paths:
+  - "**/*.component.ts"
+  - "**/*.directive.ts"
+
+# One line, shown to the agent when it decides whether to load this rule. Write
+# it so that decision is obvious from the description alone.
+description: Angular component and reactivity conventions
+
+# The practice note or notes this rule was distilled from, by slug — a slug is
+# the note's filename without the extension, the same identifier a [[wikilink]]
+# uses. One or several: a rule is routinely distilled from more than one note,
+# and naming one of seven leaves the other six reading as never promoted.
+#
+#   source: prefer-signal-apis
+#   source: [prefer-signal-apis, next-server-components-by-default]
+#
+# Never rendered — it reaches no `.mdc` or `.claude/rules/*.md` output. It
+# exists so `check-lineage.py` can cross-check the capture side (automated,
+# writes notes) against the promotion side (human, writes rules): which
+# enforced notes still have no rule, and which rules cite a note that has been
+# deleted or demoted. A rule with no `source:` is not a smaller problem than a
+# wrong one — with nothing declared, neither question can be answered at all.
+source: [prefer-signal-apis]
+---
+
+Imperative bullets, one convention each. This is the body an agent actually
+reads, so write what to do rather than why it was decided — the reasoning
+belongs in the practice note this was distilled from.
+
+- Use signal APIs (`input()`, `output()`, `computed()`), not decorators, in new
+  code.
+- Default every component to `OnPush`.

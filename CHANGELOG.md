@@ -17,6 +17,26 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`check-rules.py`** — validates rule frontmatter against the shape the rest
+  of the system reads, and joins `make audit` as its fourth check. The failure
+  it exists for is a misspelled key: frontmatter is a plain mapping, so
+  `sourse:` or `path:` isn't an error anywhere, just a key nobody reads. The
+  rule renders, the diff looks right, and it records no lineage / is silently
+  always-on — strictly worse than a missing field, which at least reports as
+  missing. Any key outside `paths`/`description`/`source` is an error naming
+  the offender, as are a missing or empty `source:` and an unparseable
+  frontmatter block. It leaves `description` and Cursor glob compatibility to
+  `render.py`, which already owns them: two scripts with separate opinions
+  about one field is how they drift.
+- **`rule.md.example`** — an annotated template for `rules/*.md`, carrying the
+  `source:` field and the reasoning for it. A parity test asserts the template
+  and the validator's key set can't fall out of step, and that the template
+  passes the validator it documents. This is the fourth instance of a
+  convention living in a script or skill but not in the template someone
+  copies — it is why `source:` was documented in `AUDIT.md` and present in
+  none of the four rules actually written by hand.
+
 ### Changed
 - **A rule's `source:` may now name several notes**, inline (`source: [a, b]`)
   or as a block list, because a rule is routinely distilled from more than one:

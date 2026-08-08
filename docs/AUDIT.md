@@ -136,6 +136,40 @@ of follow-ups (an email awaiting a reply, a key to revoke in a console) belong
 to no repo at all. Tagging happens on the write side, in `update-second-brain`,
 where the repo is known for certain.
 
+## Rule frontmatter
+
+`make audit` also runs `check-rules.py`, which validates the *shape* of every
+rule's frontmatter rather than its content:
+
+```bash
+./scripts/check-rules.py --rules-dir ~/dev-conventions/rules
+```
+
+The failure it exists for is a misspelled key. Frontmatter is a plain mapping,
+so an unrecognised key isn't an error anywhere — it's just a key nobody reads:
+
+```yaml
+sourse: prefer-signal-apis     # lineage silently unrecorded
+path:  "**/*.ts"               # rule silently always-on, and billed for it
+```
+
+Both render, both look right in review, and both mean the opposite of what was
+written — strictly worse than a missing field, which at least reports as
+missing. So any key outside `paths`, `description` and `source` is an error
+naming the offender and listing the known set. A rule with no `source:` at all,
+an empty `source:`/`paths:`, and an unparseable frontmatter block are errors
+too.
+
+It deliberately does not check `description`, or whether globs survive Cursor's
+comma-separated form: `render.py` already owns both, they change what renders,
+and two scripts holding separate opinions about one field is how they drift.
+This one owns the file's shape; `render.py` owns its output.
+
+`rule.md.example` in the engine root is the annotated template for the format,
+and a parity test fails if it and the validator fall out of step — a convention
+living in a script but not in the template someone copies is exactly how
+`source:` came to be missing from every hand-written rule in the first place.
+
 ## Rule token budget
 
 `make audit` also runs `rule-budget.py`, estimating the always-on rule set's

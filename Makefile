@@ -70,7 +70,8 @@ lint-shell:
 
 lint-python:
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
-	  scripts/check-followups.py scripts/rule-budget.py scripts/lib/config.py scripts/lib/frontmatter.py \
+	  scripts/check-followups.py scripts/check-rules.py scripts/rule-budget.py scripts/lib/config.py \
+	  scripts/lib/frontmatter.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -94,13 +95,15 @@ doctor:
 # an even stronger dependency than doctor/vault-index-check, so the same
 # reasoning applies twice over. Both scripts' own tests (which run against
 # fixtures, like everything else in `make test`) are what CI verifies.
-# Runs all three regardless of whether an earlier one fails, so one finding
+# Runs all four regardless of whether an earlier one fails, so one finding
 # doesn't hide another.
 audit:
 	@fail=0; \
 	./scripts/check-lineage.py --vault "$(VAULT)" || fail=1; \
 	echo; \
 	./scripts/check-followups.py --vault "$(VAULT)" || fail=1; \
+	echo; \
+	./scripts/check-rules.py || fail=1; \
 	echo; \
 	./scripts/rule-budget.py || fail=1; \
 	exit $$fail
