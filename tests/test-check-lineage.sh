@@ -323,6 +323,112 @@ case "${out_ambig}" in
   *) fail "conflicting thresholds are named, not silently resolved to the first match" "${out_ambig}" ;;
 esac
 
+# --- a rule may declare several sources --------------------------------------
+# The common case, not the exotic one: the real backend rule set descends from
+# seven notes. A single-valued field could only have expressed that by naming
+# one and dropping six, so every note but the named one would have read as
+# unpromoted — the same false finding this file's coverage work exists to stop.
+MULTI_V="${SANDBOX}/multi-vault"
+MULTI_R="${SANDBOX}/multi-rules"
+mkdir -p "${MULTI_V}/practices/backend" "${MULTI_V}/00-maps" "${MULTI_R}"
+cp "${LVAULT}/00-maps/promotion-candidates.md" "${MULTI_V}/00-maps/"
+cp "${LVAULT}/practices/cross-cutting/covered.md" "${MULTI_V}/practices/backend/"
+sed 's/^# Covered/# Second/' "${LVAULT}/practices/cross-cutting/covered.md" \
+  > "${MULTI_V}/practices/backend/second.md"
+cat > "${MULTI_R}/multi-rule.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Distilled from two notes at once
+source: [covered, second]
+---
+
+Fixture rule body.
+EOF
+out_multi="$("${CHECK}" --vault "${MULTI_V}" --rules-dir "${MULTI_R}" --as-of "${AS_OF}" 2>/dev/null)"
+rc_multi=$?
+assert_exit 0 "${rc_multi}" "a rule covering every enforced note via a list exits 0"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_multi}" in
+  *"Unpromoted notes (enforced, no covering rule): 0"*) pass "every slug in a source list counts as covering" ;;
+  *) fail "every slug in a source list counts as covering" "${out_multi}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_multi}" in
+  *"Rules with no recorded source: 0"*) pass "a list-sourced rule is not counted as sourceless" ;;
+  *) fail "a list-sourced rule is not counted as sourceless" "${out_multi}" ;;
+esac
+
+# A block list is the same field written the other way — the shared parser
+# handles both, and neither may read as "declared nothing".
+cat > "${MULTI_R}/multi-rule.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Same two sources, block-list form
+source:
+  - covered
+  - second
+---
+
+Fixture rule body.
+EOF
+out_block="$("${CHECK}" --vault "${MULTI_V}" --rules-dir "${MULTI_R}" --as-of "${AS_OF}" 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_block}" in
+  *"Unpromoted notes (enforced, no covering rule): 0"*) pass "a block-list source is read the same as an inline one" ;;
+  *) fail "a block-list source is read the same as an inline one" "${out_block}" ;;
+esac
+
+# One bad slug among several must not be masked by the good ones — and the
+# rule stays orphaned on exactly the source that broke, named.
+cat > "${MULTI_R}/multi-rule.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: One good source, one that names nothing
+source: [covered, does-not-exist]
+---
+
+Fixture rule body.
+EOF
+out_partial="$("${CHECK}" --vault "${MULTI_V}" --rules-dir "${MULTI_R}" --as-of "${AS_OF}" 2>/dev/null)"
+rc_partial=$?
+assert_exit 1 "${rc_partial}" "one unresolvable slug among several still orphans the rule"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_partial}" in
+  *"multi-rule.md: source 'does-not-exist' not found in practices/"*) pass "the orphan message names the slug that broke, not the rule's first" ;;
+  *) fail "the orphan message names the slug that broke, not the rule's first" "${out_partial}" ;;
+esac
+# "second" is now uncovered, and must be reported as such rather than being
+# credited to a rule that merely mentions a sibling slug.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_partial}" in
+  *"- second"*) pass "a note dropped from a source list reads as unpromoted" ;;
+  *) fail "a note dropped from a source list reads as unpromoted" "${out_partial}" ;;
+esac
+
+# An empty list, and a key with nothing after it, both mean "declared nothing"
+# — never a source named "". Coverage is undetermined, not "one sourced rule".
+cat > "${MULTI_R}/multi-rule.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Key present, nothing after it
+source:
+---
+
+Fixture rule body.
+EOF
+out_blank="$("${CHECK}" --vault "${MULTI_V}" --rules-dir "${MULTI_R}" --as-of "${AS_OF}" 2>/dev/null)"
+rc_blank=$?
+assert_exit 1 "${rc_blank}" "an empty source: declares nothing and fails closed"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_blank}" in
+  *"Coverage undetermined"*) pass "an empty source: is not a source named the empty string" ;;
+  *) fail "an empty source: is not a source named the empty string" "${out_blank}" ;;
+esac
+
 # --- a duplicate slug is a hard error, not last-write-wins -------------------
 # notes_by_slug is keyed on the basename while practices/ is foldered, so two
 # same-named notes in different subdirectories used to overwrite each other —

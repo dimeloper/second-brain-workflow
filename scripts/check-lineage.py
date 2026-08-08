@@ -24,10 +24,19 @@ This reports four things, none of which anything else currently checks:
                     reported as a near-miss rather than silently losing the
                     exemption.
 
-Rules trace back to a note via a `source:` frontmatter field naming the
-note's slug (its filename, no extension — the same identifier every
+Rules trace back to notes via a `source:` frontmatter field naming their
+slugs (a slug is the filename, no extension — the same identifier every
 `[[wikilink]]` in the vault already uses, since Obsidian's link namespace is
-flat regardless of how notes are foldered). `practices/` itself is *not*
+flat regardless of how notes are foldered). One slug or several, since a rule
+is routinely distilled from more than one note:
+
+    source: prefer-signal-apis
+    source: [validate-at-the-boundary, fail-fast-env-validation]
+
+A scalar is read as a one-element list, so both forms are equivalent and
+neither is deprecated. Every slug is checked independently — a rule is
+orphaned by any one of its sources going missing, and covers every note it
+names. `practices/` itself is *not*
 flat — notes sit in per-domain subdirectories — so slug uniqueness is
 enforced when notes are loaded rather than assumed from the layout: two
 notes with the same filename in different subdirectories are a hard error,
@@ -164,7 +173,20 @@ def load_rules(rules_dir):
             fm = {}
         else:
             problems.extend((path.name, w) for w in warnings)
-        rules.append({"file": path.name, "source": fm.get("source") or ""})
+        # `source:` accepts one slug or several. A rule is routinely distilled
+        # from more than one note — the backend rule set descends from seven —
+        # so a single-valued field couldn't express its lineage honestly, and
+        # the alternative to a list is leaving it blank, which is what made
+        # coverage undetermined in the first place. Scalars are coerced rather
+        # than deprecated: same idiom as `repos` on the note side, so a rule
+        # written either way keeps working and nothing needs migrating.
+        sources = fm.get("source") or []
+        if not isinstance(sources, list):
+            sources = [sources]
+        # Drop blanks: a bare `source:` with nothing after it, or a stray comma
+        # in an inline list, means "declared nothing" — never a note named "".
+        sources = [s.strip() for s in sources if isinstance(s, str) and s.strip()]
+        rules.append({"file": path.name, "sources": sources})
     return rules, problems
 
 
@@ -223,8 +245,8 @@ def audit(vault, rules_dir, stale_months, as_of):
     # threshold: a check that couldn't do its job says so and exits non-zero,
     # rather than printing a count it never earned. Distinguish "parsed and
     # matched" from "parsed nothing and therefore didn't disagree."
-    sourced_rules = [r for r in rules if r["source"]]
-    no_source = [r for r in rules if not r["source"]]
+    sourced_rules = [r for r in rules if r["sources"]]
+    no_source = [r for r in rules if not r["sources"]]
     if not sourced_rules:
         coverage = "none"
     elif no_source:
@@ -237,17 +259,21 @@ def audit(vault, rules_dir, stale_months, as_of):
         # code path that formats a count.
         unpromoted, orphaned = None, None
     else:
-        sourced_slugs = {r["source"] for r in sourced_rules}
+        sourced_slugs = {s for r in sourced_rules for s in r["sources"]}
         unpromoted = [
             n for n in notes if n["maturity"] == "enforced" and n["slug"] not in sourced_slugs
         ]
+        # Every source is checked, not just the first: a rule descending from
+        # seven notes is orphaned by any one of them going missing, and naming
+        # only the first would hide the rest behind whichever got fixed.
         orphaned = []
         for r in sourced_rules:
-            note = notes_by_slug.get(r["source"])
-            if note is None:
-                orphaned.append((r, f"source '{r['source']}' not found in practices/"))
-            elif note["maturity"] != "enforced":
-                orphaned.append((r, f"source '{r['source']}' is {note['maturity']}, not enforced"))
+            for src in r["sources"]:
+                note = notes_by_slug.get(src)
+                if note is None:
+                    orphaned.append((r, f"source '{src}' not found in practices/"))
+                elif note["maturity"] != "enforced":
+                    orphaned.append((r, f"source '{src}' is {note['maturity']}, not enforced"))
 
     stale_cutoff_days = stale_months * 30
     stale = []

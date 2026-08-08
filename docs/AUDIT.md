@@ -19,9 +19,21 @@ human distills it into a rule under `rules/` (in whichever repo
 `SBW_RULES_DIR` resolves to), then repos re-sync. Tooling reports; it never
 promotes a note to a rule.
 
-Record that lineage: add `source: <note-slug>` to the rule's frontmatter,
-naming the note it was distilled from (the same slug every `[[wikilink]]` in
-the vault already uses). Nothing renders it — `source:` never reaches
+Record that lineage: add `source:` to the rule's frontmatter, naming the note
+or notes it was distilled from by slug (the same slug every `[[wikilink]]` in
+the vault already uses). One or several — a rule is routinely distilled from
+more than one note, and naming one of seven would leave the other six reading
+as unpromoted:
+
+```yaml
+source: prefer-signal-apis
+source: [validate-at-the-boundary, fail-fast-env-validation]
+```
+
+A single slug is read as a one-element list, so both forms are equivalent and
+nothing written the old way needs changing. Every slug is checked on its own: a
+rule covers each note it names, and is orphaned by any one of them going
+missing. Nothing renders it — `source:` never reaches
 `.mdc`/`.claude/rules/*.md` output — it exists purely so the capture side
 (automated) and the review side (otherwise entirely manual) can be
 cross-checked:

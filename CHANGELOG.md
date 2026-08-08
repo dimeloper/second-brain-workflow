@@ -17,6 +17,19 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **A rule's `source:` may now name several notes**, inline (`source: [a, b]`)
+  or as a block list, because a rule is routinely distilled from more than one:
+  the backend rule set in `dev-conventions` descends from seven. A
+  single-valued field could only have expressed that by naming one and dropping
+  the rest, and the six dropped notes would then have read as unpromoted —
+  manufacturing exactly the false finding the coverage work below exists to
+  prevent. A scalar is read as a one-element list, the same coercion `repos`
+  already uses on the note side, so no existing rule needs changing and both
+  forms stay valid. Every slug is checked independently: a rule covers each
+  note it names and is orphaned by any one of them going missing, named
+  individually rather than reported against the rule's first source.
+
 ### Fixed
 - **`check-lineage.py` reported both lineage directions as findings when it
   had computed neither.** Both are derived from the rules that declare a
