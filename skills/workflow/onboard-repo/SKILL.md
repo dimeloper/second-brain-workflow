@@ -131,6 +131,39 @@ If the user does adopt one, the loop is theirs to run, not yours to assume:
 the skill listing is read at startup, so a newly linked skill is invisible until
 then.
 
+### 2c. Practices this repo has never had
+
+```bash
+~/second-brain-workflow/scripts/practices-for.py --repo <abs-path>
+```
+
+Only `enforced` notes become rules, and only rules reach a repo — so on a large
+vault the notes at `idea` and `trialing` are invisible to a repo that was just
+onboarded. This is what closes that gap. Two tiers, and the difference matters:
+
+- **Governs files here** — the note's own `applies-to` glob matches real files.
+  A promotion delta is shown for these (`-> applying here clears ENFORCED`).
+  Use these to replace step 2's guessed list.
+- **Same domain, judgement required** — matched on domain alone. **No promotion
+  claim is made**, because a guess that says "clears ENFORCED" would invite
+  adding a `repos:` entry for a note that does not govern this repo.
+
+**Report these; never apply them, and never offer to apply them all.** Promotion
+is driven by `length(repos)`, and the vault's own rule is that `trialing` must be
+*earned by deliberate re-application, not just counted*. Applying a dozen notes in
+one onboarding pass would add a dozen `repos:` entries and manufacture exactly the
+evidence the bar exists to measure — the same defect as promoting a note on a
+single repo. Onboarding is also when the repo is least understood, which is the
+worst moment to change its code.
+
+If the user picks one, apply **that one**, then record it through
+`update-second-brain` so the `repos:` bump and any promotion are captured as the
+deliberate act they were.
+
+Sanity-check a delta before repeating it: a note whose glob is `**/package.json`
+matches every Node repo ever written, and the rung it would clear is not evidence
+of anything. Say so rather than passing it on.
+
 ### 3. Project onboarding rule
 
 Create or update **one** always-apply rule:

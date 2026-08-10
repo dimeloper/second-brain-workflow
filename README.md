@@ -445,6 +445,41 @@ The `onboard-repo` skill runs this at step 2b and **reports without installing**
 adopting a skill is a standing choice about every future session, and several
 write into the project.
 
+### Which practices a repo has never had
+
+```bash
+make practices-for REPO=/path/to/repo
+```
+
+Only `enforced` notes become rules, and only rules reach a repo — so on a large
+vault the notes at `idea` and `trialing` are invisible to a repo you just
+onboarded. This reports them, filtered to the ones this repo is **not** already
+in the `repos:` of, in two tiers:
+
+- **Governs files here** — the note's own `applies-to` glob matches real files,
+  named with the file that matched. These carry a **promotion delta**:
+  `-> applying here clears ENFORCED`.
+- **Same domain, judgement required** — matched on the repo's inferred stack
+  alone. **No promotion claim**, because a guess that said "clears ENFORCED"
+  would invite adding a `repos:` entry for a note that does not govern this repo.
+
+The delta is the point: promotion runs on `length(repos)`, so one deliberate
+application is often the single act that clears a rung — and knowing which note
+is one repo short used to depend on remembering. The bars are read from the
+vault's own `00-maps/promotion-candidates.md`; an unreadable one is a **hard
+error**, never a default, because a report computed against a guessed bar names
+specific notes as ready when they are not.
+
+It **reports and never applies**, and neither does `onboard-repo`'s step 2c. The
+vault's rule is that `trialing` is *earned by deliberate re-application, not just
+counted*, so applying a dozen notes in one pass would manufacture exactly the
+evidence the bar exists to measure. Apply one, then record it through
+`update-second-brain`.
+
+Cross-cutting notes without a matching glob are excluded and the count is
+printed — they apply everywhere, so listing a hundred of them would bury the
+repo-specific ones.
+
 **Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
 runs `sync-skills.sh` before a machine config exists, so the default applies and
 both directories get the links; a config written afterwards naming only one

@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
-        vault-index-check sync-skills fetch-skills skills-for uninstall upgrade explain guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain guard doctor audit \
         verify-claude check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
@@ -30,6 +30,7 @@ help:
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
 	@echo "make fetch-skills        preview fetching declared skill sources; YES=1 to act"
 	@echo "make skills-for REPO=... which skills apply to a repo, adopted and candidate"
+	@echo "make practices-for REPO=... vault notes that govern a repo but were never applied"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
@@ -78,6 +79,7 @@ lint-python:
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
 	  scripts/check-followups.py scripts/check-rules.py scripts/rule-budget.py scripts/lib/config.py \
 	  scripts/lib/frontmatter.py scripts/lib/registry.py scripts/lib/skill_manifest.py \
+	  scripts/lib/repo_match.py scripts/lib/promotion.py scripts/practices-for.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -140,6 +142,14 @@ fetch-skills:
 skills-for:
 	@if [ -z "$(REPO)" ]; then echo "usage: make skills-for REPO=/path/to/repo" >&2; exit 2; fi
 	@python3 ./scripts/lib/skill_manifest.py relevant --repo "$(REPO)"
+
+# Which vault notes govern a repo and have never been applied there, and which of
+# those one deliberate application would promote. Read-only, and deliberately not
+# an applier: the vault's bar counts deliberate re-application, so a batch would
+# manufacture the evidence it exists to measure.
+practices-for:
+	@if [ -z "$(REPO)" ]; then echo "usage: make practices-for REPO=/path/to/repo" >&2; exit 2; fi
+	@./scripts/practices-for.py --repo "$(REPO)" --vault "$(VAULT)"
 
 # Preview by default; --yes is the script's own gate, so `make uninstall` can
 # never remove anything on its own.

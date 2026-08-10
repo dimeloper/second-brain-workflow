@@ -50,6 +50,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from lib.repo_match import repo_files, path_matches  # noqa: E402,F401
+
 SOURCE_KEYS_REQUIRED = ("name", "repo", "allow")
 # "//" is the conventional JSON comment key, and it is accepted rather than
 # rejected so the shipped skills.json.example can carry its own instructions and
@@ -432,53 +435,6 @@ def resolve(engine, sources):
                 status = "ok"
             rows.append((status, skill, str(target), source["name"]))
     return rows
-
-
-def repo_files(repo, limit=20000):
-    """Repo-relative paths, preferring git's index.
-
-    `git ls-files` is fast, already excludes ignored files, and so never walks
-    node_modules or a build directory — which a naive glob would, on the largest
-    repos, for the longest time. The bounded fallback exists because a repo being
-    onboarded is not always a git repo yet.
-    """
-    repo = Path(repo)
-    try:
-        import subprocess
-        out = subprocess.run(
-            ["git", "-C", str(repo), "ls-files"],
-            capture_output=True, text=True, timeout=30, check=False)
-        if out.returncode == 0:
-            return [line for line in out.stdout.splitlines() if line][:limit]
-    except (OSError, ImportError):
-        pass
-
-    skip = {".git", "node_modules", ".next", "dist", "build", "__pycache__",
-            ".venv", "venv", "Pods", ".expo", ".dart_tool"}
-    found = []
-    for path in repo.rglob("*"):
-        if len(found) >= limit:
-            break
-        if any(part in skip for part in path.parts):
-            continue
-        if path.is_file():
-            found.append(str(path.relative_to(repo)))
-    return found
-
-
-def path_matches(rel, pattern):
-    """Does one repo-relative path match one glob?
-
-    `**/` is treated as "zero or more directories", matching gitignore and Cursor
-    rather than fnmatch, whose `**/x` demands a literal slash and so would miss
-    the file at the repo root — the single most likely place to look.
-    """
-    from fnmatch import fnmatch
-    if fnmatch(rel, pattern):
-        return True
-    if pattern.startswith("**/") and fnmatch(rel, pattern[3:]):
-        return True
-    return False
 
 
 def relevant(entries, files):
