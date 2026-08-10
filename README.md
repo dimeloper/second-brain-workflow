@@ -577,6 +577,12 @@ skills, run [`doctor`](docs/GUARD.md#make-doctor) inline, run `render.py
 repo with the exact command that fixes each, and report a vault CI `ENGINE_REF`
 left behind the target.
 
+In preview, that drift is measured against the checkout as it stands, so its
+counts are lower bounds and the summary line says so: switching stamps a new
+version into every rendered file and into `.sbw-version`, so expect every
+registered repo to need re-rendering afterwards. A preview targeting the
+version already checked out has nothing pending, and says it plainly.
+
 It never renders, commits, pushes, or writes to a vault. `--check` reports and
 you decide; a stale `ENGINE_REF` is named, not edited.
 

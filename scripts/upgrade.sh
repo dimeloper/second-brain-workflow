@@ -377,11 +377,35 @@ EOF
   if [ "${drift}" -gt 0 ]; then
     findings=$((findings + 1))
     echo
-    echo "  ${drift} of ${live} checkable repo(s) need re-rendering, with the commands above."
+    if preview_of_another_version; then
+      echo "  at least ${drift} of ${live} checkable repo(s) need re-rendering, with the"
+      echo "  commands above — and expect all ${live} to, once the switch has happened."
+    else
+      echo "  ${drift} of ${live} checkable repo(s) need re-rendering, with the commands above."
+    fi
     echo "  This script does not render: --check reports, you decide."
+  elif preview_of_another_version; then
+    ok "all ${live} repo(s) match the current checkout — expect all ${live} to need"
+    note "re-rendering after switching to ${TARGET_REF}"
   else
     ok "all ${live} checkable repo(s) are up to date"
   fi
+}
+
+# In preview, --check has run against the checkout as it stands, so a clean
+# result is true when printed and false the moment --yes switches the ref. That
+# is fine for the per-repo lines and not fine for the summary: "all N up to
+# date" is the line a reader scans for permission to stop reading, and a caveat
+# in a header several lines above it is not carried by the line that gets read.
+# So the qualification goes in the wording itself.
+#
+# Keyed on the version rather than on whether the commit moves: the version is
+# stamped into every rendered file's provenance header and into .sbw-version, so
+# a target with a different version is what *guarantees* all of them drift.
+# Same-version targets are the only case where the plain wording is true, and
+# `--ref` already refuses anything that is not a release tag.
+preview_of_another_version() {
+  [ "${APPLY}" -eq 0 ] && [ "$(ver_cmp "${CURRENT}" "${TARGET_VERSION}")" != "eq" ]
 }
 
 # Never a count. "0 repos need re-rendering" is the answer that reads as

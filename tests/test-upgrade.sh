@@ -192,6 +192,15 @@ else
 fi
 assert_no_file "${SKILLS_A}/mcp-per-project" "the preview installs no skills"
 out_has "would run, in this order" "and names the commands it would run instead"
+
+# The line a reader scans for permission to stop reading. In preview it is true
+# when printed and false the instant --yes runs, so it has to say so itself
+# rather than lean on the caveat in the section header above it.
+out_has "all 1 repo(s) match the current checkout — expect all 1 to need" \
+  "a clean preview qualifies its own summary line"
+out_has "re-rendering after switching to v0.9.1" "naming the ref that will invalidate it"
+out_lacks "all 1 checkable repo(s) are up to date" \
+  "and never states it unqualified while a switch is still pending"
 out_has "Re-run with --yes" "and names the flag, since this run was not via make"
 
 # --- the Major entries, before anything is proposed -------------------------
@@ -293,7 +302,10 @@ rc=$?
 out_has "up to date: $(real "${REPO_OK}")" "a clean registered repo is reported as up to date"
 out_has "DRIFT $(real "${REPO_DRIFT}")" "and a drifted one is named"
 out_has "fix: ./scripts/render.py $(real "${REPO_DRIFT}")" "with the exact command that fixes it"
-out_has "1 of 2 checkable repo(s) need re-rendering" "and a count of the ones that need it"
+out_has "at least 1 of 2 checkable repo(s) need re-rendering" \
+  "the preview count is a lower bound, not a total"
+out_has "expect all 2 to, once the switch has happened" \
+  "because switching stamps a new version into every rendered file"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${rc}" -ne 0 ]; then
   pass "drift makes the run non-zero"
@@ -374,6 +386,23 @@ else
 fi
 upgrade --ref v0.9.1
 out_has "up to date: $(real "${REPO_DRIFT}")" "and clears the drift it was printed for"
+# The checkout is at v0.9.1 by now, so this preview targets the version it is
+# already on: no switch is pending, and the plain count is the true wording.
+#
+# repo-ok is the one drifting here, and that is the point made concretely — it
+# was rendered at 0.9.0 and the switch stamped 0.9.1 into everything, which is
+# exactly what the qualified wording above warns a reader to expect.
+out_has "1 of 2 checkable repo(s) need re-rendering, with the commands above." \
+  "with no switch pending, the count is stated plainly"
+out_lacks "at least 1 of 2" "not hedged as a lower bound, which it no longer is"
+
+# And the clean-plus-nothing-pending cell of the same matrix: every repo current,
+# no switch to invalidate it, so the summary carries no qualification at all.
+"${FIX}/scripts/render.py" "${REPO_OK}" >/dev/null 2>&1
+upgrade --ref v0.9.1
+out_has "all 2 checkable repo(s) are up to date" \
+  "and a fully current machine says so without qualification"
+out_lacks "expect all 2 to need" "having nothing pending to qualify"
 
 # --- make upgrade -----------------------------------------------------------
 # MAKELEVEL is what invocation.sh detects, and make exports it into every

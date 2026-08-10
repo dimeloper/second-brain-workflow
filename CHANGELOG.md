@@ -51,6 +51,12 @@ write release notes, not two to keep in sync by hand.
   seams so the tests need neither network nor a fabricated tag in the real
   remote.
 
+  In preview, drift is measured against the checkout as it stands, so the counts
+  are lower bounds and the summary line carries that qualification itself rather
+  than leaving it to a header — switching stamps a new version into every
+  rendered file and into `.sbw-version`, so a clean preview means "current with
+  this checkout", not "nothing to do after the switch".
+
   When the registry is missing, empty or wholly stale, the onboarded set is
   reported as undetermined and the run exits 3. A zero count would read as
   success and leave every repo on the machine at a stale render — the same
