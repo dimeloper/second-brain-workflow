@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
-        vault-index-check sync-skills uninstall upgrade explain guard doctor audit \
+        vault-index-check sync-skills fetch-skills uninstall upgrade explain guard doctor audit \
         verify-claude check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
@@ -19,6 +19,7 @@ SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
                  scripts/lib/registry.sh scripts/upgrade.sh \
                  scripts/lib/resolve-vault.sh scripts/uninstall.sh \
+                 scripts/fetch-skill-sources.sh scripts/lib/skill-links.sh \
                  tests/lib.sh $(wildcard tests/test-*.sh)
 
 help:
@@ -27,6 +28,7 @@ help:
 	@echo "make vault-index         regenerate <vault>/practices/INDEX.md"
 	@echo "make vault-index-check   fail if the index is stale"
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
+	@echo "make fetch-skills        preview fetching declared skill sources; YES=1 to act"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
@@ -74,7 +76,7 @@ lint-shell:
 lint-python:
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
 	  scripts/check-followups.py scripts/check-rules.py scripts/rule-budget.py scripts/lib/config.py \
-	  scripts/lib/frontmatter.py scripts/lib/registry.py \
+	  scripts/lib/frontmatter.py scripts/lib/registry.py scripts/lib/skill_manifest.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -124,6 +126,11 @@ vault-index-check:
 
 sync-skills:
 	@./scripts/sync-skills.sh
+
+# The network step, kept out of sync-skills so `make check` never needs a network
+# or credentials. Preview by default, same shape as uninstall and upgrade.
+fetch-skills:
+	@./scripts/fetch-skill-sources.sh $(if $(YES),--yes,)
 
 # Preview by default; --yes is the script's own gate, so `make uninstall` can
 # never remove anything on its own.
