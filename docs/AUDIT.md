@@ -73,14 +73,46 @@ which makes their coverage worth stating explicitly:
   may be covered by a rule that simply never recorded it, so the number is an
   upper bound.
 
+### Provisional rules
+
+A rule may knowingly cite a source below `enforced`. Declare it, with the reason:
+
+```yaml
+source: [route-a-generated-asset-workflow-to-a-dedicated-repo]
+provisional: read off what the tool writes, so no repo count will mature it
+```
+
+It is then counted as **provisional** rather than orphaned — printed on every
+run, including when the count is zero, and never failing the audit.
+
+The case it exists for is a rule that is not a distilled practice. A constraint
+read off *what an external tool writes* — "this screenshot generator scaffolds a
+Next.js app, so it must not run inside yours" — is as true on the first repo as
+on the third. It has no evidence curve to climb, so the note it descends from
+will sit at `idea` indefinitely and the rule would read as orphaned forever. The
+alternatives were both worse: promote the note on one repo, which games the bar
+the whole promotion model rests on, or withdraw a constraint that is true today.
+
+Two deliberate constraints:
+
+- **Prose, never `true`.** `provisional: true` is rejected by `check-rules.py`. A
+  boolean exemption outlives the reason it was added for with nothing left to
+  read; a sentence is printed by every audit and can be judged stale by whoever
+  reads it. One line — the frontmatter parser has no folded scalars.
+- **It excuses an immature source, never a missing one.** A rule naming a note
+  that does not exist stays orphaned regardless. With the note gone the lineage
+  cannot be read at all, which is the state the check exists for, and letting a
+  reason string suppress that would make the field the blanket opt-out it is
+  written to avoid being.
+
 Two notes sharing a filename in different `practices/` subdirectories is also a
 hard error naming both paths. Rules reference notes by slug alone, so a
 collision would otherwise let whichever note loaded last decide whether a rule
 read as orphaned.
 
 Otherwise exits 1 only for orphaned rules — that's the one finding that means a
-rule is actively citing evidence that no longer exists; everything else is a
-visible backlog, not a block.
+rule is actively citing evidence that no longer exists; everything else,
+provisional rules included, is a visible backlog rather than a block.
 
 ## Stale follow-ups
 

@@ -31,6 +31,32 @@ description: Angular component and reactivity conventions
 # deleted or demoted. A rule with no `source:` is not a smaller problem than a
 # wrong one — with nothing declared, neither question can be answered at all.
 source: [prefer-signal-apis]
+
+# Optional, and prose rather than a boolean. Declares that this rule knowingly
+# cites a source note below `enforced`, with the reason why that is permanent
+# rather than a matter of time. `check-lineage.py` then counts it as
+# *provisional* instead of *orphaned* — reported on every run, never failing.
+#
+# The case it exists for: a rule encoding an external tool's behaviour rather
+# than a practice earned across repos. "This screenshot generator scaffolds a
+# Next.js app, so it must not run inside your app" is as true on the first repo
+# as the third — there is no evidence curve to climb, so the note it descends
+# from will sit at `idea` indefinitely and the rule would read as orphaned
+# forever.
+#
+#   provisional: read off what the tool writes, so no repo count will mature it
+#
+# One line. The frontmatter parser here is deliberately minimal — no folded or
+# block scalars — so a continuation line is reported as `unparsed line` by
+# check-rules.py and silently truncates the reason everywhere else.
+#
+# Write the reason, never `true`. A boolean outlives the reason it was added for
+# with nothing left to read; a sentence gets printed by every audit and can be
+# judged stale by whoever reads it. `provisional: true` is rejected.
+#
+# It excuses an *immature* source, never a *missing* one. A rule naming a note
+# that does not exist stays orphaned regardless — the lineage cannot be read at
+# all in that state, which is the whole point of the check.
 ---
 
 Imperative bullets, one convention each. This is the body an agent actually

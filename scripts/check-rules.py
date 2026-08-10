@@ -20,7 +20,7 @@ reports as missing.
 
 Checks, all of them hard errors — see "Exit status":
 
-  Unknown key       outside {paths, description, source}. Almost always a
+  Unknown key       outside {paths, description, source, provisional}. Almost always a
                     typo, and the one failure mode nothing else can catch.
   No source         the rule records no lineage at all, so check-lineage.py
                     cannot tell whether it covers anything. That is the state
@@ -68,7 +68,7 @@ ENGINE = Path(__file__).resolve().parent.parent
 # The complete set of keys anything in this system reads from a rule.
 # `rule.md.example` documents exactly these, and tests/test-check-rules.sh
 # fails if the two fall out of step.
-KNOWN_KEYS = {"paths", "description", "source"}
+KNOWN_KEYS = {"paths", "description", "source", "provisional"}
 
 # Keys that must hold a non-empty list of non-empty strings when present.
 # A scalar is legal for both — render.py and check-lineage.py each coerce one
@@ -99,6 +99,29 @@ def check_rule(name, text):
             f"unknown key '{key}' — nothing reads it, so whatever it was meant "
             f"to express does not apply. Known keys: {', '.join(sorted(KNOWN_KEYS))}"
         )
+
+    # `provisional:` must be prose, not `true`. The field exempts a rule from
+    # the "source must be enforced" lineage check, and a boolean exemption
+    # outlives the reason it was added for with nothing left to read; a sentence
+    # can be judged stale. `true`/`yes`/`1` are therefore rejected explicitly
+    # rather than silently accepted as a truthy string — that is precisely the
+    # value someone reaching for a flag will write first.
+    if "provisional" in fm:
+        value = fm["provisional"]
+        text_value = " ".join(value) if isinstance(value, list) else str(value)
+        text_value = text_value.strip()
+        if not text_value:
+            findings.append(
+                "'provisional:' is present but empty — it must state why this "
+                "rule may cite a source that is not yet enforced"
+            )
+        elif text_value.lower() in {"true", "false", "yes", "no", "1", "0"}:
+            findings.append(
+                f"'provisional: {text_value}' is a boolean — write the reason "
+                "instead, e.g. 'constraint read off an external tool's behaviour, "
+                "so it has no evidence curve to climb'. check-lineage.py prints "
+                "it on every run, and a flag with no reason cannot be judged stale"
+            )
 
     for key in LIST_KEYS:
         if key not in fm:

@@ -207,6 +207,79 @@ case "${out_orph}" in
   *) fail "a source below enforced is orphaned" "${out_orph}" ;;
 esac
 
+# --- provisional: a rule may knowingly cite a source below enforced ----------
+# The case: a rule encoding an external tool's behaviour rather than a practice
+# earned across repos. "This generator scaffolds an app, so don't run it in
+# yours" is as true on the first repo as the third, so its note stays at `idea`
+# and the rule would read as orphaned forever. Reusing the fixture above, which
+# already has a trialing source and a missing one.
+PROV_R="${SANDBOX}/prov-rules"
+mkdir -p "${PROV_R}"
+cat > "${PROV_R}/early-rule.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Distilled ahead of its source reaching enforced, deliberately
+source: still-trialing
+provisional: read off what the tool writes, so no repo count will mature it
+---
+
+Fixture rule body.
+EOF
+out_prov="$("${CHECK}" --vault "${ORPH_V}" --rules-dir "${PROV_R}" --as-of "${AS_OF}" 2>/dev/null)"
+rc_prov=$?
+assert_exit 0 "${rc_prov}" "a provisional rule does not fail the audit"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prov}" in
+  *"Orphaned rules (source note gone or demoted): 0"*) pass "a provisional rule is not counted as orphaned" ;;
+  *) fail "a provisional rule is not counted as orphaned" "${out_prov}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prov}" in
+  *"Provisional rules (source deliberately not yet enforced): 1"*) pass "it is counted as provisional instead" ;;
+  *) fail "it is counted as provisional instead" "${out_prov}" ;;
+esac
+# The reason is the whole value of the field — an exemption whose justification
+# is not printed is one that stops being read.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prov}" in
+  *"early-rule.md: source 'still-trialing' is trialing, not enforced — read off what the tool writes"*)
+    pass "the reason is printed alongside the finding" ;;
+  *) fail "the reason is printed alongside the finding" "${out_prov}" ;;
+esac
+
+# It excuses an immature source, never an absent one: with the note gone the
+# lineage cannot be read at all, which is the state the check exists for.
+cat > "${PROV_R}/ghost-rule.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Provisional, but its source does not exist
+source: does-not-exist
+provisional: claiming this should not help
+---
+
+Fixture rule body.
+EOF
+out_ghost="$("${CHECK}" --vault "${ORPH_V}" --rules-dir "${PROV_R}" --as-of "${AS_OF}" 2>/dev/null)"
+rc_ghost=$?
+assert_exit 1 "${rc_ghost}" "provisional does not excuse a missing source note"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_ghost}" in
+  *"ghost-rule.md: source 'does-not-exist' not found in practices/"*)
+    pass "a provisional rule with no such note is still orphaned" ;;
+  *) fail "a provisional rule with no such note is still orphaned" "${out_ghost}" ;;
+esac
+
+# Zero is printed too. A section that appears only when non-empty is a section
+# nobody learns to look for.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(run 2>/dev/null)" in
+  *"Provisional rules (source deliberately not yet enforced): 0"*)
+    pass "the provisional count prints even at zero" ;;
+  *) fail "the provisional count prints even at zero" "$(run 2>/dev/null)" ;;
+esac
+
 # --- no rule declares a source: coverage is undetermined, not "0 orphaned" ---
 # With an empty sourced-slug set both lineage directions go vacuous — every
 # enforced note reads as unpromoted because nothing claims it, and no rule

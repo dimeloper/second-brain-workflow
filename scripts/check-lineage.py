@@ -5,11 +5,16 @@ The capture side of this system is automated (update-second-brain writes
 notes); the review side — does an `enforced` note actually have a rule,
 does a rule's source note still justify it, is the evidence still real —
 was entirely manual, which means it's the part that quietly stops happening.
-This reports four things, none of which anything else currently checks:
+This reports five things, none of which anything else currently checks:
 
   Unpromoted note   maturity: enforced with no rule tracing back to it
   Orphaned rule     a rule whose source note is gone, or demoted below
                     enforced — never promotes anything, only reports
+  Provisional rule  a rule that *declares* it cites a source below enforced,
+                    with the reason why that is permanent rather than a matter
+                    of time (`provisional:` in its frontmatter). Reported on
+                    every run, never fails. It excuses an immature source, never
+                    a missing one — see docs/AUDIT.md#provisional-rules
   Stale claim       enforced, last-reviewed older than --stale-months
                     (default 6 — the same 180-day window review-queue.md
                     already uses for a different purpose)
@@ -186,7 +191,19 @@ def load_rules(rules_dir):
         # Drop blanks: a bare `source:` with nothing after it, or a stray comma
         # in an inline list, means "declared nothing" — never a note named "".
         sources = [s.strip() for s in sources if isinstance(s, str) and s.strip()]
-        rules.append({"file": path.name, "sources": sources})
+        # `provisional:` is a *reason*, never a boolean. A rule may legitimately
+        # descend from a note that is not yet `enforced` — a constraint read off
+        # what an external tool writes is as true on the first repo as the third,
+        # so it has no evidence curve to climb and would sit orphaned forever.
+        # Requiring prose rather than `true` is the whole design: a boolean gets
+        # set once and outlives its reason invisibly, while a sentence can be
+        # read back and judged, and is printed on every audit run so the
+        # exemption stays visible instead of becoming silent.
+        provisional = fm.get("provisional") or ""
+        if isinstance(provisional, list):
+            provisional = " ".join(str(p) for p in provisional)
+        provisional = str(provisional).strip()
+        rules.append({"file": path.name, "sources": sources, "provisional": provisional})
     return rules, problems
 
 
@@ -257,7 +274,7 @@ def audit(vault, rules_dir, stale_months, as_of):
     if coverage == "none":
         # None, not [] — an undetermined result must not be reachable by any
         # code path that formats a count.
-        unpromoted, orphaned = None, None
+        unpromoted, orphaned, provisional = None, None, None
     else:
         sourced_slugs = {s for r in sourced_rules for s in r["sources"]}
         unpromoted = [
@@ -267,13 +284,25 @@ def audit(vault, rules_dir, stale_months, as_of):
         # seven notes is orphaned by any one of them going missing, and naming
         # only the first would hide the rest behind whichever got fixed.
         orphaned = []
+        provisional = []
         for r in sourced_rules:
             for src in r["sources"]:
                 note = notes_by_slug.get(src)
                 if note is None:
+                    # A missing note orphans a rule whether or not it declared
+                    # itself provisional. `provisional` excuses an *immature*
+                    # source, never an absent one: the note being gone means the
+                    # lineage cannot be read at all, which is the state the check
+                    # exists for, and letting a reason string suppress it would
+                    # turn the field into the blanket opt-out it is written to
+                    # avoid being.
                     orphaned.append((r, f"source '{src}' not found in practices/"))
                 elif note["maturity"] != "enforced":
-                    orphaned.append((r, f"source '{src}' is {note['maturity']}, not enforced"))
+                    why = f"source '{src}' is {note['maturity']}, not enforced"
+                    if r["provisional"]:
+                        provisional.append((r, f"{why} — {r['provisional']}"))
+                    else:
+                        orphaned.append((r, why))
 
     stale_cutoff_days = stale_months * 30
     stale = []
@@ -300,6 +329,7 @@ def audit(vault, rules_dir, stale_months, as_of):
         "sourced_rules": len(sourced_rules),
         "unpromoted": unpromoted,
         "orphaned": orphaned,
+        "provisional": provisional,
         "no_source": no_source,
         "stale": stale,
         "thin": thin,
@@ -342,6 +372,18 @@ def report(result, vault, rules_dir, stale_months):
 
         lines.append(f"Orphaned rules (source note gone or demoted): {len(result['orphaned'])}")
         for r, why in result["orphaned"]:
+            lines.append(f"  - {r['file']}: {why}")
+        lines.append("")
+
+        # Printed on every run, including when the count is zero. An exemption
+        # that only appears when someone goes looking is one that stops being
+        # read, and the reason is the whole value of the field — a line the
+        # reader can disagree with beats a check that silently passed.
+        lines.append(
+            f"Provisional rules (source deliberately not yet enforced): "
+            f"{len(result['provisional'])}"
+        )
+        for r, why in result["provisional"]:
             lines.append(f"  - {r['file']}: {why}")
         lines.append("")
 

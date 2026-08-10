@@ -69,7 +69,7 @@ case "${out_typo}" in
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_typo}" in
-  *"Known keys: description, paths, source"*) pass "the known key set is listed so the typo is obvious" ;;
+  *"Known keys: description, paths, provisional, source"*) pass "the known key set is listed so the typo is obvious" ;;
   *) fail "the known key set is listed so the typo is obvious" "${out_typo}" ;;
 esac
 # The typo means the rule also has no source at all — both must be reported,
@@ -153,6 +153,66 @@ case "${out_missing}" in
   *) fail "a missing rules directory is named" "${out_missing}" ;;
 esac
 
+# --- provisional: prose, never a boolean ------------------------------------
+# The field exempts a rule from the "source must be enforced" lineage check. A
+# boolean exemption outlives the reason it was added for with nothing left to
+# read, so the reason *is* the field — and `true` is the first thing anyone
+# reaching for a flag will write, which is why it is rejected by name rather
+# than quietly accepted as a truthy string.
+PROV_R="${SANDBOX}/prov-rules"
+mkdir -p "${PROV_R}"
+cat > "${PROV_R}/reasoned.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Cites an immature source on purpose
+source: some-note
+provisional: read off what the tool writes, so no repo count will mature it
+---
+
+Fixture rule body.
+EOF
+"${CHECK}" --rules-dir "${PROV_R}" >/dev/null 2>&1
+assert_exit 0 $? "a provisional reason is accepted"
+
+cat > "${PROV_R}/reasoned.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Reaches for a flag instead of a reason
+source: some-note
+provisional: true
+---
+
+Fixture rule body.
+EOF
+out_bool="$("${CHECK}" --rules-dir "${PROV_R}" 2>&1)"
+assert_exit 1 $? "a boolean provisional fails"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bool}" in
+  *"is a boolean — write the reason instead"*) pass "the boolean finding says to write a reason" ;;
+  *) fail "the boolean finding says to write a reason" "${out_bool}" ;;
+esac
+
+cat > "${PROV_R}/reasoned.md" <<'EOF'
+---
+paths:
+  - "**/*.ts"
+description: Declares an exemption and justifies nothing
+source: some-note
+provisional:
+---
+
+Fixture rule body.
+EOF
+out_blank_p="$("${CHECK}" --rules-dir "${PROV_R}" 2>&1)"
+assert_exit 1 $? "an empty provisional fails"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_blank_p}" in
+  *"'provisional:' is present but empty"*) pass "an empty provisional is named as such" ;;
+  *) fail "an empty provisional is named as such" "${out_blank_p}" ;;
+esac
+
 # --- template parity --------------------------------------------------------
 # The shape this whole thread is about: a convention that lives in a script but
 # not in the template someone copies. `source:` was documented in AUDIT.md and
@@ -184,12 +244,19 @@ if [ -z "${keys}" ]; then
 else
   pass "the known key set could be read from check-rules.py"
 fi
+# A key counts as documented whether it is pre-filled in the frontmatter or
+# shown in a commented example. Both forms are documentation; the difference is
+# whether the key is a sensible *default*, and some are deliberately not. A
+# rule copied from the template must not arrive already claiming a lineage
+# exemption, so `provisional:` is documented and not pre-filled — requiring
+# every known key to be live in the template would force exactly the bad
+# default this check is meant to protect against.
 for key in ${keys}; do
   TESTS_RUN=$((TESTS_RUN + 1))
-  if grep -q "^${key}:" "${TEMPLATE}"; then
+  if grep -qE "^${key}:|^#[[:space:]]+${key}:" "${TEMPLATE}"; then
     pass "the template documents '${key}:'"
   else
-    fail "the template documents '${key}:'" "not found in ${TEMPLATE}"
+    fail "the template documents '${key}:'" "not found in ${TEMPLATE}, live or commented"
   fi
 done
 
