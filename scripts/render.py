@@ -32,6 +32,10 @@ brace group like `{ts,tsx}`, so making it canonical would forbid braces
 everywhere. As the derived form, the limitation applies only when Cursor is a
 target — see check_globs().
 
+A successful render also appends the target's real path to the machine's repo
+registry (see lib/registry.py) — the only thing this writes outside the target
+repo, and the only record of where the engine has rendered.
+
 Stdlib only. Config: RENDER_TARGETS env var, or --targets. Rules location:
 SBW_RULES_DIR env/config var, or --rules-dir — defaults to
 ENGINE/rules, so a self-contained checkout (rules co-located with the
@@ -46,6 +50,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
+from lib.registry import register as register_repo  # noqa: E402
 
 ENGINE = Path(__file__).resolve().parent.parent
 RULES_SRC = ENGINE / "rules"
@@ -477,6 +482,16 @@ def main():
                 existing.unlink()
                 print(f"  pruned: {rel}")
                 changed += 1
+
+    # Recorded after the writes, and only in write mode: --check and --dry-run
+    # change nothing anywhere, which is the same contract .sbw-version already
+    # has and what tests/test-render.sh already asserts for it. A repo that
+    # rendered fine is still rendered when this fails, so the failure warns
+    # rather than propagating — but it does warn, because an unwritable
+    # registry is exactly how the onboarded set becomes undetermined later with
+    # nothing left to explain it.
+    if mode == "write":
+        register_repo(repo, warn=lambda m: print(f"warning: {m}", file=sys.stderr))
 
     if mode == "check":
         if drift:

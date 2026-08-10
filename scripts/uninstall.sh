@@ -32,6 +32,10 @@ ds_config_load
 . "${STANDARDS_DIR}/scripts/lib/skill-links.sh"
 # shellcheck source=scripts/lib/invocation.sh
 . "${STANDARDS_DIR}/scripts/lib/invocation.sh"
+# Only for naming the repo registry in the closing "not removed" list — this
+# script never reads or writes it.
+# shellcheck source=scripts/lib/registry.sh
+. "${STANDARDS_DIR}/scripts/lib/registry.sh"
 skills_dirs_load
 
 APPLY=0
@@ -141,5 +145,6 @@ EOF
 echo "Removed ${removed} link(s). ${kept} entr(ies) left alone."
 echo
 echo "Not removed, by design: your vault(s), $(ds_config_path),"
-echo "and rendered rules in any repo you onboarded (.cursor/rules, .claude/rules,"
-echo "AGENTS.md, CLAUDE.md, .sbw-version — delete those per repo if you want them gone)."
+echo "the repo registry ($(sbw_registry_path)), and rendered"
+echo "rules in any repo you onboarded (.cursor/rules, .claude/rules, AGENTS.md,"
+echo "CLAUDE.md, .sbw-version — delete those per repo if you want them gone)."
