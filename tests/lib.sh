@@ -34,6 +34,13 @@ setup_sandbox() {
   # script-form message passes when run by hand and fails under `make check`.
   # Tests that mean to exercise the make form set it themselves.
   unset MAKELEVEL
+  # sync-skills.sh and doctor.sh now read a skill-source manifest, and this is
+  # the third time a tool here started reading more of the environment than the
+  # sandbox knew to blank. SBW_CONFIG_FILE above covers the config-file route;
+  # the environment route needs its own line, or a developer with a real roster
+  # exported gets extra skills installed into fixtures and assertions that count
+  # links fail for a reason nowhere near what they were testing.
+  unset SBW_SKILLS_MANIFEST
   isolate_home
   trap 'teardown_sandbox' EXIT INT TERM
 }
