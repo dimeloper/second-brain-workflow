@@ -6,7 +6,7 @@
 
 Precedence: existing environment wins over the config file, which wins over
 defaults. CLI flags are the caller's job — apply them on top of load().
-Keep in step with lib/config.sh; both implement the same eight keys.
+Keep in step with lib/config.sh; both implement the same nine keys.
 """
 
 import os
@@ -17,6 +17,11 @@ DEFAULTS = {
     "RENDER_TARGETS": "cursor,claude-code,agents",
     "SKILLS_DIRS": "~/.cursor/skills:~/.claude/skills",
     "VENDOR_SKILLS": "obsidian-bases obsidian-markdown",
+    # Empty means "no third-party skill sources declared". The roster belongs to
+    # the person, not to this repo — same split as SBW_RULES_DIR below, and for
+    # the same reason: an engine shipping a curated set of someone else's skills
+    # would be shipping an opinion, which `rules/` being empty exists to avoid.
+    "SBW_SKILLS_MANIFEST": "",
     # Empty means "not overridden" — render.py falls back to ENGINE/rules.
     "SBW_RULES_DIR": "",
     # Empty by design, not a fallback — no shell consumer reads this key yet

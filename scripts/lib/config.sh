@@ -7,9 +7,9 @@
 #
 # Precedence: existing environment wins over the config file, which wins over
 # defaults. CLI flags are the caller's job — parse them after loading.
-# Keep in step with lib/config.py; both implement the same eight keys.
+# Keep in step with lib/config.py; both implement the same nine keys.
 
-SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID SBW_SCAN_ROOTS SBW_SCAN_DEPTH"
+SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_SKILLS_MANIFEST SBW_RULES_DIR SBW_EXPECTED_VAULT_ID SBW_SCAN_ROOTS SBW_SCAN_DEPTH"
 
 ds_config_path() {
   local base="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -97,6 +97,12 @@ ds_config_load() {
   SBW_SKILLS_DIRS_DEFAULT="$HOME/.cursor/skills:$HOME/.claude/skills"
   [ -n "${SKILLS_DIRS+set}" ]         || SKILLS_DIRS="${SBW_SKILLS_DIRS_DEFAULT}"
   [ -n "${VENDOR_SKILLS+set}" ]       || VENDOR_SKILLS="obsidian-bases obsidian-markdown"
+  # Empty means "no third-party skill sources declared", which is the state the
+  # engine ships in and the state a fresh clone stays in. The roster belongs to
+  # the person, not to this repo — same split as SBW_RULES_DIR, and for the same
+  # reason: a public engine that shipped a curated set of someone's skills would
+  # be shipping an opinion, which is exactly what `rules/` being empty avoids.
+  [ -n "${SBW_SKILLS_MANIFEST+set}" ] || SBW_SKILLS_MANIFEST=""
   [ -n "${SBW_RULES_DIR+set}" ] || SBW_RULES_DIR=""
   # Empty by design — there is no sensible default "expected id". A guard
   # that fell back to something here would defeat the point of it; unset
@@ -111,6 +117,7 @@ ds_config_load() {
   [ -n "${SBW_SCAN_ROOTS+set}" ] || SBW_SCAN_ROOTS="$HOME"
   [ -n "${SBW_SCAN_DEPTH+set}" ] || SBW_SCAN_DEPTH="5"
   export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID
+  export SBW_SKILLS_MANIFEST
   export SBW_SCAN_ROOTS SBW_SCAN_DEPTH
   export SBW_SKILLS_DIRS_DEFAULT
 }
