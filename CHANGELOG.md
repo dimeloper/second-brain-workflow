@@ -17,6 +17,17 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`doctor` stopped at the first check that had something to report.**
+  `check_skills` and `check_submodules` both ended in a bare test, so a run
+  with a finding returned non-zero from the function itself — and under
+  `set -e` that ended the script there. A skill missing from one `SKILLS_DIRS`
+  entry silently cost the orphaned-skill check, the submodule check and the
+  summary line; worse, it capped the exit code at 1, so a vault path that
+  points nowhere — an error, exit 2 — was reported as warnings-only whenever
+  any earlier check also had a finding. The severity split those codes exist
+  for was decided before the code that could report it ever ran.
+
 ## [0.9.0] - 2026-08-10
 
 ### Major
