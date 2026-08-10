@@ -5,6 +5,11 @@
 mcp.json
 .cursor/mcp.json
 
+# Third-party skill sources fetched from the manifest. Deliberately not
+# submodules: a submodule records its pin in .gitmodules, and this repo is
+# public, so the roster of skills a person adopted would ship with the engine.
+/vendor/external/
+
 __pycache__/
 *.pyc
 .DS_Store
