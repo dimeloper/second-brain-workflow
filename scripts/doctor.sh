@@ -4,6 +4,8 @@
 #   - the vault's commit guard is wired in as a pre-commit hook, and it's ours
 #   - commits here would be authored as the identity vault.json declares
 #   - a skill installed into one configured skills dir isn't missing from another
+#   - every third-party skill the manifest declares is fetched, at its pinned
+#     sha, and linked — and nothing is linked that no source declares
 #   - a vendored submodule isn't left at the wrong commit after a tag switch
 #   - every repo the registry names still exists, and still carries rendered output
 #   - every repo on this machine that carries rendered output is in the registry
@@ -59,7 +61,7 @@ while [ $# -gt 0 ]; do
     # the closing paragraph mid-sentence each time a bullet was added.
     # tests/test-registry-scan.sh asserts the final line still reaches the
     # reader, so the next edit here cannot truncate it silently.
-    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -411,11 +413,153 @@ EOF
   return 0
 }
 
+# Whether the machine actually holds the third-party skills its manifest
+# declares. Three distinct drifts, none of which anything else reports:
+#
+#   declared but not linked   the manifest gained a skill and nobody re-synced,
+#                             so it is a roster entry that does nothing
+#   pinned but not at the pin the checkout sits at a different sha than the
+#                             manifest names, so two machines reading one
+#                             manifest are running different skills — the exact
+#                             failure pinning exists to prevent, and invisible
+#                             because a wrong-sha skill works fine
+#   linked but not declared   a skill dropped from `allow` whose link survives,
+#                             because pruning only happens on a sync that runs
+#
+# Detection only, like every other check here. Repairing the first would need a
+# sync, the second a fetch — both network or filesystem writes, and doctor is
+# read-only by contract.
+#
+# Deliberately reports through the *configured* dirs for the not-linked case and
+# the union for the not-declared case, mirroring the split between check_skills
+# and check_orphaned_skills: "you have not installed this yet" is only meaningful
+# about directories you asked for, while "this is left over" is meaningful
+# anywhere it landed.
+check_roster() {
+  local rows sources status name path source current clean=1
+  local dir linked ok_paths="" sname sref sdir target
+
+  # Nothing declared, nothing to read. Returning before the manifest tool is
+  # invoked at all, rather than invoking it and interpreting its silence: a
+  # check that shells out to read an input that does not exist reports on the
+  # reader instead of the machine, and this one did — every fixture engine
+  # without scripts/lib/skill_manifest.py had its submodule drift re-graded from
+  # "setup unfinished" (1) to "misconfigured" (2) by a roster it never had.
+  if [ -z "${SBW_SKILLS_MANIFEST}" ]; then
+    ok "no third-party skill sources declared"
+    return 0
+  fi
+
+  if ! rows="$(python3 "${STANDARDS_DIR}/scripts/lib/skill_manifest.py" \
+                 resolve --engine "${STANDARDS_DIR}")"; then
+    err "skill manifest unusable (see the error above) — fix it, or unset
+        SBW_SKILLS_MANIFEST in $(ds_config_path) to run with workflow skills only."
+    return 0
+  fi
+
+  if [ -z "${rows}" ]; then
+    if [ -n "${SBW_SKILLS_MANIFEST}" ]; then
+      ok "skill manifest declares no skills (${SBW_SKILLS_MANIFEST})"
+    else
+      ok "no third-party skill sources declared"
+    fi
+    return 0
+  fi
+
+  while IFS="$(printf '\t')" read -r status name path source; do
+    [ -n "${status}" ] || continue
+    case "${status}" in
+      missing-source)
+        clean=0
+        warn "${name}: source '${source}' is declared but not fetched — run $(say_remediation 'make fetch-skills YES=1' './scripts/fetch-skill-sources.sh --yes')"
+        ;;
+      missing-skill)
+        clean=0
+        warn "${name}: not present in source '${source}' at ${path}
+        renamed upstream, or a typo in that source's allow list."
+        ;;
+      ok)
+        ok_paths="${ok_paths}${path}
+"
+        linked=0
+        while IFS= read -r dir; do
+          [ -n "${dir}" ] || continue
+          [ -L "${dir}/${name}" ] || continue
+          [ "$(skill_link_target "${dir}/${name}")" = "${path}" ] && linked=1
+        done <<EOF
+${SKILLS_DIRS_CONFIGURED}
+EOF
+        if [ "${linked}" -eq 0 ]; then
+          clean=0
+          warn "${name}: declared in the manifest and fetched, but not linked into any configured skills dir — run $(say_remediation 'make sync-skills' './scripts/sync-skills.sh')"
+        fi
+        ;;
+    esac
+  done <<EOF
+${rows}
+EOF
+
+  # Pin drift. Read from `sources` rather than from the resolve rows because the
+  # sha is a property of the source, and reporting it once per allowed skill
+  # would print the same finding four times for a source allowing four.
+  if sources="$(python3 "${STANDARDS_DIR}/scripts/lib/skill_manifest.py" \
+                  sources --engine "${STANDARDS_DIR}")"; then
+    while IFS="$(printf '\t')" read -r sname _ sref sdir; do
+      [ -n "${sname}" ] || continue
+      [ -d "${sdir}/.git" ] || continue
+      current="$(git -C "${sdir}" rev-parse HEAD 2>/dev/null || true)"
+      [ -n "${current}" ] || continue
+      [ "${current}" = "${sref}" ] && continue
+      clean=0
+      warn "source '${sname}' is checked out at ${current}
+        but the manifest pins ${sref}. Re-fetch with $(say_remediation 'make fetch-skills YES=1' './scripts/fetch-skill-sources.sh --yes')."
+    done <<EOF
+${sources}
+EOF
+  fi
+
+  # Links into vendor/external that the manifest no longer accounts for. The
+  # union, not the configured set: a link left in a directory the config stopped
+  # naming is exactly the case check_orphaned_skills exists for, and this is the
+  # same shape of leftover one layer in.
+  while IFS= read -r dir; do
+    [ -n "${dir}" ] || continue
+    [ -d "${dir}" ] || continue
+    for entry in "${dir}"/*; do
+      [ -L "${entry}" ] || continue
+      target="$(skill_link_target "${entry}")"
+      case "${target}" in
+        "${STANDARDS_DIR}/vendor/external/"*) ;;
+        *) continue ;;
+      esac
+      case "
+${ok_paths}" in
+        *"
+${target}
+"*) continue ;;
+      esac
+      clean=0
+      warn "$(basename "${entry}"): linked from ${dir} but no manifest source declares it
+        dropped from an allow list, or its source was removed. A sync prunes it:
+        $(say_remediation 'make sync-skills' './scripts/sync-skills.sh')."
+    done
+  done <<EOF
+${SKILLS_DIRS_ALL}
+EOF
+
+  [ "${clean}" -eq 1 ] && ok "every declared third-party skill is fetched at its pin and linked"
+  # Same reason as check_skills and check_submodules: the test above is the last
+  # command, so a finding would make this return 1 and `set -e` would abort the
+  # run before the summary and before the warning/error exit-code split.
+  return 0
+}
+
 echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
 check_author
 check_skills
 check_orphaned_skills
+check_roster
 check_submodules
 check_registry
 

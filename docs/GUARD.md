@@ -287,6 +287,17 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   configured skills directory but missing from another is invisible from
   whichever agent reads the second one. See the README's
   [Skills](../README.md#skills) section.
+- **Skill-roster parity** — the third-party skills a `skills.json` declares,
+  against what is actually on this machine, in three directions: a source that
+  was never fetched, a source whose checkout sits at a **different sha** than the
+  manifest pins, and a link that no source declares any more (a skill dropped
+  from an `allow` list, whose link survives until a sync prunes it). The middle
+  one is the reason this check exists: a wrong-sha skill works perfectly, so two
+  machines can be running different versions of the same adopted skill with
+  nothing anywhere reporting it. Skipped entirely when no manifest is configured
+  — the check reads a declared roster, so with none declared there is nothing to
+  compare and it must not manufacture a finding. See the README's
+  [Bringing your own skills](../README.md#bringing-your-own-skills) section.
 - **Vendored submodule drift** — `vendor/obsidian-skills` checked out at a
   commit other than the one this engine checkout's tag actually pins, the
   state a bare `git checkout <tag>` leaves behind. See the README's
