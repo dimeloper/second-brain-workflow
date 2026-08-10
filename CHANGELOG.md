@@ -17,6 +17,52 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-10
+
+No **Major** entry: `applies_to` and `candidates` are optional, and a manifest
+without them behaves exactly as before.
+
+### Added
+- **`make skills-for REPO=...`** — which adopted skills are scoped to a repo, and
+  which declared candidates are worth considering there. The second list is the
+  point, and it is the one question an agent host cannot answer for itself: it
+  routes to the skills that are **installed** and can say nothing about one that
+  exists and is not. That knowledge belongs to whoever keeps the roster, so it
+  lives beside the roster rather than being inferred.
+
+  Sources gain an optional `applies_to` glob list. A new top-level `candidates`
+  array records skills deliberately *not* adopted — `name`, `repo` and `when`
+  required, `install` and `applies_to` optional. `when` should name the **cost**
+  as well as the benefit; the reason to read the list is to decide.
+
+- **`onboard-repo` step 2b** runs it and **reports without installing.** Adopting
+  a skill is a standing choice about every future session in every repo, and
+  several write into the project — a design linter registering an edit-time hook,
+  a screenshot tool scaffolding a whole Next.js app. It names the candidate, names
+  the cost, and leaves the decision. Skipped silently when no manifest is
+  configured, which is a supported state.
+
+- **Any `//`-prefixed key is a comment**, at every level, so each section of a
+  manifest can carry its own note. JSON has no comment syntax and a roster of
+  other people's skills is exactly the file that needs prose, since the reason
+  each one is in or out is what decays fastest. A typo still fails — it does not
+  start with two slashes.
+
+### Changed
+- Relevance reports **three** buckets, not two. An entry with no `applies_to` is
+  *unscoped* and reported as applying everywhere, never as a miss: it was never
+  claimed to be repo-specific, so calling it irrelevant asserts something nobody
+  said.
+- `**/x` matches the repo root. `fnmatch` alone demands a literal slash, so the
+  file at the top level — the single most likely place to look — would be missed.
+- Repo files come from `git ls-files` where the repo has an index, so
+  `node_modules` and build output are never walked; a bounded fallback covers a
+  repo not yet under git.
+- A skill both allowed by a source and listed as a candidate is refused. The two
+  are contradictory states and the contradiction is silent: onboarding would
+  suggest installing something already linked.
+- Suite 805 → 825 assertions.
+
 ## [0.12.0] - 2026-08-10
 
 No **Major** entry: `provisional:` is a new optional key, and a rules directory
@@ -1040,7 +1086,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.9.0...v0.10.0
