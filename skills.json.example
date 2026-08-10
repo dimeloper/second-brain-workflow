@@ -35,7 +35,13 @@
     "                 the one roster that was chosen wholesale turned out to want",
     "                 three of six.",
     "  skills_subdir  optional, defaults to 'skills'. Where in that repo the",
-    "                 skill directories live.",
+    "                 skill directories live. Use '.' for a suite that puts skill",
+    "                 directories at its repo root.",
+    "  license        optional, free text (an SPDX id, or a sentence about why",
+    "                 there isn't one). Omitting it WARNS on every run: what you",
+    "                 are allowed to do with someone else's content is asked once",
+    "                 at adoption and then never again, so it wants a mechanical",
+    "                 prompt. An unlicensed repo is all-rights-reserved by default.",
     "  applies_to     optional path globs. Purely for reporting: `make skills-for",
     "                 REPO=...` and the onboard-repo skill use it to say which",
     "                 skills are scoped to a repo. Omit it and the skill is",
@@ -60,6 +66,7 @@
       "name": "example-motion",
       "repo": "https://github.com/example/motion-skills",
       "ref": "0000000000000000000000000000000000000000",
+      "license": "MIT",
       "allow": ["animate", "review-animations"]
     },
     {
@@ -67,6 +74,7 @@
       "repo": "https://github.com/example/store-screenshots",
       "ref": "0000000000000000000000000000000000000000",
       "skills_subdir": "skills",
+      "license": "MIT",
       "applies_to": ["app.json", "app.config.*", "eas.json"],
       "allow": ["app-store-screenshots"]
     }
@@ -80,6 +88,7 @@
     {
       "name": "example-design-linter",
       "repo": "https://github.com/example/design-linter",
+      "license": "Apache-2.0",
       "when": "design-heavy frontend wanting a visual-polish pass. Invasive: writes files at the project root and registers an edit-time hook. Project scope only, never global.",
       "install": "npx example-design-linter install --scope=project",
       "applies_to": ["**/*.tsx", "**/*.css"]

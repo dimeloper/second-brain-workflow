@@ -483,6 +483,72 @@ case "${out_rooted}" in
   *) fail "'**/*.tsx' matches a file at the repo root" "${out_rooted}" ;;
 esac
 
+# --- license: a warning, not a gate -----------------------------------------
+# "What am I allowed to do with this" gets asked once at adoption and then never
+# again, which is exactly the kind of question that wants a mechanical prompt.
+# Not fatal, because the answer is a judgement this script cannot make.
+nolic="${SANDBOX}/nolicense.json"
+write_manifest "${nolic}" "{\"sources\":[{\"name\":\"fix\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"allow\":[]}]}"
+out_nolic="$(SBW_SKILLS_MANIFEST="${nolic}" python3 "${MANIFEST_PY}" validate 2>&1)"
+assert_exit 0 $? "a source with no license still validates"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nolic}" in
+  *"no 'license' recorded for 'fix'"*"all-rights-reserved by default"*)
+    pass "a source with no license warns, naming the repo and the default" ;;
+  *) fail "a source with no license warns, naming the repo and the default" "${out_nolic}" ;;
+esac
+
+haslic="${SANDBOX}/haslicense.json"
+write_manifest "${haslic}" "{\"sources\":[{\"name\":\"fix\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[]}]}"
+out_haslic="$(SBW_SKILLS_MANIFEST="${haslic}" python3 "${MANIFEST_PY}" validate 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_haslic}" in
+  *"no 'license' recorded"*) fail "a recorded license silences the warning" "${out_haslic}" ;;
+  *) pass "a recorded license silences the warning" ;;
+esac
+
+# Blank is an error rather than a silent pass: it looks answered and is not, which
+# is worse than omitting the key, whose warning at least says what is missing.
+bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"\",\"allow\":[]}]}" \
+  "'license' must be a non-empty string" "a blank license is an error, not a warning"
+
+# A candidate's license is shown at the moment of decision, and free text is
+# allowed so "there isn't one" can be recorded as the finding it is.
+lic_rel="${SANDBOX}/lic-relevant.json"
+write_manifest "${lic_rel}" "{\"sources\":[],\"candidates\":[{\"name\":\"unl\",\"repo\":\"https://example.invalid/unl\",\"license\":\"none upstream, all rights reserved\",\"when\":\"blocked\",\"applies_to\":[\"**/*.tsx\"]}]}"
+out_lic="$(SBW_SKILLS_MANIFEST="${lic_rel}" python3 "${MANIFEST_PY}" relevant --repo "${ROOTED}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_lic}" in
+  *"[none upstream, all rights reserved]"*) pass "a candidate's license is shown in the report" ;;
+  *) fail "a candidate's license is shown in the report" "${out_lic}" ;;
+esac
+
+nolic_rel="${SANDBOX}/lic-none.json"
+write_manifest "${nolic_rel}" "{\"sources\":[],\"candidates\":[{\"name\":\"unk\",\"repo\":\"https://example.invalid/unk\",\"when\":\"unknown terms\",\"applies_to\":[\"**/*.tsx\"]}]}"
+out_unk="$(SBW_SKILLS_MANIFEST="${nolic_rel}" python3 "${MANIFEST_PY}" relevant --repo "${ROOTED}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_unk}" in
+  *"[license not recorded]"*) pass "a candidate with no license says so rather than staying quiet" ;;
+  *) fail "a candidate with no license says so rather than staying quiet" "${out_unk}" ;;
+esac
+
+# --- a source whose skills sit at the repo root ------------------------------
+# Undocumented until now, and worth pinning: several suites put skill directories
+# at the top level rather than under skills/.
+ROOTSRC="${SANDBOX}/engine-root"
+mkdir -p "${ROOTSRC}/scripts" "${ROOTSRC}/vendor/external/flat/design-review"
+cp -R "${ENGINE}/scripts/lib" "${ROOTSRC}/scripts/lib"
+printf -- '---\nname: design-review\ndescription: fixture\n---\nbody\n' \
+  > "${ROOTSRC}/vendor/external/flat/design-review/SKILL.md"
+flat="${SANDBOX}/flat.json"
+write_manifest "${flat}" "{\"sources\":[{\"name\":\"flat\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"skills_subdir\":\".\",\"allow\":[\"design-review\"]}]}"
+out_flat="$(SBW_SKILLS_MANIFEST="${flat}" python3 "${MANIFEST_PY}" resolve --engine "${ROOTSRC}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_flat}" in
+  ok*design-review*) pass "skills_subdir '.' resolves a source whose skills are at its root" ;;
+  *) fail "skills_subdir '.' resolves a source whose skills are at its root" "${out_flat}" ;;
+esac
+
 # --- candidate validation ---------------------------------------------------
 bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[\"animate\"]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
   "cannot be both adopted and merely suggested" \

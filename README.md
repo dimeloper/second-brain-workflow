@@ -384,6 +384,11 @@ Three rules worth knowing before you write one:
   is accepted with a warning; the placeholder from the example is refused.
 - **`allow` is required and per-source.** There is no "install everything" —
   every adopted skill is charged against the same session budget as your own.
+- **Record the `license`.** Omitting it warns on every run. What you are allowed
+  to do with someone else's content gets asked once at adoption and then never
+  again, which is exactly the kind of question that wants a mechanical prompt —
+  an unlicensed repo is all-rights-reserved by default. Free text, so "there
+  isn't one" can be recorded as the finding it is.
 - **A skill of yours wins.** A same-named local skill shadows the adopted one,
   and the sync says so rather than silently preferring one.
 
@@ -418,7 +423,8 @@ The second list is the point, and it is the one thing an agent host cannot do fo
 itself: it routes to the skills that are **installed** and can say nothing about
 one that exists and is not. Add `applies_to` globs to a source to scope it, and a
 top-level `candidates` array for skills you have deliberately *not* adopted —
-`name`, `repo` and `when` required, `install` and `applies_to` optional. Write
+`name`, `repo` and `when` required, `install`, `license` and `applies_to`
+optional. Write
 `when` about the **cost** as well as the benefit; the reason to read the list is
 to decide.
 

@@ -56,7 +56,7 @@ SOURCE_KEYS_REQUIRED = ("name", "repo", "allow")
 # still be a valid manifest. An example that has to be edited before it parses is
 # an example whose first run fails for a reason that has nothing to do with the
 # reader's own mistake.
-SOURCE_KEYS_OPTIONAL = ("ref", "skills_subdir", "//", "applies_to")
+SOURCE_KEYS_OPTIONAL = ("ref", "skills_subdir", "//", "applies_to", "license")
 
 
 # Any key starting with "//" is a comment and is ignored, at every level. JSON has
@@ -75,7 +75,7 @@ TOP_KEYS = ("sources", "candidates", "//")
 # because some candidates are adopted by editing this file rather than by running
 # anything, and the reporter says so when it is absent.
 CANDIDATE_KEYS_REQUIRED = ("name", "repo", "when")
-CANDIDATE_KEYS_OPTIONAL = ("install", "applies_to", "//")
+CANDIDATE_KEYS_OPTIONAL = ("install", "applies_to", "//", "license")
 CANDIDATE_KEYS = CANDIDATE_KEYS_REQUIRED + CANDIDATE_KEYS_OPTIONAL
 
 # The ref the example ships. Refused outright rather than warned about: it is a
@@ -218,6 +218,19 @@ def parse(text, origin="manifest"):
                     % (where, skill, seen_skills[skill]))
             seen_skills[skill] = name
 
+        # Absent is a warning, not an error. You are installing someone else's
+        # content into every session on this machine, and "what am I allowed to
+        # do with this" is a question that gets asked once and then never again —
+        # which is precisely the kind that wants a mechanical prompt. Not fatal,
+        # because the answer is a judgement the operator makes, not one this
+        # script can make for them.
+        license_ = _license(raw.get("license"), where)
+        if not license_:
+            warnings.append(
+                "%s: no 'license' recorded for '%s' (%s). Check it before "
+                "adopting — an unlicensed repo is all-rights-reserved by default"
+                % (where, name, repo.strip()))
+
         subdir = raw.get("skills_subdir", DEFAULT_SKILLS_SUBDIR)
         if not isinstance(subdir, str) or not subdir.strip():
             raise ManifestError(
@@ -231,10 +244,22 @@ def parse(text, origin="manifest"):
             "skills_subdir": subdir.strip().strip("/"),
             "allow": [entry.strip() for entry in allow],
             "applies_to": _globs(raw.get("applies_to"), where),
+            "license": license_,
         })
 
     candidates = _parse_candidates(data.get("candidates"), origin, seen_skills)
     return sources, candidates, warnings
+
+
+def _license(value, where):
+    """Optional free text — an SPDX id, or a sentence about why there isn't one."""
+    if value is None:
+        return ""
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError(
+            "%s: 'license' must be a non-empty string; omit the key if you have "
+            "not checked yet, which warns rather than passing silently" % where)
+    return value.strip()
 
 
 def _globs(value, where):
@@ -307,6 +332,7 @@ def _parse_candidates(value, origin, adopted_skills):
             raise ManifestError("%s: 'install' must be a string" % where)
 
         candidates.append({
+            "license": _license(raw.get("license"), where),
             "name": name,
             "repo": raw["repo"].strip(),
             "when": raw["when"].strip(),
@@ -545,7 +571,9 @@ def _report_relevant(repo, sources, candidates):
     print("Not adopted, worth considering here: %d" % len(c_match))
     for entry in c_match:
         print("  - %s — %s" % (entry["name"], entry["when"]))
-        print("      %s" % entry["repo"])
+        print("      %s%s" % (entry["repo"],
+                              "  [%s]" % entry["license"] if entry["license"] else
+                              "  [license not recorded]"))
         print("      install: %s" % (entry["install"] or
                                      "add it to skills.json sources, then "
                                      "make fetch-skills YES=1 && make sync-skills"))
