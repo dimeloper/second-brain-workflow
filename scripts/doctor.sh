@@ -216,6 +216,12 @@ check_skills() {
   done <<< "${names}"
 
   [ "${clean}" -eq 1 ] && ok "every installed skill is present in all configured skills directories"
+  # `return 0`, for the same reason check_author has one: the test above is this
+  # function's last command, so with a finding to report it returned 1 — and
+  # under `set -e` that aborted the whole run, silently dropping every later
+  # check and the summary line. A skill missing from one directory is a warning;
+  # it is not a reason to stop looking at the machine.
+  return 0
 }
 
 # Our links in a directory SKILLS_DIRS no longer names. Separate from the
@@ -283,6 +289,11 @@ check_submodules() {
     esac
   done <<< "${status}"
   [ "${clean}" -eq 1 ] && ok "vendored submodule(s) match the commit this checkout pins"
+  # Same as check_skills: without this, a drifted submodule made the function
+  # return 1 and `set -e` exited before the summary — and before the exit-code
+  # split between warnings (1) and misconfiguration (2) could be applied, so an
+  # ERROR earlier in the run was reported as a warning.
+  return 0
 }
 
 echo "second-brain-workflow doctor — vault: ${VAULT}"

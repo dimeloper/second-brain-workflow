@@ -138,6 +138,30 @@ case "${out}" in
 esac
 rm -rf "${EMPTY1}/foreign-tool"
 
+# --- a finding in one check never ends the run -------------------------------
+# check_skills' last command was a bare test, so a run with something to report
+# returned 1 from it — and under `set -e` that ended the script there: no
+# orphaned-skill check, no submodule check, no summary line, and an ERROR raised
+# earlier reported as exit 1 (warnings only) instead of 2 (misconfiguration).
+# Pairing a skills finding with a path that points nowhere pins both halves.
+mkdir -p "${EMPTY1}/foreign-tool"
+echo "not ours" > "${EMPTY1}/foreign-tool/SKILL.md"
+out="$("${DOCTOR}" --vault "${SANDBOX}/no-such-vault" 2>&1)"
+rc=$?
+assert_exit 2 "${rc}" "an error alongside a warning still exits 2, not 1"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no skills of ours are installed outside SKILLS_DIRS"*)
+    pass "checks after the one with a finding still run" ;;
+  *) fail "checks after the one with a finding still run" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"of them misconfiguration"*) pass "and the summary line is still printed" ;;
+  *) fail "and the summary line is still printed" "${out}" ;;
+esac
+rm -rf "${EMPTY1}/foreign-tool"
+
 # --- check_skills(): one of ours, missing from one dir ----------------------
 # A symlink into this engine's own skills/ tree — the fix is sync-skills.sh,
 # not a manual ln -s, since that command alone would propagate it everywhere.
