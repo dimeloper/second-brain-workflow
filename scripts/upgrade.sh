@@ -325,24 +325,65 @@ run_doctor() {
 }
 
 # Step 7: which onboarded repos are behind. Reports; never renders.
+#
+# Two sources, the same pair doctor compares: the registry, and a scan of this
+# machine for repos carrying rendered output. Reading the registry alone told a
+# machine with rendered-but-unregistered repos that "all 1 checkable repo(s) are
+# up to date" immediately before a switch that would stale the rest.
+#
+# A repo the scan found and the registry does not name is drift-checked like any
+# other, because it *is* an onboarded repo — the registry not naming it is a
+# bookkeeping gap, not a reason to skip it. It is labelled in the same line,
+# since `render.py <repo>` closes both at once.
 report_repos() {
-  local file entries repo drift=0 live=0 stale=0 fixes=""
+  local file entries scan targets scope repo drift=0 live=0 stale=0 unreg=0 label
   heading "Onboarded repos (render --check, nothing is rendered)"
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
+  scope="$(sbw_scan_scope_line)"
+  # Roots validated here, walk captured after: the command substitution below is
+  # a subshell and would take the skipped-root record with it when it exits.
+  sbw_scan_prepare_roots
+  scan="$(sbw_scan_rendered_repos)"
+
   if [ "${APPLY}" -eq 0 ]; then
     echo "  (drift is measured against the current checkout, not ${TARGET_REF})"
   fi
 
-  if [ -z "${entries}" ]; then
-    local why="there is no registry at ${file}"
-    [ ! -f "${file}" ] || why="${file} lists no repos"
-    report_undetermined "${why}"
+  while IFS= read -r repo; do
+    [ -n "${repo}" ] || continue
+    warn "scan root skipped: ${repo}"
+  done <<EOF
+${SBW_SCAN_SKIPPED}
+EOF
+
+  # The one state still genuinely undetermined: no second source ran, so the
+  # registry cannot be compared against anything and a count from it alone would
+  # be the guess this whole check exists to refuse.
+  if [ "${SBW_SCAN_USABLE}" -eq 0 ]; then
+    report_undetermined "no scan root could be read"
+    say_scan_scope "${scope}"
     return 0
   fi
 
+  # Registry ∪ scan. A path in both is one path; sort -u decides that, not the
+  # order they arrive in.
+  targets="$(printf '%s\n%s\n' "${entries}" "${scan}" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u)"
+
   while IFS= read -r repo; do
     [ -n "${repo}" ] || continue
+    label=""
+    case "
+${entries}
+" in
+      *"
+${repo}
+"*) ;;
+      *) label=" (not in the registry)"; unreg=$((unreg + 1)) ;;
+    esac
+
+    # Only a registry entry can be missing or unrendered — the scan found what it
+    # found by looking at what is there.
     if [ ! -d "${repo}" ]; then
       stale=$((stale + 1))
       warn "registered, but not there: ${repo} — cannot be checked"
@@ -353,26 +394,23 @@ report_repos() {
       warn "registered, but carries no rendered output: ${repo} — cannot be checked"
       continue
     fi
+
     live=$((live + 1))
     if "${STANDARDS_DIR}/scripts/render.py" "${repo}" --check >/dev/null 2>&1; then
-      ok "up to date: ${repo}"
+      ok "up to date: ${repo}${label}"
+      [ -z "${label}" ] || echo "        register it: ./scripts/render.py ${repo}"
     else
       drift=$((drift + 1))
-      echo "  DRIFT ${repo}"
-      echo "        fix: ./scripts/render.py ${repo}"
-      fixes="${fixes}${repo}"$'\n'
+      echo "  DRIFT ${repo}${label}"
+      if [ -z "${label}" ]; then
+        echo "        fix: ./scripts/render.py ${repo}"
+      else
+        echo "        fix: ./scripts/render.py ${repo} — re-renders it and registers it"
+      fi
     fi
   done <<EOF
-${entries}
+${targets}
 EOF
-
-  # Every entry stale is the same state as no registry: nothing here can be
-  # checked, so the set of repos needing a re-render is unknown rather than
-  # empty.
-  if [ "${live}" -eq 0 ]; then
-    report_undetermined "all ${stale} registered path(s) have gone stale"
-    return 0
-  fi
 
   if [ "${drift}" -gt 0 ]; then
     findings=$((findings + 1))
@@ -384,12 +422,34 @@ EOF
       echo "  ${drift} of ${live} checkable repo(s) need re-rendering, with the commands above."
     fi
     echo "  This script does not render: --check reports, you decide."
+  elif [ "${live}" -eq 0 ]; then
+    # Determined, not unknown: the scan ran and found nothing, within a boundary
+    # that is printed below. What is refused is a count with no boundary at all.
+    ok "no repos carry rendered output here, and the registry names none"
   elif preview_of_another_version; then
     ok "all ${live} repo(s) match the current checkout — expect all ${live} to need"
     note "re-rendering after switching to ${TARGET_REF}"
   else
     ok "all ${live} checkable repo(s) are up to date"
   fi
+
+  # An unregistered repo is a finding even when it is up to date: the next run of
+  # anything that reads the registry alone will not know it exists.
+  if [ "${unreg}" -gt 0 ]; then
+    findings=$((findings + 1))
+    echo "  ${unreg} of those carr(ies) rendered output the registry does not name."
+    echo "  Rendering each registers it; leave the ones you have abandoned."
+  fi
+
+  say_scan_scope "${scope}"
+}
+
+# Printed on every report, clean ones included. A scan cannot claim completeness,
+# so a result that does not state its boundary is a stronger claim than this can
+# support — and "nothing to do" is exactly the answer a reader takes as final.
+say_scan_scope() {
+  echo "        scanned scope: $1"
+  echo "        (a repo outside it — another volume, nested deeper — is not covered)"
 }
 
 # In preview, --check has run against the checkout as it stands, so a clean
@@ -408,18 +468,21 @@ preview_of_another_version() {
   [ "${APPLY}" -eq 0 ] && [ "$(ver_cmp "${CURRENT}" "${TARGET_VERSION}")" != "eq" ]
 }
 
-# Never a count. "0 repos need re-rendering" is the answer that reads as
-# success while leaving every repo on this machine at a stale render.
+# Never a count. "0 repos need re-rendering" is the answer that reads as success
+# while leaving every repo on this machine at a stale render.
+#
+# What used to live here was a find command for the reader to run, carrying the
+# second copy of a rule that had drifted from what counts as a rendered repo
+# everywhere else — it matched AGENTS.md alone, so a repo with a hand-written or
+# absent AGENTS.md was invisible to it. The scan does that job now, which leaves
+# this function the one state that is genuinely unknown: the scan could not run.
 report_undetermined() {
   undetermined=1
   echo "  ERROR the onboarded repo set is undetermined — $1"
   note "so this run cannot tell you which repos need re-rendering, and will not"
-  note "report that none do."
-  note "Every render records itself; repos onboarded before that did not. List"
-  note "the ones carrying a provenance marker with:"
-  note "  find \"\$HOME\" -maxdepth 5 -type d \\( -name node_modules -o -name Library -o -name .git -o -name vaults \\) -prune \\"
-  note "    -o -name AGENTS.md -exec grep -l second-brain-workflow {} + 2>/dev/null | sed 's|/AGENTS.md\$||'"
-  note "Re-rendering each hit registers it. Then run this again."
+  note "report that none do: with no scan, the registry has nothing to be"
+  note "compared against, and it only holds what renders recorded."
+  note "Point SBW_SCAN_ROOTS at a directory that exists, then run this again."
 }
 
 # Step 8: the vault's CI pins. Reported only — the vault is its own repo, and

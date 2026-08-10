@@ -44,7 +44,17 @@ write release notes, not two to keep in sync by hand.
   now a *determined* result reported within its stated boundary, where v0.9.1
   called it undetermined. Undetermined survives, narrowed to the state that
   genuinely is: no configured root could be read, so there was no second source.
-  `upgrade.sh` still reads the registry alone — that follows.
+- **`upgrade.sh` reads the same two sources.** `report_repos` read the registry
+  alone, so a machine with rendered repos the registry does not name was told
+  "all 1 checkable repo(s) are up to date" immediately before a switch that would
+  stale the rest. It now scans, drift-checks what it finds whether or not the
+  registry names it — an unregistered onboarded repo is still an onboarded repo —
+  labels it in the same line (one `render.py <repo>` closes both gaps), and prints
+  the scan's scope on every report. `report_undetermined` loses its copy of the
+  `find` and keeps the one state that is genuinely unknown: a scan that could not
+  run. Exit codes are otherwise unchanged, and an unregistered repo is a finding
+  (`1`) even when it is up to date, because the next tool to read the registry
+  alone will not know it exists.
 
 ### Added
 - **A repo registry, so the set of onboarded repos is known rather than

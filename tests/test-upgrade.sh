@@ -153,7 +153,12 @@ at_version() { git -C "${FIX}" checkout -q "v$1"; }
 head_sha() { git -C "${FIX}" rev-parse HEAD; }
 at_version 0.9.0
 
-upgrade() { "${UPGRADE}" --no-fetch --vault "${VAULT}" "$@" >"${OUT}" 2>&1; }
+# SCAN_ROOTS defaults to the sandbox HOME, where nothing is rendered, so a case
+# that says nothing about the scan behaves as it did before there was one.
+upgrade() {
+  SBW_SCAN_ROOTS="${SCAN_ROOTS:-${HOME}}" \
+    "${UPGRADE}" --no-fetch --vault "${VAULT}" "$@" >"${OUT}" 2>&1
+}
 
 # The registry stores realpaths, and on macOS $TMPDIR resolves /var -> /private/var
 # — so an assertion naming an unresolved sandbox path compares two spellings of
@@ -313,36 +318,109 @@ else
   fail "drift makes the run non-zero" "$(cat "${OUT}")"
 fi
 
-# --- no registry at all: fail closed ----------------------------------------
-# The load-bearing case. "0 repos need re-rendering" reads as success and leaves
-# every repo on the machine at a stale render indefinitely.
-( XDG_CONFIG_HOME="${SANDBOX}/no-registry" \
+# --- no registry, and nothing found either -----------------------------------
+# v0.9.1 called this undetermined, because the registry was the only source. The
+# scan is a second one, so an empty registry plus an empty scan is a determined
+# result — stated inside the boundary it holds within, which is what separates it
+# from the confident zero that reads as success.
+EMPTY_SCAN="${SANDBOX}/nothing-rendered-here"
+mkdir -p "${EMPTY_SCAN}"
+( XDG_CONFIG_HOME="${SANDBOX}/no-registry" SBW_SCAN_ROOTS="${EMPTY_SCAN}" \
   "${UPGRADE}" --no-fetch --vault "${VAULT}" --ref v0.9.1 >"${OUT}" 2>&1 )
 rc=$?
-assert_exit 3 "${rc}" "no registry: the run exits non-zero"
+out_has "no repos carry rendered output here, and the registry names none" \
+  "no registry and an empty scan is a determined result"
+out_lacks "undetermined" "and is not called undetermined"
+out_lacks "0 repo" "still never a count of zero repos"
+out_lacks "0 of" "and never zero-of-anything either"
+out_has "scanned scope: roots=${EMPTY_SCAN}" "with the boundary that result holds within"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${rc}" -ne 3 ]; then
+  pass "and it does not exit 3, which now means something narrower"
+else
+  fail "and it does not exit 3, which now means something narrower" "$(cat "${OUT}")"
+fi
+
+# --- the scan cannot run: the one state still undetermined -------------------
+( XDG_CONFIG_HOME="${SANDBOX}/no-registry" \
+  SBW_SCAN_ROOTS="${SANDBOX}/no-such-root:${SANDBOX}/nor-this-one" \
+  "${UPGRADE}" --no-fetch --vault "${VAULT}" --ref v0.9.1 >"${OUT}" 2>&1 )
+rc=$?
+assert_exit 3 "${rc}" "no readable scan root: the run exits 3"
 out_has "onboarded repo set is undetermined" "and says the set is undetermined"
 out_has "will not" "and that it will not claim otherwise"
-out_lacks "0 repo" "never a count of zero repos"
-out_lacks "0 of" "and never zero-of-anything either"
-out_has "find \"\$HOME\" -maxdepth 5" "and names the command that seeds a registry"
+out_lacks "0 repo" "with no count of zero repos"
+out_lacks "0 of" "and no zero-of-anything either"
+out_has "scan root skipped: ${SANDBOX}/no-such-root" "naming the root it could not read"
+out_lacks "find \"\$HOME\"" "and printing no find command for the reader to run"
+
+# --- registry empty, but the scan finds a repo -------------------------------
+# The pre-registry machine. Nothing in the registry, a real onboarded repo on
+# disk: reporting "nothing to do" here is the failure this pair of commits is
+# about, and it is no longer reachable.
+SCAN_ROOT="${SANDBOX}/scan-root"
+UNREG="${SCAN_ROOT}/repo-unregistered"
+mkdir -p "${SCAN_ROOT}"
+make_target_repo "${UNREG}"
+# Rendered with its registry pointed elsewhere, so this machine's registry never
+# learns about it — which is exactly the state a pre-registry render leaves.
+( XDG_CONFIG_HOME="${SANDBOX}/elsewhere" "${FIX}/scripts/render.py" "${UNREG}" >/dev/null 2>&1 )
+( XDG_CONFIG_HOME="${SANDBOX}/no-registry" SBW_SCAN_ROOTS="${SCAN_ROOT}" \
+  "${UPGRADE}" --no-fetch --vault "${VAULT}" --ref v0.9.1 >"${OUT}" 2>&1 )
+rc=$?
+out_has "$(real "${UNREG}") (not in the registry)" \
+  "an empty registry does not hide a repo the scan found"
+out_lacks "undetermined" "and that is a determined answer, not an unknown"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${rc}" -ne 3 ]; then
+  pass "so the run does not exit 3"
+else
+  fail "so the run does not exit 3" "$(cat "${OUT}")"
+fi
 
 # --- a registry whose every entry has gone stale ----------------------------
+# Still reported, no longer undetermined: the scan ran, so the set is known — it
+# is the registry's contents that are wrong, and that is a finding.
 STALE_HOME="${SANDBOX}/stale-registry"
 mkdir -p "${STALE_HOME}/second-brain-workflow"
 printf '%s\n%s\n' "${SANDBOX}/gone-one" "${SANDBOX}/gone-two" \
   > "${STALE_HOME}/second-brain-workflow/repos"
-( XDG_CONFIG_HOME="${STALE_HOME}" \
+( XDG_CONFIG_HOME="${STALE_HOME}" SBW_SCAN_ROOTS="${EMPTY_SCAN}" \
   "${UPGRADE}" --no-fetch --vault "${VAULT}" --ref v0.9.1 >"${OUT}" 2>&1 )
 rc=$?
-assert_exit 3 "${rc}" "a wholly stale registry: the run exits non-zero"
-out_has "all 2 registered path(s) have gone stale" "and says why the set is undetermined"
-out_has "onboarded repo set is undetermined" "in the same terms as no registry at all"
+out_has "registered, but not there: ${SANDBOX}/gone-one" "a stale entry is named"
+out_lacks "undetermined" "and no longer makes the whole set undetermined"
 out_lacks "0 repo" "still never a count of zero"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${rc}" = "1" ]; then
+  pass "it is a finding, so the run exits 1"
+else
+  fail "it is a finding, so the run exits 1" "got ${rc}: $(cat "${OUT}")"
+fi
+
+# --- an unregistered repo is drift-checked like any other -------------------
+echo "tampered by hand" >> "${UNREG}/.claude/rules/frontend-angular.md"
+SCAN_ROOTS="${SCAN_ROOT}" upgrade --ref v0.9.1
+rc=$?
+out_has "DRIFT $(real "${UNREG}") (not in the registry)" \
+  "a rendered-but-unregistered repo is drift-checked, and its drift reported"
+out_has "fix: ./scripts/render.py $(real "${UNREG}") — re-renders it and registers it" \
+  "with the one command that closes both gaps"
+out_has "carr(ies) rendered output the registry does not name" \
+  "and the unregistered count is called out on its own"
+out_has "scanned scope: roots=${SCAN_ROOT}" "the scope line prints in preview"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${rc}" -ne 0 ]; then
+  pass "an unregistered repo is a finding"
+else
+  fail "an unregistered repo is a finding" "$(cat "${OUT}")"
+fi
 
 # --- --yes acts, and still never renders ------------------------------------
 drift_before="$(fingerprint "${REPO_DRIFT}")"
+unreg_before="$(fingerprint "${UNREG}")"
 vault_before="$(fingerprint "${VAULT}")"
-upgrade --ref v0.9.1 --yes
+SCAN_ROOTS="${SCAN_ROOT}" upgrade --ref v0.9.1 --yes
 rc=$?
 out_has "checked out v0.9.1" "--yes switches the checkout"
 out_has "Summary" "and the run completes despite rewriting its own script mid-run"
@@ -367,6 +445,13 @@ else
   fail "and the vault is untouched"
 fi
 out_has "DRIFT $(real "${REPO_DRIFT}")" "and the drift is still reported, not fixed"
+out_has "scanned scope: roots=${SCAN_ROOT}" "the scope line prints under --yes too"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "$(fingerprint "${UNREG}")" = "${unreg_before}" ]; then
+  pass "and the unregistered repo is byte-identical too — it is checked, not adopted"
+else
+  fail "and the unregistered repo is byte-identical too — it is checked, not adopted"
+fi
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${rc}" -ne 0 ]; then
   pass "and the run is non-zero while drift remains"
