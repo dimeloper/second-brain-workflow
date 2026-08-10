@@ -594,12 +594,15 @@ it is read from the target ref's own changelog rather than the working tree's.
 Then, in order: refuse if the checkout is dirty or holds local commits the
 target doesn't contain, switch the checkout, update the submodule, re-link
 skills, run [`doctor`](docs/GUARD.md#make-doctor) inline, run `render.py
---check` across the [repo registry](#the-repo-registry) reporting drift per
-repo with the exact command that fixes each, and report a vault CI `ENGINE_REF`
-left behind the target.
+--check` across every onboarded repo — from the registry *and* the scan, so a
+repo the registry does not name is still checked — reporting drift per repo with
+the exact command that fixes each, and report a vault CI `ENGINE_REF` left
+behind the target.
 
-In preview, that drift is measured against the checkout as it stands, so its
-counts are lower bounds and the summary line says so: switching stamps a new
+Every one of those reports states the scan's scope, on clean runs too — see
+[the repo registry](#the-repo-registry). In preview, drift is measured against
+the checkout as it stands, so its counts are lower bounds and the summary line
+says so: switching stamps a new
 version into every rendered file and into `.sbw-version`, so expect every
 registered repo to need re-rendering afterwards. A preview targeting the
 version already checked out has nothing pending, and says it plainly.
@@ -610,9 +613,12 @@ you decide; a stale `ENGINE_REF` is named, not edited.
 `make upgrade REF=v0.9.0` targets a specific tag instead of the newest, and
 `NO_FETCH=1` skips contacting the remote. Exit codes: `0` nothing to act on,
 `1` findings, `2` refused (or `doctor` found a misconfiguration), `3` **the
-onboarded repo set is undetermined** — a missing, empty or wholly stale
-registry means the question "which repos need re-rendering" has no answer, and
-the run says so and fails rather than printing a zero that reads as success.
+onboarded repo set is undetermined** — meaning no scan root could be read, so
+there was no second source to compare the registry against and the question
+"which repos need re-rendering" has no answer. The run says so and fails rather
+than printing a zero that reads as success. An empty registry is *not* that
+state: the scan answers it, and a repo it finds is drift-checked and labelled
+as unregistered, with one command that re-renders and registers it.
 
 **Rollback:** in the engine checkout,
 
