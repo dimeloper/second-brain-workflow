@@ -432,6 +432,15 @@ A skill with no `applies_to` is reported as applying everywhere rather than as a
 miss — it was never claimed to be repo-specific, so calling it irrelevant would
 assert something nobody said.
 
+A candidate carries an optional `status`: `suggested` (default), `adopted` or
+`declined`. Only `suggested` gets pitched — the other two are decisions already
+made, listed one line each under *Already decided, not pitched*. They stay in the
+list rather than being deleted, because **the value of a rejected option is the
+reason it was rejected**; delete the entry and the next session re-evaluates from
+scratch and may reach a different answer for no new reason. `adopted` also covers
+a skill installed the vendor's own way, which is genuinely adopted while
+appearing in no source's `allow` list.
+
 The `onboard-repo` skill runs this at step 2b and **reports without installing**:
 adopting a skill is a standing choice about every future session, and several
 write into the project.

@@ -75,7 +75,19 @@ TOP_KEYS = ("sources", "candidates", "//")
 # because some candidates are adopted by editing this file rather than by running
 # anything, and the reporter says so when it is absent.
 CANDIDATE_KEYS_REQUIRED = ("name", "repo", "when")
-CANDIDATE_KEYS_OPTIONAL = ("install", "applies_to", "//", "license")
+CANDIDATE_KEYS_OPTIONAL = ("install", "applies_to", "//", "license", "status")
+
+# A candidate's standing. "suggested" is the default and the only one that gets
+# pitched by the relevance report; the other two are *decisions already made*.
+#
+# They are kept in the same list rather than deleted, because the value of a
+# rejected option is the reason it was rejected — delete the entry and the next
+# session re-evaluates from scratch and may well reach a different answer for no
+# new reason. And "adopted" exists because a skill installed the vendor's own way
+# (its own installer, a real directory sync-skills.sh refuses to touch) is
+# genuinely adopted while never appearing in any source's allow list, so without
+# it the roster cannot describe the installed set.
+CANDIDATE_STATUSES = ("suggested", "adopted", "declined")
 CANDIDATE_KEYS = CANDIDATE_KEYS_REQUIRED + CANDIDATE_KEYS_OPTIONAL
 
 # The ref the example ships. Refused outright rather than warned about: it is a
@@ -327,12 +339,20 @@ def _parse_candidates(value, origin, adopted_skills):
             if not isinstance(raw[key], str) or not raw[key].strip():
                 raise ManifestError("%s: '%s' must be a non-empty string" % (where, key))
 
+        status = raw.get("status", "suggested")
+        if not isinstance(status, str) or status.strip() not in CANDIDATE_STATUSES:
+            raise ManifestError(
+                "%s: 'status' must be one of %s, got %r"
+                % (where, ", ".join(CANDIDATE_STATUSES), status))
+        status = status.strip()
+
         install = raw.get("install", "")
         if not isinstance(install, str):
             raise ManifestError("%s: 'install' must be a string" % where)
 
         candidates.append({
             "license": _license(raw.get("license"), where),
+            "status": status,
             "name": name,
             "repo": raw["repo"].strip(),
             "when": raw["when"].strip(),
@@ -554,7 +574,10 @@ def _report_relevant(repo, sources, candidates):
                             "source": source["name"]})
 
     a_match, a_unscoped, _ = relevant(adopted, files)
-    c_match, c_unscoped, _ = relevant(candidates, files)
+    undecided = [c for c in candidates if c["status"] == "suggested"]
+    decided = [c for c in candidates if c["status"] != "suggested"]
+    c_match, c_unscoped, _ = relevant(undecided, files)
+    d_match, d_unscoped, _ = relevant(decided, files)
 
     print("skills relevant to %s  (%d file(s) considered)" % (repo, len(files)))
     print()
@@ -580,6 +603,16 @@ def _report_relevant(repo, sources, candidates):
     for entry in c_unscoped:
         print("  - %s — %s (no applies_to; relevance is yours to judge)"
               % (entry["name"], entry["when"]))
+
+    # One line each, not the full pitch. Printed rather than filtered out so the
+    # decision stays visible — a roster that silently omitted what was rejected
+    # would invite re-litigating it, which is the cost the reason was written to
+    # avoid. Zero is printed too, for the same reason the other counts are.
+    already = d_match + d_unscoped
+    print()
+    print("Already decided, not pitched: %d" % len(already))
+    for entry in already:
+        print("  - %s [%s]" % (entry["name"], entry["status"]))
     return 0
 
 

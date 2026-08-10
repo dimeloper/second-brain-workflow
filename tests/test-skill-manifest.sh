@@ -483,6 +483,42 @@ case "${out_rooted}" in
   *) fail "'**/*.tsx' matches a file at the repo root" "${out_rooted}" ;;
 esac
 
+# --- candidate status: a decision, recorded but not pitched ------------------
+# A decided candidate stays in the list rather than being deleted, because the
+# value of a rejected option is the reason it was rejected — delete it and the
+# next session re-evaluates from scratch and may reach a different answer for no
+# new reason. `adopted` exists because a skill installed the vendor's own way is
+# genuinely adopted while appearing in no source's allow list.
+st="${SANDBOX}/status.json"
+write_manifest "${st}" '{"sources":[],"candidates":[{"name":"pitch-me","repo":"r","when":"undecided","applies_to":["**/*.tsx"]},{"name":"took-it","repo":"r","status":"adopted","when":"installed the vendor way","applies_to":["**/*.tsx"]},{"name":"passed-on-it","repo":"r","status":"declined","when":"needs a second runtime","applies_to":["**/*.tsx"]}]}'
+out_st="$(SBW_SKILLS_MANIFEST="${st}" python3 "${MANIFEST_PY}" relevant --repo "${ROOTED}" 2>&1)"
+assert_exit 0 $? "a manifest with candidate statuses validates"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_st}" in
+  *"Not adopted, worth considering here: 1"*) pass "only an undecided candidate is pitched" ;;
+  *) fail "only an undecided candidate is pitched" "${out_st}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_st}" in
+  *"Already decided, not pitched: 2"*) pass "decided candidates are counted separately" ;;
+  *) fail "decided candidates are counted separately" "${out_st}" ;;
+esac
+# Visible, not filtered out: a roster that silently omitted what was rejected
+# would invite re-litigating it, which the reason exists to prevent.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_st}" in
+  *"took-it [adopted]"*"passed-on-it [declined]"*)
+    pass "each decision is named with its standing" ;;
+  *) fail "each decision is named with its standing" "${out_st}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_st}" in
+  *"needs a second runtime"*) fail "a decided candidate is not re-pitched with its full case" "${out_st}" ;;
+  *) pass "a decided candidate is not re-pitched with its full case" ;;
+esac
+bad_case '{"sources":[],"candidates":[{"name":"x","repo":"r","when":"w","status":"maybe"}]}' \
+  "'status' must be one of" "an unknown status is an error, not a silent default"
+
 # --- license: a warning, not a gate -----------------------------------------
 # "What am I allowed to do with this" gets asked once at adoption and then never
 # again, which is exactly the kind of question that wants a mechanical prompt.
