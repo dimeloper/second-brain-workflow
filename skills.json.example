@@ -36,6 +36,21 @@
     "                 three of six.",
     "  skills_subdir  optional, defaults to 'skills'. Where in that repo the",
     "                 skill directories live.",
+    "  applies_to     optional path globs. Purely for reporting: `make skills-for",
+    "                 REPO=...` and the onboard-repo skill use it to say which",
+    "                 skills are scoped to a repo. Omit it and the skill is",
+    "                 treated as applying everywhere, which is reported as such",
+    "                 rather than as a miss.",
+    "",
+    "A 'candidates' array records skills you have deliberately NOT adopted, so",
+    "onboarding can mention them. This is the one thing the agent host cannot do",
+    "for itself: it routes to the skills that are installed and can say nothing",
+    "about one that exists and is not. Fields: name, repo and when are required;",
+    "install and applies_to are optional. Keep `when` honest about the cost, not",
+    "only the benefit — the reason to read the list is to decide.",
+    "",
+    "Any key starting with '//' is a comment, at every level, so each section can",
+    "carry its own note. A typo still fails, because a typo does not start with //.",
     "",
     "A skill of your own with the same name always wins — sync reports the",
     "shadowing rather than silently preferring one."
@@ -52,7 +67,22 @@
       "repo": "https://github.com/example/store-screenshots",
       "ref": "0000000000000000000000000000000000000000",
       "skills_subdir": "skills",
+      "applies_to": ["app.json", "app.config.*", "eas.json"],
       "allow": ["app-store-screenshots"]
+    }
+  ],
+  "//candidates": [
+    "Not installed. Reported by `make skills-for REPO=...` and by onboard-repo,",
+    "which name them and never install them: adopting a skill is a standing choice",
+    "about every future session, and some write into the project."
+  ],
+  "candidates": [
+    {
+      "name": "example-design-linter",
+      "repo": "https://github.com/example/design-linter",
+      "when": "design-heavy frontend wanting a visual-polish pass. Invasive: writes files at the project root and registers an edit-time hook. Project scope only, never global.",
+      "install": "npx example-design-linter install --scope=project",
+      "applies_to": ["**/*.tsx", "**/*.css"]
     }
   ]
 }

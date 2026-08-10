@@ -56,9 +56,27 @@ SOURCE_KEYS_REQUIRED = ("name", "repo", "allow")
 # still be a valid manifest. An example that has to be edited before it parses is
 # an example whose first run fails for a reason that has nothing to do with the
 # reader's own mistake.
-SOURCE_KEYS_OPTIONAL = ("ref", "skills_subdir", "//")
+SOURCE_KEYS_OPTIONAL = ("ref", "skills_subdir", "//", "applies_to")
+
+
+# Any key starting with "//" is a comment and is ignored, at every level. JSON has
+# no comment syntax, and a roster of other people's skills is exactly the kind of
+# file that needs prose — the reason each one is in or out is the part that decays
+# fastest. A single "//" key would allow one note per object; a prefix allows one
+# per section, which is how the shipped example is written. A typo still fails,
+# because a typo does not begin with two slashes.
+def _is_comment(key):
+    return isinstance(key, str) and key.startswith("//")
 SOURCE_KEYS = SOURCE_KEYS_REQUIRED + SOURCE_KEYS_OPTIONAL
-TOP_KEYS = ("sources", "//")
+TOP_KEYS = ("sources", "candidates", "//")
+
+# A candidate is a skill you have *not* adopted, recorded so onboarding can
+# mention it. `when` is required and `repo` is required; `install` is optional
+# because some candidates are adopted by editing this file rather than by running
+# anything, and the reporter says so when it is absent.
+CANDIDATE_KEYS_REQUIRED = ("name", "repo", "when")
+CANDIDATE_KEYS_OPTIONAL = ("install", "applies_to", "//")
+CANDIDATE_KEYS = CANDIDATE_KEYS_REQUIRED + CANDIDATE_KEYS_OPTIONAL
 
 # The ref the example ships. Refused outright rather than warned about: it is a
 # well-formed sha, so nothing downstream would question it, and the failure it
@@ -117,6 +135,8 @@ def parse(text, origin="manifest"):
 
     _require_mapping(data, origin)
     for key in data:
+        if _is_comment(key):
+            continue
         if key not in TOP_KEYS:
             raise ManifestError(_unknown_key_message(key, TOP_KEYS, origin))
 
@@ -137,6 +157,8 @@ def parse(text, origin="manifest"):
         _require_mapping(raw, where)
 
         for key in raw:
+            if _is_comment(key):
+                continue
             if key not in SOURCE_KEYS:
                 raise ManifestError(_unknown_key_message(key, SOURCE_KEYS, where))
         for key in SOURCE_KEYS_REQUIRED:
@@ -208,9 +230,90 @@ def parse(text, origin="manifest"):
             "ref": ref.strip(),
             "skills_subdir": subdir.strip().strip("/"),
             "allow": [entry.strip() for entry in allow],
+            "applies_to": _globs(raw.get("applies_to"), where),
         })
 
-    return sources, warnings
+    candidates = _parse_candidates(data.get("candidates"), origin, seen_skills)
+    return sources, candidates, warnings
+
+
+def _globs(value, where):
+    """An optional list of path globs. Absent means 'relevant everywhere'."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ManifestError("%s: 'applies_to' must be an array of globs, got %s"
+                           % (where, _kind(value)))
+    out = []
+    for entry in value:
+        if not isinstance(entry, str) or not entry.strip():
+            raise ManifestError("%s: 'applies_to' holds a blank or non-string glob (%r)"
+                               % (where, entry))
+        out.append(entry.strip())
+    return out
+
+
+def _parse_candidates(value, origin, adopted_skills):
+    """Skills deliberately *not* adopted, recorded so onboarding can mention them.
+
+    The gap this fills is one the host cannot: an agent routes to the skills that
+    are installed, and can say nothing about one that exists and is not. That is
+    knowledge only the person keeping the roster has, so it lives here beside the
+    roster rather than being inferred.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ManifestError("%s: 'candidates' must be an array, got %s"
+                           % (origin, _kind(value)))
+
+    candidates = []
+    seen = {}
+    for index, raw in enumerate(value):
+        where = "%s: candidates[%d]" % (origin, index)
+        _require_mapping(raw, where)
+        for key in raw:
+            if _is_comment(key):
+                continue
+            if key not in CANDIDATE_KEYS:
+                raise ManifestError(_unknown_key_message(key, CANDIDATE_KEYS, where))
+        for key in CANDIDATE_KEYS_REQUIRED:
+            if key not in raw:
+                raise ManifestError("%s: missing required key '%s'" % (where, key))
+
+        name = raw["name"]
+        if not isinstance(name, str) or not name.strip():
+            raise ManifestError("%s: 'name' must be a non-empty string" % where)
+        name = name.strip()
+        if name in seen:
+            raise ManifestError("%s: duplicate candidate '%s', already at candidates[%d]"
+                               % (where, name, seen[name]))
+        # Adopted and merely-a-candidate are contradictory states, and the
+        # contradiction is silent: onboarding would suggest installing something
+        # already linked. Caught here rather than left to read oddly in a report.
+        if name in adopted_skills:
+            raise ManifestError(
+                "%s: '%s' is listed as a candidate but source '%s' already allows "
+                "it — a skill cannot be both adopted and merely suggested"
+                % (where, name, adopted_skills[name]))
+        seen[name] = index
+
+        for key in ("repo", "when"):
+            if not isinstance(raw[key], str) or not raw[key].strip():
+                raise ManifestError("%s: '%s' must be a non-empty string" % (where, key))
+
+        install = raw.get("install", "")
+        if not isinstance(install, str):
+            raise ManifestError("%s: 'install' must be a string" % where)
+
+        candidates.append({
+            "name": name,
+            "repo": raw["repo"].strip(),
+            "when": raw["when"].strip(),
+            "install": install.strip(),
+            "applies_to": _globs(raw.get("applies_to"), where),
+        })
+    return candidates
 
 
 def manifest_path(flag=None, cfg=None):
@@ -235,10 +338,10 @@ def manifest_path(flag=None, cfg=None):
 
 
 def load(flag=None, cfg=None):
-    """(path, sources, warnings). path is None when no manifest is configured."""
+    """(path, sources, candidates, warnings). path is None when unconfigured."""
     path = manifest_path(flag, cfg)
     if path is None:
-        return None, [], []
+        return None, [], [], []
     if not path.is_file():
         raise ManifestError(
             "%s: no such file. This is where the skill roster is expected "
@@ -248,8 +351,8 @@ def load(flag=None, cfg=None):
         text = path.read_text(encoding="utf-8")
     except OSError as exc:
         raise ManifestError("%s: cannot read: %s" % (path, exc))
-    sources, warnings = parse(text, origin=str(path))
-    return path, sources, warnings
+    sources, candidates, warnings = parse(text, origin=str(path))
+    return path, sources, candidates, warnings
 
 
 def source_root(engine, source):
@@ -285,10 +388,81 @@ def resolve(engine, sources):
     return rows
 
 
+def repo_files(repo, limit=20000):
+    """Repo-relative paths, preferring git's index.
+
+    `git ls-files` is fast, already excludes ignored files, and so never walks
+    node_modules or a build directory — which a naive glob would, on the largest
+    repos, for the longest time. The bounded fallback exists because a repo being
+    onboarded is not always a git repo yet.
+    """
+    repo = Path(repo)
+    try:
+        import subprocess
+        out = subprocess.run(
+            ["git", "-C", str(repo), "ls-files"],
+            capture_output=True, text=True, timeout=30, check=False)
+        if out.returncode == 0:
+            return [line for line in out.stdout.splitlines() if line][:limit]
+    except (OSError, ImportError):
+        pass
+
+    skip = {".git", "node_modules", ".next", "dist", "build", "__pycache__",
+            ".venv", "venv", "Pods", ".expo", ".dart_tool"}
+    found = []
+    for path in repo.rglob("*"):
+        if len(found) >= limit:
+            break
+        if any(part in skip for part in path.parts):
+            continue
+        if path.is_file():
+            found.append(str(path.relative_to(repo)))
+    return found
+
+
+def path_matches(rel, pattern):
+    """Does one repo-relative path match one glob?
+
+    `**/` is treated as "zero or more directories", matching gitignore and Cursor
+    rather than fnmatch, whose `**/x` demands a literal slash and so would miss
+    the file at the repo root — the single most likely place to look.
+    """
+    from fnmatch import fnmatch
+    if fnmatch(rel, pattern):
+        return True
+    if pattern.startswith("**/") and fnmatch(rel, pattern[3:]):
+        return True
+    return False
+
+
+def relevant(entries, files):
+    """Split entries into (matched, unscoped, unmatched) against a repo's files.
+
+    Three buckets, not two. An entry with no `applies_to` is *unscoped* — it was
+    never claimed to be repo-specific, so reporting it as "does not apply here"
+    would be an assertion nobody made. Keeping it separate is what stops an
+    unscoped entry being read as either a match or a miss.
+    """
+    matched, unscoped, unmatched = [], [], []
+    for entry in entries:
+        globs = entry.get("applies_to") or []
+        if not globs:
+            unscoped.append(entry)
+            continue
+        hits = [f for f in files if any(path_matches(f, g) for g in globs)]
+        if hits:
+            matched.append(dict(entry, matched_by=hits[:3]))
+        else:
+            unmatched.append(entry)
+    return matched, unscoped, unmatched
+
+
 def _main(argv):
     parser = argparse.ArgumentParser(
         description="Parse, validate and resolve a skill-source manifest.")
-    parser.add_argument("mode", choices=("resolve", "validate", "sources"))
+    parser.add_argument("mode", choices=("resolve", "validate", "sources", "relevant"))
+    parser.add_argument("--repo", default=None,
+                        help="repo to judge relevance against (relevant mode)")
     parser.add_argument("--engine", default=str(Path(__file__).resolve().parent.parent.parent),
                         help="engine checkout, where vendor/external/ lives")
     parser.add_argument("--manifest", default=None,
@@ -299,7 +473,7 @@ def _main(argv):
     from lib.config import load as load_config  # noqa: E402
 
     try:
-        path, sources, warnings = load(args.manifest, load_config())
+        path, sources, candidates, warnings = load(args.manifest, load_config())
     except ManifestError as exc:
         sys.stderr.write("error: %s\n" % exc)
         return 2
@@ -311,9 +485,16 @@ def _main(argv):
         return 0
 
     if args.mode == "validate":
-        print("%s: %d source(s), %d skill(s) allowed"
-              % (path, len(sources), sum(len(s["allow"]) for s in sources)))
+        print("%s: %d source(s), %d skill(s) allowed, %d candidate(s)"
+              % (path, len(sources), sum(len(s["allow"]) for s in sources),
+                 len(candidates)))
         return 0
+
+    if args.mode == "relevant":
+        if not args.repo:
+            sys.stderr.write("error: relevant mode needs --repo\n")
+            return 2
+        return _report_relevant(args.repo, sources, candidates)
 
     if args.mode == "sources":
         # Tab-separated for the fetch script: name, repo, ref, checkout dir.
@@ -324,6 +505,53 @@ def _main(argv):
 
     for row in resolve(args.engine, sources):
         print("\t".join(row))
+    return 0
+
+
+def _report_relevant(repo, sources, candidates):
+    """Human-readable, for onboard-repo to read out. Not machine-parsed.
+
+    Adopted skills are flattened out of their sources because relevance is a
+    property of the skill, not of the repo it happened to come from — an
+    onboarding reader wants "use `animate` here", not "source emil is relevant".
+    """
+    repo = Path(repo).expanduser()
+    if not repo.is_dir():
+        sys.stderr.write("error: no such repo: %s\n" % repo)
+        return 2
+    files = repo_files(repo)
+
+    adopted = []
+    for source in sources:
+        for skill in source["allow"]:
+            adopted.append({"name": skill, "applies_to": source["applies_to"],
+                            "source": source["name"]})
+
+    a_match, a_unscoped, _ = relevant(adopted, files)
+    c_match, c_unscoped, _ = relevant(candidates, files)
+
+    print("skills relevant to %s  (%d file(s) considered)" % (repo, len(files)))
+    print()
+    print("Adopted and scoped to this repo: %d" % len(a_match))
+    for entry in a_match:
+        print("  - %s  (matched %s)" % (entry["name"], ", ".join(entry["matched_by"])))
+    if a_unscoped:
+        # Named, never dropped: an unscoped skill is available everywhere, and a
+        # report that listed only the scoped matches would read as the full set.
+        print("  (%d adopted skill(s) declare no applies_to, so they apply "
+              "everywhere: %s)" % (len(a_unscoped),
+                                   ", ".join(e["name"] for e in a_unscoped)))
+    print()
+    print("Not adopted, worth considering here: %d" % len(c_match))
+    for entry in c_match:
+        print("  - %s — %s" % (entry["name"], entry["when"]))
+        print("      %s" % entry["repo"])
+        print("      install: %s" % (entry["install"] or
+                                     "add it to skills.json sources, then "
+                                     "make fetch-skills YES=1 && make sync-skills"))
+    for entry in c_unscoped:
+        print("  - %s — %s (no applies_to; relevance is yours to judge)"
+              % (entry["name"], entry["when"]))
     return 0
 
 

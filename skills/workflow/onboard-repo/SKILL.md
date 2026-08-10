@@ -102,6 +102,35 @@ Also classify **MCP role** for step 6:
 | **Sibling app** | Frontend / mobile / Flutter for a product that already has a backend | Point absolute paths at that backend’s wrappers only |
 | **Standalone / no infra** | Docs, standards, libs with no Railway/Logfire/PostHog | Skip MCP (say so in Done) |
 
+### 2b. Skills for this repo
+
+```bash
+python3 ~/second-brain-workflow/scripts/lib/skill_manifest.py relevant --repo <abs-path>
+```
+
+Absolute path, not a relative one: an installed skill directory holds only this
+`SKILL.md`, so a relative path resolves to nothing and the step silently falls
+back to guesswork.
+
+Prints two lists, from the operator's own `skills.json` — nothing here invents a
+recommendation:
+
+- **Adopted and scoped to this repo.** Mention these in the Done report so the
+  next session knows they are there. They are already installed; do not re-install.
+- **Not adopted, worth considering.** Each carries the reason and its install
+  command. **Report, never install.** Adopting a skill is a standing choice about
+  every future session in every repo, and several write into the project — a
+  design linter registering an edit-time hook, a screenshot tool scaffolding a
+  whole Next.js app. Name it, name the cost, let the user decide.
+
+Skip the whole step if the command prints nothing or exits non-zero: no manifest
+is configured on this machine, which is a supported state and not a gap to fill.
+
+If the user does adopt one, the loop is theirs to run, not yours to assume:
+`make fetch-skills YES=1` then `make sync-skills`, and a **session restart** —
+the skill listing is read at startup, so a newly linked skill is invisible until
+then.
+
 ### 3. Project onboarding rule
 
 Create or update **one** always-apply rule:
@@ -220,9 +249,12 @@ Short status:
 2. Sync result (rules linked + `AGENTS.md`)
 3. Onboarding rule path (created/updated)
 4. Inferred stack + practice note slugs
-5. `CLAUDE.md` action (created stub / left alone / skipped)
-6. MCP action (backend wired / sibling pointed at `<backend>` / skipped) + server
+5. Skills scoped to this repo (already installed), and any candidate worth
+   considering with its cost — or "no manifest configured" if step 2b was skipped.
+   Nothing installed either way.
+6. `CLAUDE.md` action (created stub / left alone / skipped)
+7. MCP action (backend wired / sibling pointed at `<backend>` / skipped) + server
    name suffixes + whether tokens are SET/EMPTY / live check if possible
-7. Daily-note path updated
+8. Daily-note path updated
 
 Do not commit, push, or open extra PRs unless asked.

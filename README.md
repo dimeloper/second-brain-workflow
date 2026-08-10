@@ -395,6 +395,41 @@ A skill that ships **its own installer** does not belong in a manifest — insta
 it the vendor's way and let it be a real directory. `sync-skills.sh` refuses to
 touch one, which is what keeps `use-railway` working.
 
+#### Which skills apply to a repo
+
+```bash
+make skills-for REPO=/path/to/repo
+```
+
+Two lists, both from your own `skills.json`:
+
+```
+Adopted and scoped to this repo: 5
+  - animate  (matched App.tsx, app/(onboarding)/_layout.tsx, …)
+  - app-store-screenshots  (matched app.json, eas.json)
+
+Not adopted, worth considering here: 1
+  - impeccable — design-heavy frontend wanting a visual-polish pass. Invasive:
+    writes PRODUCT.md/DESIGN.md and registers an edit-time hook. Project scope only.
+      install: npx impeccable install --scope=project
+```
+
+The second list is the point, and it is the one thing an agent host cannot do for
+itself: it routes to the skills that are **installed** and can say nothing about
+one that exists and is not. Add `applies_to` globs to a source to scope it, and a
+top-level `candidates` array for skills you have deliberately *not* adopted —
+`name`, `repo` and `when` required, `install` and `applies_to` optional. Write
+`when` about the **cost** as well as the benefit; the reason to read the list is
+to decide.
+
+A skill with no `applies_to` is reported as applying everywhere rather than as a
+miss — it was never claimed to be repo-specific, so calling it irrelevant would
+assert something nobody said.
+
+The `onboard-repo` skill runs this at step 2b and **reports without installing**:
+adopting a skill is a standing choice about every future session, and several
+write into the project.
+
 **Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
 runs `sync-skills.sh` before a machine config exists, so the default applies and
 both directories get the links; a config written afterwards naming only one

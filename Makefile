@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
-        vault-index-check sync-skills fetch-skills uninstall upgrade explain guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for uninstall upgrade explain guard doctor audit \
         verify-claude check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
@@ -29,6 +29,7 @@ help:
 	@echo "make vault-index-check   fail if the index is stale"
 	@echo "make sync-skills         install skills into every dir in SKILLS_DIRS"
 	@echo "make fetch-skills        preview fetching declared skill sources; YES=1 to act"
+	@echo "make skills-for REPO=... which skills apply to a repo, adopted and candidate"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
@@ -131,6 +132,14 @@ sync-skills:
 # or credentials. Preview by default, same shape as uninstall and upgrade.
 fetch-skills:
 	@./scripts/fetch-skill-sources.sh $(if $(YES),--yes,)
+
+# Which adopted skills are scoped to a repo, and which declared candidates are
+# worth considering there. Read-only, and the one question the agent host cannot
+# answer for itself: it routes to what is installed and knows nothing of what
+# is not.
+skills-for:
+	@if [ -z "$(REPO)" ]; then echo "usage: make skills-for REPO=/path/to/repo" >&2; exit 2; fi
+	@python3 ./scripts/lib/skill_manifest.py relevant --repo "$(REPO)"
 
 # Preview by default; --yes is the script's own gate, so `make uninstall` can
 # never remove anything on its own.

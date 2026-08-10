@@ -401,6 +401,120 @@ case "${out}" in
   *) fail "--help still reaches the last line of the header" "${out}" ;;
 esac
 
+# --- applies_to and candidates: the onboarding report ------------------------
+# The gap this fills is the one the agent host cannot: it routes to installed
+# skills and can say nothing about one that exists and is not.
+REPO="${SANDBOX}/target-repo"
+mkdir -p "${REPO}/app" "${REPO}/scripts"
+: > "${REPO}/app.config.ts"
+: > "${REPO}/app/screen.tsx"
+: > "${REPO}/scripts/build.sh"
+
+rel="${SANDBOX}/relevant.json"
+write_manifest "${rel}" "{\"//note\":\"a comment key at top level\",\"sources\":[{\"name\":\"fix\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"applies_to\":[\"**/*.tsx\"],\"allow\":[\"animate\"]},{\"name\":\"broad\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"allow\":[\"review-animations\"]}],\"candidates\":[{\"name\":\"linter\",\"repo\":\"https://example.invalid/linter\",\"when\":\"design-heavy frontend; writes a hook\",\"install\":\"npx linter install --scope=project\",\"applies_to\":[\"**/*.css\"]},{\"name\":\"shots\",\"repo\":\"https://example.invalid/shots\",\"when\":\"store listings\",\"applies_to\":[\"app.config.*\"]}]}"
+
+out_rel="$(SBW_SKILLS_MANIFEST="${rel}" python3 "${MANIFEST_PY}" relevant --repo "${REPO}" 2>&1)"
+assert_exit 0 $? "relevant mode exits 0"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"Adopted and scoped to this repo: 1"*) pass "a scoped adopted skill matches on a real file" ;;
+  *) fail "a scoped adopted skill matches on a real file" "${out_rel}" ;;
+esac
+# An unscoped skill is neither a match nor a miss — it was never claimed to be
+# repo-specific, so reporting it as "does not apply" asserts something nobody said.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"declare no applies_to, so they apply everywhere: review-animations"*)
+    pass "an unscoped adopted skill is named separately, not dropped" ;;
+  *) fail "an unscoped adopted skill is named separately, not dropped" "${out_rel}" ;;
+esac
+# `shots` matches app.config.ts; `linter` wants *.css, and this repo has none.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"Not adopted, worth considering here: 1"*) pass "only candidates whose globs match are suggested" ;;
+  *) fail "only candidates whose globs match are suggested" "${out_rel}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"shots — store listings"*) pass "the matching candidate is named with its reason" ;;
+  *) fail "the matching candidate is named with its reason" "${out_rel}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"npx linter install"*) fail "a non-matching candidate is not suggested" "${out_rel}" ;;
+  *) pass "a non-matching candidate is not suggested" ;;
+esac
+# No install command means adoption is a manifest edit, and the report says so
+# rather than leaving the reader with a name and no next step.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"add it to skills.json sources"*) pass "a candidate with no install command still says how" ;;
+  *) fail "a candidate with no install command still says how" "${out_rel}" ;;
+esac
+
+# A repo the globs do not touch reports nothing rather than everything.
+BARE="${SANDBOX}/bare-repo"
+mkdir -p "${BARE}"
+: > "${BARE}/Makefile"
+out_bare="$(SBW_SKILLS_MANIFEST="${rel}" python3 "${MANIFEST_PY}" relevant --repo "${BARE}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bare}" in
+  *"Adopted and scoped to this repo: 0"*"Not adopted, worth considering here: 0"*)
+    pass "a repo the globs do not match reports nothing" ;;
+  *) fail "a repo the globs do not match reports nothing" "${out_bare}" ;;
+esac
+
+# Only the status matters for these two, so the output is discarded rather than
+# captured into a variable nothing reads.
+SBW_SKILLS_MANIFEST="${rel}" python3 "${MANIFEST_PY}" relevant >/dev/null 2>&1
+assert_exit 2 $? "relevant mode without --repo is an error"
+SBW_SKILLS_MANIFEST="${rel}" python3 "${MANIFEST_PY}" relevant --repo "${SANDBOX}/nope" >/dev/null 2>&1
+assert_exit 2 $? "relevant mode on a missing repo is an error"
+
+# `**/x` must match the repo root too. fnmatch alone demands a literal slash, so
+# a file at the top level — the single most likely place to look — would be missed.
+ROOTED="${SANDBOX}/rooted-repo"
+mkdir -p "${ROOTED}"
+: > "${ROOTED}/main.tsx"
+out_rooted="$(SBW_SKILLS_MANIFEST="${rel}" python3 "${MANIFEST_PY}" relevant --repo "${ROOTED}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rooted}" in
+  *"Adopted and scoped to this repo: 1"*) pass "'**/*.tsx' matches a file at the repo root" ;;
+  *) fail "'**/*.tsx' matches a file at the repo root" "${out_rooted}" ;;
+esac
+
+# --- candidate validation ---------------------------------------------------
+bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[\"animate\"]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
+  "cannot be both adopted and merely suggested" \
+  "a skill cannot be adopted and a candidate at once"
+bad_case '{"sources":[],"candidates":[{"name":"x","repo":"r"}]}' \
+  "missing required key 'when'" "a candidate must say when it is worth it"
+bad_case '{"sources":[],"candidates":[{"name":"x","repo":"r","when":"w","whn":"typo"}]}' \
+  "unknown key 'whn'" "an unknown candidate key is an error"
+bad_case '{"sources":[],"candidates":[{"name":"x","repo":"r","when":"w"},{"name":"x","repo":"r2","when":"w2"}]}' \
+  "duplicate candidate" "two candidates cannot share a name"
+bad_case '{"sources":[],"candidates":{}}' "'candidates' must be an array" \
+  "candidates must be an array"
+bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[],\"applies_to\":\"*.tsx\"}]}" \
+  "'applies_to' must be an array" "applies_to must be an array"
+bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[],\"applies_to\":[\"\"]}]}" \
+  "blank or non-string glob" "a blank glob is an error"
+
+# A comment key is ignored wherever it appears; a near-miss of a real key is not.
+comment_ok="${SANDBOX}/comments.json"
+write_manifest "${comment_ok}" "{\"//\":\"top\",\"//more\":[\"multi\",\"line\"],\"sources\":[{\"//why\":\"per-source note\",\"name\":\"f\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"allow\":[]}],\"candidates\":[{\"//\":\"per-candidate note\",\"name\":\"c\",\"repo\":\"r\",\"when\":\"w\"}]}"
+SBW_SKILLS_MANIFEST="${comment_ok}" python3 "${MANIFEST_PY}" validate >/dev/null 2>&1
+assert_exit 0 $? "a //-prefixed key is a comment at every level"
+
+# The shipped example must be a valid manifest apart from its placeholder refs —
+# it is written to be copied and edited in place, not stripped first.
+out_example="$(SBW_SKILLS_MANIFEST="${ENGINE}/skills.json.example" python3 "${MANIFEST_PY}" validate 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_example}" in
+  *"still the placeholder"*) pass "the example fails only on its unedited placeholder ref" ;;
+  *) fail "the example fails only on its unedited placeholder ref" "${out_example}" ;;
+esac
+
 # --- the two config implementations know the same keys ----------------------
 # There was no test tying these together, and the shell side is what the scripts
 # read while the Python side decides what counts as an unknown key in a config
