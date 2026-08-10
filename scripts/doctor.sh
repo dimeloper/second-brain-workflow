@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Machine health check: four read-only checks, none overlapping with
+# Machine health check: read-only, none of it overlapping with
 # `make audit` (content) or `make check` (code):
 #   - the vault's commit guard is wired in as a pre-commit hook, and it's ours
 #   - commits here would be authored as the identity vault.json declares
 #   - a skill installed into one configured skills dir isn't missing from another
 #   - a vendored submodule isn't left at the wrong commit after a tag switch
+#   - the repos this machine has rendered into are known, and still rendered
 # Changes nothing. Not part of `make check` — like `make guard` and
 # `make vault-index-check`, it needs a real vault, and CI has none.
 #
@@ -38,6 +39,8 @@ STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${STANDARDS_DIR}/scripts/lib/invocation.sh"
 # shellcheck source=scripts/lib/vault-identity.sh
 . "${STANDARDS_DIR}/scripts/lib/vault-identity.sh"
+# shellcheck source=scripts/lib/registry.sh
+. "${STANDARDS_DIR}/scripts/lib/registry.sh"
 ds_config_load
 skills_dirs_load
 
@@ -50,7 +53,7 @@ while [ $# -gt 0 ]; do
       VAULT_ORIGIN="the --vault flag"
       shift 2
       ;;
-    -h|--help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -296,12 +299,68 @@ check_submodules() {
   return 0
 }
 
+# Where this machine has rendered, read from the registry render.py appends to
+# on every successful render. Nothing else records it: render.py writes
+# .sbw-version *into* the target, so before the registry the only way to answer
+# "which repos need re-rendering after an upgrade" was a guessed glob — and a
+# glob that matches nothing reads exactly like a machine that has onboarded
+# nothing. Reported, never pruned: a repo on an unmounted volume is not a
+# deleted repo, and dropping the only record of it is not a repair.
+check_registry() {
+  local file entries count=0 stale=0 repo
+  file="$(sbw_registry_path)"
+  entries="$(sbw_registry_read)"
+
+  # Deliberately not "0 repos onboarded". A machine that has onboarded nothing
+  # and a machine whose registry was never written look identical from here,
+  # and only one of them is fine.
+  if [ -z "${entries}" ]; then
+    local why="there is no registry at ${file}"
+    [ ! -f "${file}" ] || why="${file} lists no repos"
+    # -exec ... + rather than `| xargs grep -l`: with nothing to feed it, BSD
+    # xargs runs grep once with no file arguments, so it reads stdin and the
+    # pipeline hangs — on the one machine state this message exists for, a
+    # machine with no pre-registry repos. A remediation that hangs looks like a
+    # slow search, which is the undiagnosable state all over again.
+    warn "onboarded repo set is undetermined — ${why}
+        Every render records itself now; repos onboarded before this engine
+        version did not, so this machine may have any number of them. List the
+        ones carrying a provenance marker with:
+          find \"\$HOME\" -maxdepth 5 -type d \\( -name node_modules -o -name Library -o -name .git -o -name vaults \\) -prune \\
+            -o -name AGENTS.md -exec grep -l second-brain-workflow {} + 2>/dev/null | sed 's|/AGENTS.md\$||'
+        Re-rendering each hit registers it. No output means this machine really
+        has onboarded nothing."
+    return 0
+  fi
+
+  while IFS= read -r repo; do
+    [ -n "${repo}" ] || continue
+    count=$((count + 1))
+    if [ ! -d "${repo}" ]; then
+      stale=$((stale + 1))
+      warn "registered repo is not there: ${repo}
+        left in ${file} on purpose — an unmounted volume is not a deleted repo.
+        Delete the line yourself once you know it is gone."
+    elif ! sbw_registry_marker_present "${repo}"; then
+      stale=$((stale + 1))
+      warn "registered repo carries no rendered output any more: ${repo}
+        re-render it, or delete its line from ${file}."
+    fi
+  done <<EOF
+${entries}
+EOF
+
+  [ "${stale}" -eq 0 ] && ok "${count} onboarded repo(s) registered, all still rendered"
+  return 0
+}
+
 echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
 check_author
 check_skills
 check_orphaned_skills
 check_submodules
+check_registry
 
 echo
 if [ "${problems}" -eq 0 ]; then

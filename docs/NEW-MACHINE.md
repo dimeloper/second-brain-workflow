@@ -405,6 +405,14 @@ actually did — do not scaffold them.
 rendered files match what the current rules would produce, and 1 on drift. Run
 it in that repo's CI, not just here.
 
+The render also records this repo in
+`${XDG_CONFIG_HOME:-$HOME/.config}/second-brain-workflow/repos`, so that later
+"re-render everything" is a list rather than a glob you have to guess — see the
+README's [repo registry](../README.md#the-repo-registry). `--check` and
+`--dry-run` don't write it. On a machine that onboarded repos before this
+existed, `make doctor` reports the set as undetermined and names the command
+that finds them.
+
 ### What rendering actually produces
 
 `rules/frontend-angular.md` — a `paths:` list plus a body:

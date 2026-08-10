@@ -373,7 +373,8 @@ anywhere outside this checkout (another tool's install, such as Railway's
 ours. **It also does not remove your vault, your machine config, or the
 rendered rules in repos you onboarded** — delete `.cursor/rules`,
 `.claude/rules`, `AGENTS.md`, `CLAUDE.md` and `.sbw-version` per repo if you
-want those gone.
+want those gone. The [repo registry](#the-repo-registry) stays too, so a
+reinstall still knows where this machine has rendered.
 
 ## Onboard a repo
 
@@ -386,6 +387,31 @@ Or manually:
 ./scripts/sync-rules.sh /path/to/target-repo
 ./scripts/sync-skills.sh   # once per machine, or after pulling skill changes
 ```
+
+### The repo registry
+
+A successful render appends the target's real path to
+`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repos` — one absolute path
+per line, deduped and sorted, blank lines and `#` comments ignored on read. It
+is the only record of *where* this machine has rendered, and the reason
+"re-render every onboarded repo" is a list rather than a guess: `render.py`
+writes `.sbw-version` into the target and nothing on the machine, so before
+this the only way to find onboarded repos was a directory glob — and a glob
+that matches nothing is indistinguishable from a machine that has genuinely
+onboarded nothing.
+
+`--check` and `--dry-run` never write it, the same contract `.sbw-version` has.
+A registry that can't be written (read-only home, unwritable config directory)
+warns on stderr and the render still succeeds — rendering is the job — but it
+does warn, because an unrecorded render is how the set becomes undetermined
+later with nothing left to explain it.
+
+[`make doctor`](docs/GUARD.md#make-doctor) reports registered repos that have
+gone missing or stopped carrying rendered output, and never prunes them: a repo
+on an unmounted volume is not a deleted repo. With no registry at all it
+reports the onboarded set as **undetermined** — not as zero repos — and names
+the `find` command that lists repos onboarded before the registry existed;
+re-rendering each hit registers it. `make uninstall` leaves the file alone.
 
 ## One rule set, every agent
 
@@ -540,7 +566,8 @@ git submodule update --init --recursive   # vendor/obsidian-skills is pinned per
 ./scripts/sync-skills.sh                  # installed skills are symlinks into that submodule
 ```
 
-then re-render each onboarded repo (`./scripts/render.py <repo>`). Checking
+then re-render each onboarded repo (`./scripts/render.py <repo>`) — the
+[repo registry](#the-repo-registry) is the list of which those are. Checking
 out a tag alone does not move `vendor/obsidian-skills` to the commit that tag
 pinned — skipping the submodule step leaves vendored skills at whatever they
 were before the rollback, which defeats the point of pinning. [`make

@@ -17,6 +17,32 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **A repo registry, so the set of onboarded repos is known rather than
+  guessed.** A successful render appends the target's real path to
+  `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repos` — deduped,
+  sorted, one absolute path per line, and never written by `--check` or
+  `--dry-run`, matching the contract `.sbw-version` already had. `render.py`
+  wrote `.sbw-version` *into* the target and nothing on the machine, so
+  "re-render every onboarded repo after an upgrade" had no list to work from:
+  the only available answer was a guessed directory glob, and a glob that
+  matches nothing is indistinguishable from a machine that has genuinely
+  onboarded nothing. A registry that cannot be written warns on stderr rather
+  than failing the render or going quiet.
+
+  Nothing in an onboarded repo changes, and nothing reads the registry to
+  decide what to render — `render.py` still takes its target from the command
+  line.
+- **`doctor` reports on the registry.** Registered paths that have gone missing,
+  or that no longer carry rendered output, are named individually and left in
+  place — an unmounted volume is not a deleted repo, and deleting the only
+  record of a repo is not a repair. An absent or empty registry is reported as
+  an *undetermined* onboarded set, never as "0 repos onboarded", and the message
+  names the `find` command that lists repos onboarded before the registry
+  existed; re-rendering each hit registers it. Existing machines therefore see
+  one new warning until they re-render, which is the accurate state rather than
+  a reassuring one.
+
 ### Fixed
 - **`doctor` stopped at the first check that had something to report.**
   `check_skills` and `check_submodules` both ended in a bare test, so a run

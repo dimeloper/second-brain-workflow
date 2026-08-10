@@ -16,6 +16,7 @@ endif
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
+                 scripts/lib/registry.sh \
                  scripts/lib/resolve-vault.sh scripts/uninstall.sh \
                  tests/lib.sh $(wildcard tests/test-*.sh)
 
@@ -71,7 +72,7 @@ lint-shell:
 lint-python:
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
 	  scripts/check-followups.py scripts/check-rules.py scripts/rule-budget.py scripts/lib/config.py \
-	  scripts/lib/frontmatter.py \
+	  scripts/lib/frontmatter.py scripts/lib/registry.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real

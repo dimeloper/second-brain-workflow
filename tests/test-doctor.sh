@@ -22,6 +22,18 @@ EMPTY2="${SANDBOX}/skills-empty-2"
 mkdir -p "${EMPTY1}" "${EMPTY2}"
 export SKILLS_DIRS="${EMPTY1}:${EMPTY2}"
 
+# check_registry() reads the repo registry from XDG_CONFIG_HOME, and an absent
+# one is a warning — correctly, since "this machine has onboarded nothing" and
+# "nothing ever recorded a render here" are indistinguishable from inside
+# doctor. This file is about the other checks, so it gets one satisfied entry:
+# without it every case here would carry that warning and the exit-0 assertions
+# would be asserting the wrong thing. tests/test-repo-registry.sh owns the
+# registry's own cases.
+export XDG_CONFIG_HOME="${SANDBOX}/config-home"
+mkdir -p "${XDG_CONFIG_HOME}/second-brain-workflow" "${SANDBOX}/onboarded-repo"
+echo "0.0.0-fixture" > "${SANDBOX}/onboarded-repo/.sbw-version"
+(cd "${SANDBOX}/onboarded-repo" && pwd -P) > "${XDG_CONFIG_HOME}/second-brain-workflow/repos"
+
 echo "doctor.sh"
 
 # --- a freshly init'd vault: hook present, all clear ------------------------

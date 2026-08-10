@@ -25,6 +25,16 @@ EMPTY1="${SANDBOX}/skills-a"
 EMPTY2="${SANDBOX}/skills-b"
 mkdir -p "${EMPTY1}" "${EMPTY2}"
 
+# The repo registry is machine-wide for the same reason, and an absent one is a
+# warning by design (an unwritten registry and a machine that has onboarded
+# nothing are indistinguishable from inside doctor). One satisfied entry, so the
+# only findings that vary here are the vault ones. tests/test-repo-registry.sh
+# owns the registry's own cases.
+export XDG_CONFIG_HOME="${SANDBOX}/config-home"
+mkdir -p "${XDG_CONFIG_HOME}/second-brain-workflow" "${SANDBOX}/onboarded-repo"
+echo "0.0.0-fixture" > "${SANDBOX}/onboarded-repo/.sbw-version"
+(cd "${SANDBOX}/onboarded-repo" && pwd -P) > "${XDG_CONFIG_HOME}/second-brain-workflow/repos"
+
 # Normalised, because $TMPDIR on macOS ends in a slash and mktemp -d therefore
 # hands back a path containing "//". Python's Path collapses that and the shell
 # doesn't, which would make the cross-language comparison below fail on path

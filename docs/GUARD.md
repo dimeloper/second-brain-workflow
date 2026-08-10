@@ -267,7 +267,7 @@ vault, and a per-commit identity check does that directly.
 ## `make doctor`
 
 Machine/vault health — not content, that's [`make audit`](AUDIT.md), and not
-code, that's `make check`. Three checks, read-only, none overlapping:
+code, that's `make check`. Read-only, and none of it overlapping:
 
 ```bash
 make doctor                                     # resolved vault, same as the script
@@ -291,6 +291,12 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   commit other than the one this engine checkout's tag actually pins, the
   state a bare `git checkout <tag>` leaves behind. See the README's
   [Rollback](../README.md#versioning) section.
+- **The repo registry** — registered repos that are no longer there, or no
+  longer carry rendered output, named individually and never pruned (a repo on
+  an unmounted volume is not a deleted repo). With no registry, the onboarded
+  set is reported as *undetermined* rather than as zero repos, and the message
+  names the `find` command that seeds one from provenance markers. See the
+  README's [repo registry](../README.md#the-repo-registry) section.
 
 `-h` prints this same list from the script itself, so it can't drift out of
 step with what's actually checked.
