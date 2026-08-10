@@ -336,11 +336,10 @@ run_doctor() {
 # bookkeeping gap, not a reason to skip it. It is labelled in the same line,
 # since `render.py <repo>` closes both at once.
 report_repos() {
-  local file entries scan targets scope repo drift=0 live=0 stale=0 unreg=0 label
+  local file entries scan targets repo drift=0 live=0 stale=0 unreg=0 label
   heading "Onboarded repos (render --check, nothing is rendered)"
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
-  scope="$(sbw_scan_scope_line)"
   # Roots validated here, walk captured after: the command substitution below is
   # a subshell and would take the skipped-root record with it when it exits.
   sbw_scan_prepare_roots
@@ -362,7 +361,7 @@ EOF
   # be the guess this whole check exists to refuse.
   if [ "${SBW_SCAN_USABLE}" -eq 0 ]; then
     report_undetermined "no scan root could be read"
-    say_scan_scope "${scope}"
+    sbw_scan_say_scope
     return 0
   fi
 
@@ -423,9 +422,19 @@ EOF
     fi
     echo "  This script does not render: --check reports, you decide."
   elif [ "${live}" -eq 0 ]; then
-    # Determined, not unknown: the scan ran and found nothing, within a boundary
-    # that is printed below. What is refused is a count with no boundary at all.
-    ok "no repos carry rendered output here, and the registry names none"
+    # Nothing was checkable, and the two ways that happens do not read alike.
+    # Guarded on the registry being empty, the way check_registry guards its
+    # equivalent: with stale entries present, "the registry names none" printed
+    # as `ok` directly under the warnings naming them — and `ok` is the line a
+    # reader takes as the verdict.
+    if [ -n "${entries}" ]; then
+      echo "  Nothing could be checked: all ${stale} registered path(s) are missing or no"
+      echo "  longer carry rendered output, and the scan found no others."
+    else
+      # Determined, not unknown: the scan ran and found nothing, within a
+      # boundary printed below. What is refused is a count with no boundary.
+      ok "no repos carry rendered output here, and the registry names none"
+    fi
   elif preview_of_another_version; then
     ok "all ${live} repo(s) match the current checkout — expect all ${live} to need"
     note "re-rendering after switching to ${TARGET_REF}"
@@ -441,15 +450,7 @@ EOF
     echo "  Rendering each registers it; leave the ones you have abandoned."
   fi
 
-  say_scan_scope "${scope}"
-}
-
-# Printed on every report, clean ones included. A scan cannot claim completeness,
-# so a result that does not state its boundary is a stronger claim than this can
-# support — and "nothing to do" is exactly the answer a reader takes as final.
-say_scan_scope() {
-  echo "        scanned scope: $1"
-  echo "        (a repo outside it — another volume, nested deeper — is not covered)"
+  sbw_scan_say_scope
 }
 
 # In preview, --check has run against the checkout as it stands, so a clean

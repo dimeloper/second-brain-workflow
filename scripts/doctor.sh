@@ -319,11 +319,10 @@ check_submodules() {
 # found repo is not registered for you (it may be abandoned, or rendered by an
 # engine old enough that re-rendering is a decision).
 check_registry() {
-  local file entries scan scope repo registered=0 stale=0 unregistered=0 line
+  local file entries scan repo registered=0 stale=0 unregistered=0 line
 
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
-  scope="$(sbw_scan_scope_line)"
   # Roots validated in this shell, then the walk captured. The order matters:
   # sbw_scan_rendered_repos runs inside a command substitution, and the subshell
   # would take SBW_SCAN_SKIPPED and SBW_SCAN_USABLE with it when it exited.
@@ -350,7 +349,7 @@ EOF
         nothing to compare it against, any count from it would be a guess.
         Point SBW_SCAN_ROOTS at a directory that exists — in $(ds_config_path),
         or in the environment for one run."
-    say_scan_scope "${scope}"
+    sbw_scan_say_scope
     return 0
   fi
 
@@ -408,17 +407,8 @@ EOF
       ok "${registered} onboarded repo(s) registered, all still rendered, and none unregistered"
     fi
   fi
-  say_scan_scope "${scope}"
+  sbw_scan_say_scope
   return 0
-}
-
-# Printed on every outcome, clean ones included. A scan cannot claim
-# completeness, so a report that does not state its boundary is a stronger claim
-# than the tool can support — and "nothing found" is exactly the answer a reader
-# will take as final.
-say_scan_scope() {
-  echo "        scanned scope: $1"
-  echo "        (a repo outside it — another volume, nested deeper — does not appear above)"
 }
 
 echo "second-brain-workflow doctor — vault: ${VAULT}"
