@@ -105,9 +105,27 @@ skill_link_target() {
 }
 
 # Does a resolved target have the shape of a skill inside an engine checkout?
+#
+# Three layouts, and the reason there are three is worth keeping: local skills
+# sit at skills/<category>/<name>, the pinned submodule at
+# vendor/obsidian-skills/skills/<name>, and a manifest source fetched by
+# fetch-skill-sources.sh at vendor/external/<source>/<skills_subdir>/<name>.
+# Note `*` matches `/` in a case pattern, so */vendor/*/skills/* covers both the
+# submodule and a fetched source at the default subdir — it is a superset of the
+# hardcoded obsidian-skills pattern this replaces, which matched no fetched
+# source at all. That gap mattered: a fetched skill's dangling link classified
+# `foreign-dangling`, so uninstall.sh left it behind forever, which is the exact
+# failure this file's header describes for a different reason.
+#
+# The vendor/external clause is deliberately looser than the others because
+# `skills_subdir` is per-source configurable, so the subdir name cannot be
+# assumed. Being loose here is the safe direction: it only ever runs on a target
+# that no longer exists, and the consequence is that `make uninstall` offers to
+# clean up a link rather than abandoning it.
 skill_link_engine_layout() {
   case "$1" in
-    */vendor/obsidian-skills/skills/*) return 0 ;;
+    */vendor/external/*/*) return 0 ;;
+    */vendor/*/skills/*) return 0 ;;
     */skills/*/*) return 0 ;;
     *) return 1 ;;
   esac
