@@ -99,6 +99,20 @@ sbw_scan_scope_line() {
   echo "roots=$(sbw_scan_roots_configured) depth=$(sbw_scan_depth_configured)"
 }
 
+# The boundary printed alongside an answer, rather than left to a header several
+# lines up. It lives here, next to the scope string both callers already take
+# from sbw_scan_scope_line, because it existed twice — once in doctor.sh and once
+# in upgrade.sh — and the two copies had already drifted at birth: one closed
+# with "does not appear above", the other with "is not covered". Two copies of a
+# disclosure is how one of them quietly ends up disclosing something else.
+#
+# Takes no argument on purpose: reading the scope itself means a caller cannot
+# print one scope while having scanned another.
+sbw_scan_say_scope() {
+  echo "        scanned scope: $(sbw_scan_scope_line)"
+  echo "        (a repo outside it — another volume, nested deeper — is not covered)"
+}
+
 # One root. Both branches print a *file*, so the caller takes the dirname of
 # everything and gets the repo directory either way.
 #
@@ -157,6 +171,13 @@ sbw_scan_prepare_roots() {
   SBW_SCAN_USABLE=0
 
   IFS=':' read -r -a root_list <<< "${roots}"
+  # A zero-element array expanded as "${root_list[@]}" is an unbound-variable
+  # error under `set -u` on bash before 4.4 — which is what the bash32 CI job
+  # runs, and what ships on macOS. sbw_scan_roots_configured uses `:-`, so a
+  # config key that is present but empty still yields the fallback and this stays
+  # unreachable; the guard is here so that `:-` is not the only thing between a
+  # future edit and a doctor that dies on such a machine.
+  [ "${#root_list[@]}" -gt 0 ] || return 0
   for root in "${root_list[@]}"; do
     [ -n "${root}" ] || continue
     if [ ! -d "${root}" ]; then

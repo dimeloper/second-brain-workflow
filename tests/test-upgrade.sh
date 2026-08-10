@@ -391,6 +391,14 @@ rc=$?
 out_has "registered, but not there: ${SANDBOX}/gone-one" "a stale entry is named"
 out_lacks "undetermined" "and no longer makes the whole set undetermined"
 out_lacks "0 repo" "still never a count of zero"
+# The summary must not contradict the warnings directly above it. This state
+# printed `ok  no repos carry rendered output here, and the registry names none`
+# under two warnings naming two, and `ok` is the line a reader takes as the
+# verdict. The three assertions above all passed with that line present.
+out_lacks "the registry names none" \
+  "and never says the registry names none while it names two"
+out_has "all 2 registered path(s) are missing or no" \
+  "saying instead that nothing could be checked, and why"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${rc}" = "1" ]; then
   pass "it is a finding, so the run exits 1"
