@@ -17,6 +17,33 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-10
+
+No **Major** entry: `license` is optional. An existing manifest keeps working and
+gains a warning per source that does not record one.
+
+### Added
+- **`license` on sources and candidates, with a warning when a source omits it.**
+  What you are allowed to do with someone else's content is asked once at adoption
+  and then never again, which is exactly the shape of question that wants a
+  mechanical prompt rather than a memory — an unlicensed repo is
+  all-rights-reserved by default. A **warning, not a gate**: the answer is a
+  judgement the operator makes, not one a script can make for them.
+
+  Free text, so "there is no license upstream" is recordable as the finding it is.
+  Blank *is* an error, though — it looks answered and is not, which is worse than
+  omitting the key, whose warning at least names what is missing.
+
+  `make skills-for` prints it beside a candidate's repo, since that is the moment
+  the decision actually gets made, and `[license not recorded]` when there is
+  none.
+
+### Changed
+- `skills_subdir: "."` is documented. It already worked; several skill suites put
+  their skill directories at the repo root rather than under `skills/`, and
+  nothing said so.
+- Suite 825 → 832 assertions.
+
 ## [0.13.0] - 2026-08-10
 
 No **Major** entry: `applies_to` and `candidates` are optional, and a manifest
@@ -1086,7 +1113,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.10.0...v0.11.0
