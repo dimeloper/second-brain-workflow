@@ -17,6 +17,34 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-10
+
+No **Major** entry: `status` is optional and defaults to `suggested`, which is
+how every existing candidate already behaves.
+
+### Added
+- **A candidate can record a decision instead of being re-pitched forever.**
+  Optional `status`: `suggested` (default), `adopted`, `declined`. Only
+  `suggested` is pitched by `make skills-for`; the rest are listed one line each
+  under *Already decided, not pitched*.
+
+  Two deliberate choices. They **stay in the list** rather than being deleted,
+  because the value of a rejected option is the reason it was rejected — delete
+  the entry and the next session re-evaluates from scratch and may reach a
+  different answer for no new reason. And they are **printed, not filtered**,
+  because a roster that silently omitted what was rejected invites re-litigating
+  it, which is exactly the cost the reason was written to avoid.
+
+  `adopted` fills a real gap: a skill installed the vendor's own way — its own
+  installer, a real directory `sync-skills.sh` refuses to touch — is genuinely
+  adopted while appearing in no source's `allow` list, so without it the roster
+  could not describe the installed set at all.
+
+  An unknown status is an error, not a silent fall back to `suggested`.
+
+### Changed
+- Suite 832 → 838 assertions.
+
 ## [0.14.0] - 2026-08-10
 
 No **Major** entry: `license` is optional. An existing manifest keeps working and
@@ -1113,7 +1141,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.11.0...v0.12.0
