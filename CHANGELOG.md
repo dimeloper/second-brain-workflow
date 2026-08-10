@@ -17,6 +17,53 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-10
+
+No **Major** entry: `provisional:` is a new optional key, and a rules directory
+without it behaves exactly as before.
+
+### Added
+- **A rule may declare that it cites a source below `enforced`.**
+  `check-lineage.py` requires a rule's `source:` note to be `enforced`, on the
+  premise that a rule is a matured practice's enforcement. That premise has met a
+  rule that is not a distilled practice: a constraint read off *what an external
+  tool writes* — "this screenshot generator scaffolds a Next.js app, so it must
+  not run inside yours" — is as true on the first repo as the third. It has no
+  evidence curve to climb, so its note sits at `idea` indefinitely and the rule
+  reads as orphaned forever.
+
+  ```yaml
+  source: [route-a-generated-asset-workflow-to-a-dedicated-repo]
+  provisional: read off what the tool writes, so no repo count will mature it
+  ```
+
+  Such a rule is counted as **provisional** rather than orphaned, printed on
+  every run — including when the count is zero, because a section that appears
+  only when non-empty is one nobody learns to look for — and never fails the
+  audit. Documented in `docs/AUDIT.md#provisional-rules` and `rule.md.example`.
+
+  **Prose, never `true`.** `check-rules.py` rejects `provisional: true` by name.
+  A boolean exemption outlives the reason it was added for with nothing left to
+  read, and `true` is the first thing anyone reaching for a flag writes. One
+  line: the frontmatter parser has no folded scalars, which the template now
+  says, because a continuation line reports as `unparsed line` and silently
+  truncates the reason everywhere else.
+
+  **It excuses an immature source, never a missing one.** A rule naming a note
+  that does not exist stays orphaned regardless — with the note gone the lineage
+  cannot be read at all, which is the state the check exists for.
+
+  The two rejected alternatives, recorded because they will be proposed again:
+  promoting the note on one repo games the bar the whole promotion model rests
+  on, and withdrawing the rule discards a constraint that is true today.
+
+### Changed
+- The template-parity test accepts a key documented as a *commented* example,
+  not only one pre-filled in the frontmatter. Requiring every known key to be
+  live in `rule.md.example` would make every rule copied from it arrive already
+  claiming a lineage exemption — the bad default the field exists to avoid.
+- Suite 792 → 805 assertions.
+
 ## [0.11.0] - 2026-08-10
 
 No **Major** entry: nothing an already-onboarded repo or machine has to do.
@@ -993,7 +1040,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.1...v0.9.0
