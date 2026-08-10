@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-10
+
 ### Major
 - **Add `source:` to every rule, or `make audit` and the vault-CI audit job
   will go red and stay red.** `check-lineage.py` used to exit 0 when no rule
@@ -803,7 +805,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.6.2...v0.7.0
