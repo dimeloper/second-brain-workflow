@@ -17,6 +17,66 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-10
+
+No **Major** entry: nothing an already-onboarded repo or machine has to do.
+`sync-skills.sh` output is byte-identical with no manifest configured, the new
+`doctor` check returns before reading anything when no roster is declared, and
+`VENDOR_SKILLS` behaves exactly as it did.
+
+### Added
+- **Bring your own skills.** A `skills.json` manifest declares third-party skill
+  sources — someone else's repo of agent skills — and the engine fetches them at
+  a pinned sha, links the ones you allowlist, and reports drift. The engine still
+  ships no roster of its own: the manifest lives beside your `rules/` in your own
+  private content repo, named by the new `SBW_SKILLS_MANIFEST` config key. A
+  public engine shipping a curated selection of another person's craft skills
+  would be shipping an opinion, which is the same reason `rules/` ships empty.
+
+  Sources are **not** submodules. A submodule records its pin in `.gitmodules`,
+  and this repo is public, so a personal roster would be published with the
+  engine. They are cloned into `vendor/external/`, which is gitignored.
+
+  See the README's *Bringing your own skills*, `skills.json.example` for every
+  field, and `docs/NEW-MACHINE.md` step 3b.
+
+- **`make fetch-skills`** (`scripts/fetch-skill-sources.sh`) — clones each
+  declared source at its `ref`, detached. Preview by default, `YES=1` acts, the
+  same shape as `uninstall` and `upgrade`. The only script here that reaches the
+  network, deliberately separate from `sync-skills.sh`, which runs during the
+  Quickstart and hundreds of times under `make check`. An undeclared leftover
+  checkout is reported, never removed.
+
+- **`scripts/lib/skill_manifest.py`** — parses, validates and resolves the
+  manifest. Every unknown key is a hard error with a near-miss suggestion, an
+  unpinned `ref` is refused (two machines reading one manifest would otherwise
+  install different skills), and so is the placeholder `skills.json.example`
+  ships — it is a well-formed sha that would otherwise fail several steps later
+  inside git. Severity is left to the shell caller, the split
+  `lib/vault_state.py` and `vault-state.sh` already keep.
+
+- **`doctor` reports skill-roster drift** — declared but not linked, fetched but
+  sitting at a sha the manifest does not pin, and linked with no source declaring
+  it. The middle one is the reason the check exists: a wrong-sha skill works
+  perfectly, so two machines can run different versions of one adopted skill with
+  nothing anywhere saying so. Documented in `docs/GUARD.md#make-doctor`.
+
+### Fixed
+- **`skill_link_engine_layout` classified a fetched skill's dangling link as
+  someone else's**, so `make uninstall` would have left it behind forever once
+  its checkout was gone. The two hardcoded layouts matched neither
+  `vendor/external/<source>/<subdir>/<name>` shape. Now `*/vendor/*/skills/*`,
+  a superset of the pattern it replaces, plus a looser `vendor/external` clause
+  because `skills_subdir` is per-source configurable.
+
+### Changed
+- `setup_sandbox` unsets `SBW_SKILLS_MANIFEST`. Third time a tool here began
+  reading more of the environment than the sandbox knew to blank; a developer
+  with a real roster exported would otherwise get extra skills installed into
+  fixtures.
+- `tests/test-skill-manifest.sh` adds 65 assertions, including the first that
+  ties `lib/config.sh` and `lib/config.py` to the same key set.
+
 ## [0.10.0] - 2026-08-10
 
 ### Major
@@ -933,7 +993,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.0...v0.8.1
