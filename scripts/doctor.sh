@@ -5,7 +5,8 @@
 #   - commits here would be authored as the identity vault.json declares
 #   - a skill installed into one configured skills dir isn't missing from another
 #   - a vendored submodule isn't left at the wrong commit after a tag switch
-#   - the repos this machine has rendered into are known, and still rendered
+#   - every repo the registry names still exists, and still carries rendered output
+#   - every repo on this machine that carries rendered output is in the registry
 # Changes nothing. Not part of `make check` — like `make guard` and
 # `make vault-index-check`, it needs a real vault, and CI has none.
 #
@@ -53,7 +54,12 @@ while [ $# -gt 0 ]; do
       VAULT_ORIGIN="the --vault flag"
       shift 2
       ;;
-    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # The whole header block, line 2 to the last comment line before `set`. A
+    # line count is a thing that rots: it used to stop at 20, then 21, cutting
+    # the closing paragraph mid-sentence each time a bullet was added.
+    # tests/test-registry-scan.sh asserts the final line still reaches the
+    # reader, so the next edit here cannot truncate it silently.
+    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -299,43 +305,58 @@ check_submodules() {
   return 0
 }
 
-# Where this machine has rendered, read from the registry render.py appends to
-# on every successful render. Nothing else records it: render.py writes
-# .sbw-version *into* the target, so before the registry the only way to answer
-# "which repos need re-rendering after an upgrade" was a guessed glob — and a
-# glob that matches nothing reads exactly like a machine that has onboarded
-# nothing. Reported, never pruned: a repo on an unmounted volume is not a
-# deleted repo, and dropping the only record of it is not a repair.
+# Which repos on this machine are onboarded, from two sources rather than one.
+#
+# The registry alone could not answer it. It knows only what a render told it, so
+# one render on a machine with twelve pre-registry repos gave one entry, present
+# and rendered, and nothing to report — coverage going from unknown to asserted
+# complete on the strength of a single line. sbw_scan_rendered_repos is the
+# second source, and comparing the two makes the direction that matters
+# reportable: a repo carrying rendered output that the registry does not name.
+#
+# Neither direction is ever repaired here. A registered repo that has gone
+# missing stays in the file (an unmounted volume is not a deleted repo) and a
+# found repo is not registered for you (it may be abandoned, or rendered by an
+# engine old enough that re-rendering is a decision).
 check_registry() {
-  local file entries count=0 stale=0 repo
+  local file entries scan scope repo registered=0 stale=0 unregistered=0 line
+
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
+  scope="$(sbw_scan_scope_line)"
+  # Roots validated in this shell, then the walk captured. The order matters:
+  # sbw_scan_rendered_repos runs inside a command substitution, and the subshell
+  # would take SBW_SCAN_SKIPPED and SBW_SCAN_USABLE with it when it exited.
+  sbw_scan_prepare_roots
+  scan="$(sbw_scan_rendered_repos)"
 
-  # Deliberately not "0 repos onboarded". A machine that has onboarded nothing
-  # and a machine whose registry was never written look identical from here,
-  # and only one of them is fine.
-  if [ -z "${entries}" ]; then
-    local why="there is no registry at ${file}"
-    [ ! -f "${file}" ] || why="${file} lists no repos"
-    # -exec ... + rather than `| xargs grep -l`: with nothing to feed it, BSD
-    # xargs runs grep once with no file arguments, so it reads stdin and the
-    # pipeline hangs — on the one machine state this message exists for, a
-    # machine with no pre-registry repos. A remediation that hangs looks like a
-    # slow search, which is the undiagnosable state all over again.
-    warn "onboarded repo set is undetermined — ${why}
-        Every render records itself now; repos onboarded before this engine
-        version did not, so this machine may have any number of them. List the
-        ones carrying a provenance marker with:
-          find \"\$HOME\" -maxdepth 5 -type d \\( -name node_modules -o -name Library -o -name .git -o -name vaults \\) -prune \\
-            -o -name AGENTS.md -exec grep -l second-brain-workflow {} + 2>/dev/null | sed 's|/AGENTS.md\$||'
-        Re-rendering each hit registers it. No output means this machine really
-        has onboarded nothing."
+  # A root that could not be walked is named, never dropped: this is the one
+  # place coverage silently shrinks, and a scope line that shrank with it would
+  # present unmeasured ground as measured.
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    warn "scan root skipped: ${line}"
+  done <<EOF
+${SBW_SCAN_SKIPPED}
+EOF
+
+  # No usable root means no second source, so there is nothing to compare the
+  # registry against. This is the only state still called undetermined, and it is
+  # narrower than the one v0.9.1 used the word for: an empty registry is now
+  # answerable, an unrunnable scan is not.
+  if [ "${SBW_SCAN_USABLE}" -eq 0 ]; then
+    warn "onboarded repo set is undetermined — no scan root could be read
+        ${file} is not a second opinion: it holds what renders recorded, so with
+        nothing to compare it against, any count from it would be a guess.
+        Point SBW_SCAN_ROOTS at a directory that exists — in $(ds_config_path),
+        or in the environment for one run."
+    say_scan_scope "${scope}"
     return 0
   fi
 
+  # Direction one: registered, and no longer what it was.
   while IFS= read -r repo; do
     [ -n "${repo}" ] || continue
-    count=$((count + 1))
     if [ ! -d "${repo}" ]; then
       stale=$((stale + 1))
       warn "registered repo is not there: ${repo}
@@ -345,13 +366,59 @@ check_registry() {
       stale=$((stale + 1))
       warn "registered repo carries no rendered output any more: ${repo}
         re-render it, or delete its line from ${file}."
+    else
+      registered=$((registered + 1))
     fi
   done <<EOF
 ${entries}
 EOF
 
-  [ "${stale}" -eq 0 ] && ok "${count} onboarded repo(s) registered, all still rendered"
+  # Direction two: rendered, and the registry has never heard of it. The one the
+  # registry cannot see on its own, and the one that was silently true on any
+  # machine that onboarded repos before the registry existed.
+  while IFS= read -r repo; do
+    [ -n "${repo}" ] || continue
+    # Newline on both ends of the subject, not just the front: `entries` comes
+    # from a command substitution, which strips the trailing one, so a pattern
+    # needing "\n<path>\n" would never match the *last* registered repo — and
+    # that repo would then be reported as unregistered while sitting in the file.
+    case "
+${entries}
+" in
+      *"
+${repo}
+"*) continue ;;
+    esac
+    unregistered=$((unregistered + 1))
+    warn "rendered but not registered: ${repo}
+        register it by rendering again: ./scripts/render.py ${repo}
+        or leave it, if that repo is abandoned — nothing here prunes or adopts."
+  done <<EOF
+${scan}
+EOF
+
+  if [ "${stale}" -eq 0 ] && [ "${unregistered}" -eq 0 ]; then
+    if [ "${registered}" -eq 0 ]; then
+      # Determined, not unknown. The scan ran, found nothing, and states the
+      # boundary it ran inside — which is a measurement. What v0.9.1 refused to
+      # print was a count with no boundary at all, and that is still refused
+      # above whenever the scan cannot run.
+      ok "no repos carry rendered output here, and the registry names none"
+    else
+      ok "${registered} onboarded repo(s) registered, all still rendered, and none unregistered"
+    fi
+  fi
+  say_scan_scope "${scope}"
   return 0
+}
+
+# Printed on every outcome, clean ones included. A scan cannot claim
+# completeness, so a report that does not state its boundary is a stronger claim
+# than the tool can support — and "nothing found" is exactly the answer a reader
+# will take as final.
+say_scan_scope() {
+  echo "        scanned scope: $1"
+  echo "        (a repo outside it — another volume, nested deeper — does not appear above)"
 }
 
 echo "second-brain-workflow doctor — vault: ${VAULT}"

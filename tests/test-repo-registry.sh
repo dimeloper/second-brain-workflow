@@ -175,55 +175,59 @@ XDG_CONFIG_HOME="${CLEAN_HOME}" "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1 ||
 out_has "1 onboarded repo(s) registered, all still rendered" \
   "doctor reports a registry whose entries are all present"
 
-# --- doctor: no registry at all ---------------------------------------------
-# The load-bearing case. "0 repos onboarded" is a plausible-looking wrong
-# answer: a machine that has onboarded nothing and a machine whose registry was
-# never written look identical from here, and only one of them is fine.
+# --- doctor: no registry, and nothing found either --------------------------
+# v0.9.1 called this undetermined, because the registry was the only source and
+# an empty one could not be told from an unwritten one. The scan is a second
+# source, so this is now a determined result — stated with the boundary it holds
+# within, which is what separates it from the confident zero v0.9.1 refused to
+# print. tests/test-registry-scan.sh owns the scan's own cases.
 EMPTY_HOME="${SANDBOX}/empty-config-home"
-XDG_CONFIG_HOME="${EMPTY_HOME}" "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1
+EMPTY_SCAN="${SANDBOX}/nothing-rendered-here"
+mkdir -p "${EMPTY_SCAN}"
+XDG_CONFIG_HOME="${EMPTY_HOME}" SBW_SCAN_ROOTS="${EMPTY_SCAN}" \
+  "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1
 doctor_rc=$?
-out_has "undetermined" "no registry: the onboarded set is reported as undetermined"
-out_lacks "0 onboarded repo" "and never as a count of zero"
-# shellcheck disable=SC2016  # matching the literal text doctor.sh prints, which
-# must reach the reader's shell unexpanded — that is the whole assertion.
-out_has 'find "$HOME" -maxdepth 5' "and names the command that seeds one"
-TESTS_RUN=$((TESTS_RUN + 1))
-if [ "${doctor_rc}" -ne 0 ]; then
-  pass "and the run stays non-zero"
-else
-  fail "and the run stays non-zero" "$(cat "${OUT}")"
-fi
+out_has "no repos carry rendered output here, and the registry names none" \
+  "no registry and an empty scan: a determined result, not an unknown"
+out_lacks "undetermined" "so the word undetermined does not appear"
+out_lacks "0 onboarded repo" "and still never a count of zero"
+out_has "scanned scope: roots=${EMPTY_SCAN}" "with the scope that result holds within"
 assert_no_file "${EMPTY_HOME}/second-brain-workflow/repos" "and doctor creates no registry of its own"
 
-# And it runs, against a HOME holding one pre-registry repo and one decoy under
-# a pruned directory. Asserting the string alone would pass just as happily on a
-# command that hangs — which the `| xargs grep -l` form does on BSD xargs when
-# nothing matches, i.e. on exactly the machine this message is printed for.
+# --- doctor: no registry, but repos are there -------------------------------
+# The pre-registry machine. What used to be a printed find command for the
+# reader to run is now the check itself, so the repos are named rather than
+# described — including the decoy under a pruned directory that must not be.
 SEED_HOME="${SANDBOX}/seed-home"
 mkdir -p "${SEED_HOME}/onboarded" "${SEED_HOME}/node_modules/decoy"
 render "${SEED_HOME}/onboarded" >/dev/null 2>&1
 cp "${SEED_HOME}/onboarded/AGENTS.md" "${SEED_HOME}/node_modules/decoy/AGENTS.md"
-seed_cmd="$(sed -n '/^          find /,/AGENTS.md\$||.$/p' "${OUT}" | sed 's/^ *//')"
-seed_out="$(HOME="${SEED_HOME}" eval "${seed_cmd}" </dev/null 2>&1)"
-seed_rc=$?
-assert_exit 0 "${seed_rc}" "and that command runs to completion"
+XDG_CONFIG_HOME="${EMPTY_HOME}" SBW_SCAN_ROOTS="${SEED_HOME}" \
+  "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1
+doctor_rc=$?
+out_has "rendered but not registered: $(real "${SEED_HOME}")/onboarded" \
+  "a repo onboarded before the registry existed is named"
+out_has "./scripts/render.py $(real "${SEED_HOME}")/onboarded" \
+  "with the command that registers it"
+out_lacks "node_modules" "and the decoy under a pruned directory is not reported"
 TESTS_RUN=$((TESTS_RUN + 1))
-if [ "${seed_out}" = "${SEED_HOME}/onboarded" ]; then
-  pass "and lists the pre-registry repo, without the pruned decoy"
+if [ "${doctor_rc}" -ne 0 ]; then
+  pass "and the run stays non-zero while it is unregistered"
 else
-  fail "and lists the pre-registry repo, without the pruned decoy" \
-    "ran ${seed_cmd} — got: ${seed_out}"
+  fail "and the run stays non-zero while it is unregistered" "$(cat "${OUT}")"
 fi
 
 # --- doctor: a registry that exists but lists nothing -----------------------
 # Comments and blank lines are ignored on read, so a file holding only those is
-# the same undetermined state as no file — not an empty set of repos.
+# the same state as no file at all — which is now answerable rather than unknown.
 ANNOTATED="${SANDBOX}/annotated-config-home"
 mkdir -p "${ANNOTATED}/second-brain-workflow"
 printf '# nothing yet\n\n   \n' > "${ANNOTATED}/second-brain-workflow/repos"
-XDG_CONFIG_HOME="${ANNOTATED}" "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1 || true
-out_has "undetermined" "a registry of only comments is undetermined too"
-out_has "lists no repos" "and says the file is there but empty"
+XDG_CONFIG_HOME="${ANNOTATED}" SBW_SCAN_ROOTS="${EMPTY_SCAN}" \
+  "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1 || true
+out_has "no repos carry rendered output here" \
+  "a registry of only comments reads the same as no registry"
+out_lacks "undetermined" "and is equally not undetermined"
 
 # --- comments and blank lines are ignored, not counted ----------------------
 printf '# machine registry\n\n%s\n' "$(real "${CLEAN_REPO}")" \

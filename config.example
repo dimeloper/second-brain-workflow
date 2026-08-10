@@ -53,3 +53,21 @@ SBW_RULES_DIR=
 # is unset and neither --expect-id nor this key resolves to a value. Set it
 # once per vault this machine writes to, e.g. "personal" or "work".
 SBW_EXPECTED_VAULT_ID=
+
+# Where `doctor` looks for repos carrying rendered output, and how deep.
+# Colon-separated roots; default: your home directory. The scan is a second
+# source next to the repo registry, and it is what makes "rendered but not
+# registered" reportable — the registry alone only knows what a render told it.
+#
+# It cannot claim completeness: a repo on another volume, or nested deeper than
+# the depth below, is outside the scan and every report says so. Widen the roots
+# if your repos live somewhere else, e.g.
+# SBW_SCAN_ROOTS=/Users/you:/Volumes/work
+SBW_SCAN_ROOTS=
+
+# Depth handed to `find`, counted from each root. This is the depth of the
+# *marker file*, so a repo directly under a root is depth 1 and its
+# `.sbw-version` is depth 2 — the default of 5 therefore reaches repos about
+# four directories deep. Raising it costs scan time; lowering it silently
+# narrows what "no repos found" means, which is why the scope is printed.
+SBW_SCAN_DEPTH=

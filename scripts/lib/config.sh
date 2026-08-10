@@ -7,9 +7,9 @@
 #
 # Precedence: existing environment wins over the config file, which wins over
 # defaults. CLI flags are the caller's job — parse them after loading.
-# Keep in step with lib/config.py; both implement the same six keys.
+# Keep in step with lib/config.py; both implement the same eight keys.
 
-SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID"
+SBW_CONFIG_KEYS="SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID SBW_SCAN_ROOTS SBW_SCAN_DEPTH"
 
 ds_config_path() {
   local base="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -102,6 +102,15 @@ ds_config_load() {
   # that fell back to something here would defeat the point of it; unset
   # means "not configured yet," and callers that care must fail closed on it.
   [ -n "${SBW_EXPECTED_VAULT_ID+set}" ] || SBW_EXPECTED_VAULT_ID=""
+  # Where sbw_scan_rendered_repos looks, and how deep. Authoritative here rather
+  # than in lib/registry.sh: a scan whose boundary can be configured has to read
+  # that boundary the same way every other setting is read, or the config file
+  # stops being the place a machine is described. registry.sh carries matching
+  # fallbacks for the case where it is sourced without ds_config_load, and
+  # tests/test-registry-scan.sh asserts the two agree.
+  [ -n "${SBW_SCAN_ROOTS+set}" ] || SBW_SCAN_ROOTS="$HOME"
+  [ -n "${SBW_SCAN_DEPTH+set}" ] || SBW_SCAN_DEPTH="5"
   export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID
+  export SBW_SCAN_ROOTS SBW_SCAN_DEPTH
   export SBW_SKILLS_DIRS_DEFAULT
 }

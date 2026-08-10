@@ -291,12 +291,16 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   commit other than the one this engine checkout's tag actually pins, the
   state a bare `git checkout <tag>` leaves behind. See the README's
   [Rollback](../README.md#versioning) section.
-- **The repo registry** — registered repos that are no longer there, or no
-  longer carry rendered output, named individually and never pruned (a repo on
-  an unmounted volume is not a deleted repo). With no registry, the onboarded
-  set is reported as *undetermined* rather than as zero repos, and the message
-  names the `find` command that seeds one from provenance markers. See the
-  README's [repo registry](../README.md#the-repo-registry) section.
+- **The repo registry, both directions** — the registry is compared against a
+  scan of this machine for repos carrying rendered output, because the registry
+  alone only knows what a render told it. Registered repos that are gone or no
+  longer rendered are named and never pruned (a repo on an unmounted volume is
+  not a deleted repo); repos that are rendered but *not* registered are named
+  with the command that registers each. Every report states the scan's scope —
+  `roots=… depth=…`, on clean runs too — because a scan cannot claim
+  completeness, and *undetermined* now means only that no configured root could
+  be read. See the README's [repo registry](../README.md#the-repo-registry)
+  section.
 
 `-h` prints this same list from the script itself, so it can't drift out of
 step with what's actually checked.
