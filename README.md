@@ -557,6 +557,36 @@ hand-edit it.
 See [Quickstart](#quickstart) for cloning at the newest release; drop the
 `git checkout` line there to track `main` instead.
 
+### Upgrading a set-up machine
+
+```bash
+make upgrade              # preview: print what would happen, change nothing
+make upgrade YES=1        # switch the checkout, then report
+```
+
+Preview is the default and `YES=1` is the only thing that acts, the same
+convention as [`make uninstall`](#removing-them-again). It prints
+`current → target`, then **every `### Major` section from `CHANGELOG.md` in that
+range, verbatim, before proposing anything** — that step is the skippable one
+and the only one carrying required action, which is why it comes first and why
+it is read from the target ref's own changelog rather than the working tree's.
+Then, in order: refuse if the checkout is dirty or holds local commits the
+target doesn't contain, switch the checkout, update the submodule, re-link
+skills, run [`doctor`](docs/GUARD.md#make-doctor) inline, run `render.py
+--check` across the [repo registry](#the-repo-registry) reporting drift per
+repo with the exact command that fixes each, and report a vault CI `ENGINE_REF`
+left behind the target.
+
+It never renders, commits, pushes, or writes to a vault. `--check` reports and
+you decide; a stale `ENGINE_REF` is named, not edited.
+
+`make upgrade REF=v0.9.0` targets a specific tag instead of the newest, and
+`NO_FETCH=1` skips contacting the remote. Exit codes: `0` nothing to act on,
+`1` findings, `2` refused (or `doctor` found a misconfiguration), `3` **the
+onboarded repo set is undetermined** — a missing, empty or wholly stale
+registry means the question "which repos need re-rendering" has no answer, and
+the run says so and fails rather than printing a zero that reads as success.
+
 **Rollback:** in the engine checkout,
 
 ```bash
@@ -567,7 +597,9 @@ git submodule update --init --recursive   # vendor/obsidian-skills is pinned per
 ```
 
 then re-render each onboarded repo (`./scripts/render.py <repo>`) — the
-[repo registry](#the-repo-registry) is the list of which those are. Checking
+[repo registry](#the-repo-registry) is the list of which those are, and
+`make upgrade REF=v0.2.0` runs this whole sequence (minus the render) with a
+preview first. Checking
 out a tag alone does not move `vendor/obsidian-skills` to the commit that tag
 pinned — skipping the submodule step leaves vendored skills at whatever they
 were before the rollback, which defeats the point of pinning. [`make

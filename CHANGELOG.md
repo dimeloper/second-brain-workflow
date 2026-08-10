@@ -33,6 +33,29 @@ write release notes, not two to keep in sync by hand.
   Nothing in an onboarded repo changes, and nothing reads the registry to
   decide what to render — `render.py` still takes its target from the command
   line.
+- **`make upgrade`** (`scripts/upgrade.sh`) — one command for what was seven
+  sequenced ones, preview by default with `YES=1` the only thing that acts, as
+  in `make uninstall`. It prints `current → target` and then every `### Major`
+  section in that range verbatim *before* proposing anything: that step is the
+  skippable one and the only one carrying required action. The sections are read
+  from the target ref's own `CHANGELOG.md`, since the checkout at the current
+  version does not contain the target release's notes — still local, no network.
+
+  Then, in order: refuse on a dirty checkout or local commits the target does
+  not contain (naming them — a checkout switch loses a hand-edit silently),
+  switch, `git submodule update --init --recursive`, `sync-skills.sh`, `doctor`
+  inline, `render.py --check` across the repo registry with the exact per-repo
+  fix command, and a report of a vault CI `ENGINE_REF` left behind the target.
+  It never renders, commits, pushes, or writes to a vault: `--check` reports and
+  the human decides. `--ref` and `--no-fetch` (`REF=`/`NO_FETCH=` via make) are
+  seams so the tests need neither network nor a fabricated tag in the real
+  remote.
+
+  When the registry is missing, empty or wholly stale, the onboarded set is
+  reported as undetermined and the run exits 3. A zero count would read as
+  success and leave every repo on the machine at a stale render — the same
+  failure shape as the changelog coverage check in v0.9.0 and the unparseable
+  threshold in v0.6.0.
 - **`doctor` reports on the registry.** Registered paths that have gone missing,
   or that no longer carry rendered output, are named individually and left in
   place — an unmounted volume is not a deleted repo, and deleting the only
