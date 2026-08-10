@@ -6,7 +6,7 @@
 
 Precedence: existing environment wins over the config file, which wins over
 defaults. CLI flags are the caller's job — apply them on top of load().
-Keep in step with lib/config.sh; both implement the same six keys.
+Keep in step with lib/config.sh; both implement the same eight keys.
 """
 
 import os
@@ -23,6 +23,12 @@ DEFAULTS = {
     # (guard-vault-commit.sh / init-vault.sh are bash), but it's tracked here
     # too so the two config implementations never define different key sets.
     "SBW_EXPECTED_VAULT_ID": "",
+    # Where the rendered-repo scan looks, and how deep. No Python consumer reads
+    # either one yet — the scan is shell — but they are tracked here for the same
+    # reason SBW_EXPECTED_VAULT_ID is: a key the two implementations do not both
+    # know about is a key one of them warns is unknown.
+    "SBW_SCAN_ROOTS": "~",
+    "SBW_SCAN_DEPTH": "5",
 }
 
 

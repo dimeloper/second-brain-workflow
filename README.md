@@ -406,12 +406,33 @@ warns on stderr and the render still succeeds — rendering is the job — but i
 does warn, because an unrecorded render is how the set becomes undetermined
 later with nothing left to explain it.
 
-[`make doctor`](docs/GUARD.md#make-doctor) reports registered repos that have
-gone missing or stopped carrying rendered output, and never prunes them: a repo
-on an unmounted volume is not a deleted repo. With no registry at all it
-reports the onboarded set as **undetermined** — not as zero repos — and names
-the `find` command that lists repos onboarded before the registry existed;
-re-rendering each hit registers it. `make uninstall` leaves the file alone.
+### Both directions, from two sources
+
+The registry alone cannot answer "which repos on this machine are onboarded" —
+it holds what renders recorded, so one render on a machine with a dozen
+pre-registry repos looks exactly like complete coverage. So
+[`make doctor`](docs/GUARD.md#make-doctor) also **scans** for repos carrying
+rendered output (a `.sbw-version`, or the provenance marker in `AGENTS.md` /
+`CLAUDE.md` — the same rule every other registry check uses) and compares the
+two sets:
+
+- **Registered, but gone or no longer rendered** — named, never pruned. A repo
+  on an unmounted volume is not a deleted repo.
+- **Rendered, but not registered** — named, with `./scripts/render.py <repo>`
+  to register it, or leave it if that repo is abandoned. Nothing adopts it for
+  you.
+
+A scan cannot claim completeness: a repo on another volume, or nested deeper
+than the depth limit, is outside it. So **every report states its scope** —
+`roots=… depth=…` — on clean runs too, and a root that could not be read is
+named rather than dropped. Set `SBW_SCAN_ROOTS` (colon-separated, default
+`$HOME`) and `SBW_SCAN_DEPTH` (default `5`) in the config file to widen it; see
+`config.example`.
+
+Finding nothing within a stated boundary is a result. **Undetermined** is now
+only what it says: no configured root could be read, so there was no second
+source to compare against at all. `make uninstall` leaves the registry file
+alone.
 
 ## One rule set, every agent
 

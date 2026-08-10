@@ -17,6 +17,35 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **`doctor` determines the onboarded repo set instead of asking about it.** The
+  registry was the only source, so one render on a machine with twelve
+  pre-registry repos gave one entry — present, rendered, nothing to report — and
+  coverage went from unknown to asserted complete on the strength of that entry.
+  `sbw_scan_rendered_repos` is a second source, so the direction that matters is
+  now reportable: **repos carrying rendered output that the registry does not
+  name**, each with the command that registers it. The existing direction
+  (registered but gone) is unchanged, and neither is ever repaired automatically.
+
+  The scan replaces the `find` command `doctor` used to print for the reader to
+  run. That command matched an `AGENTS.md` carrying the marker and nothing else,
+  while every other registry check also accepts a bare `.sbw-version` — so a repo
+  whose `AGENTS.md` is hand-written (`render.py` leaves those alone by design) or
+  absent (`RENDER_TARGETS=cursor`) was invisible to the remediation while being
+  visible to the checks. On such a machine it printed nothing, which reads as
+  "onboarded nothing at all".
+
+  Because a scan cannot claim completeness, every report states its scope
+  (`roots=… depth=…`, on clean runs too) and names any root it could not read.
+  Two new config keys set that boundary: `SBW_SCAN_ROOTS` (colon-separated,
+  default `$HOME`) and `SBW_SCAN_DEPTH` (default `5`).
+
+  **One semantic change:** an empty registry with a scan that found nothing is
+  now a *determined* result reported within its stated boundary, where v0.9.1
+  called it undetermined. Undetermined survives, narrowed to the state that
+  genuinely is: no configured root could be read, so there was no second source.
+  `upgrade.sh` still reads the registry alone — that follows.
+
 ### Added
 - **A repo registry, so the set of onboarded repos is known rather than
   guessed.** A successful render appends the target's real path to

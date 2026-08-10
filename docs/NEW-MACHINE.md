@@ -410,8 +410,8 @@ The render also records this repo in
 "re-render everything" is a list rather than a glob you have to guess — see the
 README's [repo registry](../README.md#the-repo-registry). `--check` and
 `--dry-run` don't write it. On a machine that onboarded repos before this
-existed, `make doctor` reports the set as undetermined and names the command
-that finds them.
+existed, `make doctor` scans for them and names each one it finds that the
+registry does not — re-rendering registers it.
 
 ### What rendering actually produces
 
