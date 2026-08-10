@@ -1,0 +1,58 @@
+{
+  "//": [
+    "Third-party skill sources — someone else's repo of agent skills you want",
+    "installed alongside this engine's own workflow skills.",
+    "",
+    "This file does NOT belong in the engine checkout. Put it beside rules/ in",
+    "whatever private content repo this machine points at, and name it in the",
+    "machine config:",
+    "",
+    "    SBW_SKILLS_MANIFEST=~/dev-conventions/skills.json",
+    "",
+    "The reason is the same one rules/ ships empty here: a public engine that",
+    "shipped a curated roster of another person's skills would be shipping an",
+    "opinion. The mechanism is the engine's; the roster is yours.",
+    "",
+    "Then: `make fetch-skills` (preview) / `make fetch-skills YES=1` to clone",
+    "each source at its pin, and `make sync-skills` to link them in.",
+    "`make doctor` reports a source that is unfetched, sitting at the wrong sha,",
+    "or linked without being declared. A '//' key is a comment and is ignored,",
+    "so this file is a valid manifest as it stands — copy it and edit in place.",
+    "",
+    "The all-zero refs below are refused rather than attempted, so a copy you",
+    "have not finished editing says so instead of failing later inside git.",
+    "",
+    "Fields:",
+    "  name           required. Becomes the directory under vendor/external/,",
+    "                 so it must be a single safe path segment.",
+    "  repo           required. Anything `git clone` accepts.",
+    "  ref            required, and a full 40-character sha unless you enjoy",
+    "                 surprises. An unpinned source means two machines reading",
+    "                 this file install different skills on different days.",
+    "  allow          required. Per-source allowlist, by skill directory name.",
+    "                 There is no 'install everything' — each skill you adopt is",
+    "                 charged against the same session budget as your own, and",
+    "                 the one roster that was chosen wholesale turned out to want",
+    "                 three of six.",
+    "  skills_subdir  optional, defaults to 'skills'. Where in that repo the",
+    "                 skill directories live.",
+    "",
+    "A skill of your own with the same name always wins — sync reports the",
+    "shadowing rather than silently preferring one."
+  ],
+  "sources": [
+    {
+      "name": "example-motion",
+      "repo": "https://github.com/example/motion-skills",
+      "ref": "0000000000000000000000000000000000000000",
+      "allow": ["animate", "review-animations"]
+    },
+    {
+      "name": "example-store-assets",
+      "repo": "https://github.com/example/store-screenshots",
+      "ref": "0000000000000000000000000000000000000000",
+      "skills_subdir": "skills",
+      "allow": ["app-store-screenshots"]
+    }
+  ]
+}

@@ -177,6 +177,45 @@ One line per skill — the target shown is the link's real target, the same thin
 `readlink` would print — then the count. Fewer than expected, or a `!!` line,
 means a name collided with something already there and was left alone.
 
+Seven is the count with no third-party roster declared. If your rules repo
+carries a `skills.json`, do the next step first and re-run this one — the count
+goes up by however many skills your `allow` lists name.
+
+### 3b. Fetch your own skill roster (only if you have one)
+
+Skip this entirely if you have no `skills.json`. Nothing later depends on it, and
+the engine ships no roster of its own.
+
+```bash
+# in the machine config, alongside SBW_RULES_DIR
+SBW_SKILLS_MANIFEST=~/dev-conventions/skills.json
+
+make fetch-skills            # preview: what would be cloned, and at which sha
+make fetch-skills YES=1      # clone each source into vendor/external/
+./scripts/sync-skills.sh     # link the allowed skills in
+```
+
+This is the one step that reaches the network, which is why it is separate from
+the sync. `vendor/external/` is gitignored, so nothing you fetch is ever
+committed here.
+
+**Check.** `make fetch-skills` a second time, and every source should already be
+at its pin:
+
+```
+motion
+  repo: https://github.com/someone/skills
+  ref:  0dd13f5be1c4a2f7e9b8d6c5a4930817264f5abc
+  already at 0dd13f5be1c4a2f7e9b8d6c5a4930817264f5abc
+
+1 up to date, 0 to fetch.
+```
+
+`already at <sha>` on every source is the assertion. Anything else means the
+checkout moved, and re-running with `YES=1` re-pins it. If a source reports
+`not fetched` from `sync-skills.sh` instead, the fetch has not run yet —
+`sync-skills.sh` never clones, deliberately.
+
 ### 4. Create a vault
 
 ```bash

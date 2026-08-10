@@ -340,6 +340,61 @@ SKILLS_DIRS=~/.claude/skills ./scripts/sync-skills.sh
 VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-skills.sh
 ```
 
+### Bringing your own skills
+
+The engine ships five skills of its own and tracks one pinned upstream set. It
+does **not** ship a roster of other people's skills, for the same reason
+[`rules/`](#the-rules-live-somewhere-else) ships empty: a curated selection of
+someone else's craft skills is an opinion, and the engine's job is the mechanism.
+
+Declare the ones you want in a `skills.json` next to your own `rules/`, and point
+the machine config at it:
+
+```
+# ~/.config/second-brain-workflow/config
+SBW_SKILLS_MANIFEST=~/dev-conventions/skills.json
+```
+
+```json
+{
+  "sources": [
+    {
+      "name": "motion",
+      "repo": "https://github.com/someone/skills",
+      "ref": "0dd13f5be1c4a2f7e9b8d6c5a4930817264f5abc",
+      "allow": ["animate", "review-animations"]
+    }
+  ]
+}
+```
+
+See [`skills.json.example`](skills.json.example) for every field. Then:
+
+```bash
+make fetch-skills          # preview; YES=1 clones each source at its pin
+make sync-skills           # link the allowed skills in
+make doctor                # reports unfetched, wrong-sha, or undeclared links
+```
+
+Three rules worth knowing before you write one:
+
+- **`ref` is required, and should be a full sha.** An unpinned source means two
+  machines reading the same manifest install different skills on different days,
+  which is the whole failure the manifest exists to prevent. An abbreviated ref
+  is accepted with a warning; the placeholder from the example is refused.
+- **`allow` is required and per-source.** There is no "install everything" —
+  every adopted skill is charged against the same session budget as your own.
+- **A skill of yours wins.** A same-named local skill shadows the adopted one,
+  and the sync says so rather than silently preferring one.
+
+Sources are cloned into `vendor/external/`, which is **gitignored**. That is
+deliberately not a submodule: a submodule records its pin in `.gitmodules`, and
+this repo is public, so your roster would ship with the engine.
+
+A skill that ships **its own installer** does not belong in a manifest — install
+it the vendor's way and let it be a real directory. `sync-skills.sh` refuses to
+touch one, which is what keeps `use-railway` working.
+
 **Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
 runs `sync-skills.sh` before a machine config exists, so the default applies and
 both directories get the links; a config written afterwards naming only one
