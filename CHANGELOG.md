@@ -17,6 +17,56 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-08-10
+
+No **Major** entry: a new read-only command and a new optional step in a skill.
+Nothing an onboarded repo or an existing vault has to do.
+
+### Added
+- **`make practices-for REPO=...`** — which vault practice notes govern a repo and
+  have never been applied there. Only `enforced` notes become rules and only rules
+  reach a repo, so on a vault of ~180 notes the ~160 at `idea`/`trialing` are
+  invisible to a repo that was just onboarded. Filtered to notes whose `repos:`
+  does **not** already name this repo.
+
+  The point is the **promotion delta**. Promotion runs on `length(repos)`, so one
+  deliberate application is often the single act that clears a rung — and knowing
+  which note was one repo short used to depend on remembering.
+
+  **Two tiers, because a promotion claim is only as good as the match.** A note's
+  own `applies-to` glob earns one (and the report names the glob *and* the file
+  that matched); the domain fallback does not. The first real run made the case: an
+  Angular signals note and a Next server-actions note both surfaced for an Astro
+  site on domain alone, and a guess reading "clears ENFORCED" would invite adding a
+  `repos:` entry for a note that governs nothing there — corrupting the only
+  measure the promotion model has.
+
+  **Reports only, and never offers to apply.** The vault's rule is that `trialing`
+  is *earned by deliberate re-application, not just counted*, so applying a batch
+  would manufacture exactly the evidence the bar exists to measure. Apply one, then
+  record it through `update-second-brain`.
+
+  Cross-cutting notes without a matching glob are excluded **and counted** — they
+  apply everywhere, so listing a hundred would bury the repo-specific ones.
+
+- **`onboard-repo` step 2c** runs it and reports, replacing step 2's guessed
+  "3–6 note titles" with a computed list. It is told not to apply, and to
+  sanity-check a delta before repeating it — a note claiming `**/package.json`
+  matches every Node repo ever written.
+
+- **`scripts/lib/promotion.py`** reads both promotion bars from the vault's own
+  `00-maps/promotion-candidates.md`. Missing, unparseable, or stating two
+  different numbers for one rung is a **hard error**, never a default: a report
+  computed against a guessed bar names specific notes as ready when they are not.
+
+### Changed
+- `repo_files` and `path_matches` moved to **`scripts/lib/repo_match.py`**, shared
+  by `skill_manifest.py` and `practices-for.py`. Two commands ask the same
+  question of a repo, and two implementations of "does this glob match" would
+  drift into disagreeing about one repo.
+- Suite 838 → 861 assertions, including one asserting `promotion.py` and
+  `check-lineage.py` read the same enforced bar.
+
 ## [0.15.0] - 2026-08-10
 
 No **Major** entry: `status` is optional and defaults to `suggested`, which is
@@ -1141,7 +1191,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.12.0...v0.13.0
