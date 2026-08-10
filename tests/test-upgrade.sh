@@ -54,36 +54,39 @@ git -C "${FIX}" config user.name "t"
 
 # A synthetic changelog, so the assertions name strings that exist for the sake
 # of being asserted on rather than release notes that will be rewritten.
-cl_head() { cat <<'EOF'
+#
+# Sections are strings, not functions: release() would have to invoke them by
+# name, and a function only ever invoked indirectly reads as unreachable to the
+# linter — under a code that differs between its versions (SC2329 on 0.11,
+# SC2317 on what CI installs), so silencing it here silenced nothing in CI. A
+# variable has no such problem.
+#
+# (A line of prose must not begin with a "# shellcheck" the linter will try to
+# parse as a directive, which is its own small lesson from the same run.)
+CL_HEAD="$(cat <<'EOF'
 # Changelog
 
 ## [Unreleased]
 
 ### Major
 - MAJOR-UNRELEASED — carries no version, so it can never be inside a range.
-
 EOF
-}
-# shellcheck disable=SC2329  # invoked indirectly, by name, from release()
-cl_095_draft() { cat <<'EOF'
+)"
+CL_095_DRAFT="$(cat <<'EOF'
 ## [0.9.5] - drafted, not tagged
 
 ### Major
 - MAJOR-095-AHEAD — drafted above every target these tests use.
-
 EOF
-}
-# shellcheck disable=SC2329  # invoked indirectly, by name, from release()
-cl_0100() { cat <<'EOF'
+)"
+CL_0100="$(cat <<'EOF'
 ## [0.10.0] - 2026-09-01
 
 ### Major
 - MAJOR-0100 — two minor versions up.
-
 EOF
-}
-# shellcheck disable=SC2329  # invoked indirectly, by name, from release()
-cl_092() { cat <<'EOF'
+)"
+CL_092="$(cat <<'EOF'
 ## [0.9.2] - 2026-08-20
 
 ### Added
@@ -91,11 +94,9 @@ cl_092() { cat <<'EOF'
 
 ### Fixed
 - FIXED-092
-
 EOF
-}
-# shellcheck disable=SC2329  # invoked indirectly, by name, from release()
-cl_091() { cat <<'EOF'
+)"
+CL_091="$(cat <<'EOF'
 ## [0.9.1] - 2026-08-15
 
 ### Major
@@ -104,35 +105,39 @@ cl_091() { cat <<'EOF'
 
 ### Added
 - ADDED-091
-
 EOF
-}
-# shellcheck disable=SC2329  # invoked indirectly, by name, from release()
-cl_090() { cat <<'EOF'
+)"
+CL_090="$(cat <<'EOF'
 ## [0.9.0] - 2026-08-10
 
 ### Major
 - MAJOR-090 — below the range whenever 0.9.0 is the current version.
-
 EOF
-}
-cl_links() { cat <<'EOF'
+)"
+CL_LINKS="$(cat <<'EOF'
 [Unreleased]: https://example.com/compare/v0.10.0...HEAD
 [0.10.0]: https://example.com/compare/v0.9.2...v0.10.0
 EOF
-}
+)"
 
+# Newest section first, as the real file is. The blank line between sections is
+# added here rather than carried in the strings: command substitution strips
+# trailing newlines, so a section cannot hold its own separator.
 release() {
-  local v="$1"
+  local v="$1" section
   shift
   echo "${v}" > "${FIX}/VERSION"
-  { cl_head; for section in "$@"; do "${section}"; done; cl_links; } > "${FIX}/CHANGELOG.md"
+  {
+    printf '%s\n\n' "${CL_HEAD}"
+    for section in "$@"; do printf '%s\n\n' "${section}"; done
+    printf '%s\n' "${CL_LINKS}"
+  } > "${FIX}/CHANGELOG.md"
   git -C "${FIX}" add -A
   git -C "${FIX}" commit -q -m "release ${v}"
   git -C "${FIX}" tag "v${v}"
 }
 
-release 0.9.0 cl_090
+release 0.9.0 "${CL_090}"
 # The 0.9.1 release also grows upgrade.sh, so the --yes case below is switching
 # the checkout out from under the very file bash is executing. That is the
 # hazard the script wraps its body in a function for; without a version where
@@ -140,9 +145,9 @@ release 0.9.0 cl_090
 awk 'NR==1 {print; for (i = 0; i < 60; i++) print "# fixture padding, to move every byte offset in this file"; next} {print}' \
   "${UPGRADE}" > "${FIX}/scripts/upgrade.next" && mv "${FIX}/scripts/upgrade.next" "${UPGRADE}"
 chmod +x "${UPGRADE}"
-release 0.9.1 cl_095_draft cl_091 cl_090
-release 0.9.2 cl_095_draft cl_092 cl_091 cl_090
-release 0.10.0 cl_0100 cl_095_draft cl_092 cl_091 cl_090
+release 0.9.1 "${CL_095_DRAFT}" "${CL_091}" "${CL_090}"
+release 0.9.2 "${CL_095_DRAFT}" "${CL_092}" "${CL_091}" "${CL_090}"
+release 0.10.0 "${CL_0100}" "${CL_095_DRAFT}" "${CL_092}" "${CL_091}" "${CL_090}"
 
 at_version() { git -C "${FIX}" checkout -q "v$1"; }
 head_sha() { git -C "${FIX}" rev-parse HEAD; }
@@ -237,10 +242,16 @@ out_lacks "audit.yml pins main, behind" "not as a version behind the target"
 rm -rf "${VAULT}/.github"
 
 # --- a target ref with no version in it is refused --------------------------
+# The shape check has to come before the existence check, or the answer depends
+# on whether `git init` here happened to name the initial branch `main` — which
+# is a git default that varies by version and config, and did vary between this
+# machine and CI. "main is not a release tag" is true either way, and is the
+# more useful of the two answers.
 upgrade --ref main
 rc=$?
 assert_exit 2 "${rc}" "a --ref that is not a release tag is refused"
 out_has "must name a release tag" "and says what it wanted instead"
+out_lacks "no such ref" "not that the ref does not exist, which is a different problem"
 
 # --- a dirty checkout is refused --------------------------------------------
 echo "a hand edit nobody committed" >> "${FIX}/README.md"

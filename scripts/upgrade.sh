@@ -175,19 +175,16 @@ report_version() {
   TARGET_FROM=""
   resolve_target
 
-  if ! git -C "${STANDARDS_DIR}" rev-parse -q --verify "${TARGET_REF}^{commit}" >/dev/null; then
-    echo "  ERROR no such ref in this checkout: ${TARGET_REF}" >&2
-    if [ "${FETCH}" -eq 0 ]; then
-      note "--no-fetch was given, so nothing new was fetched."
-    fi
-    exit 2
-  fi
-
   TARGET_VERSION="${TARGET_REF#v}"
   # A ref with no version in it cannot be compared with anything. Refused rather
   # than tolerated: vnum() would read "main" as 0.0.0, making the Major range
   # empty and every vault ENGINE_REF look ahead of the target — two confident
   # answers, both wrong, in the one place this script exists to get right.
+  #
+  # Ahead of the existence check below on purpose. "main is not a release tag" is
+  # true whether or not a branch by that name exists here, and it is the more
+  # useful of the two answers — "no such ref" would send the reader looking for a
+  # fetch problem they do not have.
   case "${TARGET_VERSION}" in
     [0-9]*.[0-9]*.[0-9]*) ;;
     *)
@@ -197,6 +194,15 @@ report_version() {
       exit 2
       ;;
   esac
+
+  if ! git -C "${STANDARDS_DIR}" rev-parse -q --verify "${TARGET_REF}^{commit}" >/dev/null; then
+    echo "  ERROR no such ref in this checkout: ${TARGET_REF}" >&2
+    if [ "${FETCH}" -eq 0 ]; then
+      note "--no-fetch was given, so nothing new was fetched."
+    fi
+    exit 2
+  fi
+
   heading "Version"
   echo "  current ${CURRENT} → target ${TARGET_REF}${TARGET_FROM}"
   case "$(ver_cmp "${CURRENT}" "${TARGET_VERSION}")" in
