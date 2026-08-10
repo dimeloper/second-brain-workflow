@@ -319,10 +319,10 @@ else
 fi
 
 # --- no registry, and nothing found either -----------------------------------
-# v0.9.1 called this undetermined, because the registry was the only source. The
-# scan is a second one, so an empty registry plus an empty scan is a determined
-# result — stated inside the boundary it holds within, which is what separates it
-# from the confident zero that reads as success.
+# With the registry as the only source this would be undetermined. The scan is a
+# second one, so an empty registry plus an empty scan is a determined result —
+# stated inside the boundary it holds within, which is what separates it from the
+# confident zero that reads as success.
 EMPTY_SCAN="${SANDBOX}/nothing-rendered-here"
 mkdir -p "${EMPTY_SCAN}"
 ( XDG_CONFIG_HOME="${SANDBOX}/no-registry" SBW_SCAN_ROOTS="${EMPTY_SCAN}" \

@@ -176,11 +176,11 @@ out_has "1 onboarded repo(s) registered, all still rendered" \
   "doctor reports a registry whose entries are all present"
 
 # --- doctor: no registry, and nothing found either --------------------------
-# v0.9.1 called this undetermined, because the registry was the only source and
-# an empty one could not be told from an unwritten one. The scan is a second
-# source, so this is now a determined result — stated with the boundary it holds
-# within, which is what separates it from the confident zero v0.9.1 refused to
-# print. tests/test-registry-scan.sh owns the scan's own cases.
+# With the registry as the only source this would be undetermined: an empty
+# registry cannot be told from one never written. The scan is a second source, so
+# it is a determined result instead — stated with the boundary it holds within,
+# which is what separates it from a confident zero.
+# tests/test-registry-scan.sh owns the scan's own cases.
 EMPTY_HOME="${SANDBOX}/empty-config-home"
 EMPTY_SCAN="${SANDBOX}/nothing-rendered-here"
 mkdir -p "${EMPTY_SCAN}"

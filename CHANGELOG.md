@@ -17,6 +17,29 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-10
+
+### Major
+- **Run `make doctor` after upgrading. On any machine that onboarded a repo
+  before this release, it now exits 1 where v0.9.0 exited 0.** Nothing in an
+  onboarded repo changes and nothing stops working — what is new is bookkeeping,
+  and it is reported rather than repaired.
+
+  `doctor` compares the repo registry (also new here) against a scan of this
+  machine for repos carrying rendered output. Every repo you onboarded before the
+  registry existed is in the second set and not the first, so each is named as
+  *rendered but not registered*. Re-rendering one — `./scripts/render.py <repo>`
+  — registers it and clears the finding. Repos you have abandoned can be left
+  alone; nothing prunes or adopts them, and they keep being reported until you
+  delete their rendered output or accept the warning.
+
+  Named here rather than under Changed for the same reason v0.9.0's `source:`
+  entry was: a scheduled or scripted `make doctor` that tested for exit 0 goes
+  red on its first run after upgrading, and that is a non-zero exit in a state
+  that previously passed. `make upgrade` likewise exits 1 while any repo is
+  unregistered. The vault CI templates run `guard` and `audit`, not `doctor`, so
+  neither vault workflow is affected.
+
 ### Changed
 - **`doctor` determines the onboarded repo set instead of asking about it.** The
   registry was the only source, so one render on a machine with twelve
@@ -40,10 +63,10 @@ write release notes, not two to keep in sync by hand.
   Two new config keys set that boundary: `SBW_SCAN_ROOTS` (colon-separated,
   default `$HOME`) and `SBW_SCAN_DEPTH` (default `5`).
 
-  **One semantic change:** an empty registry with a scan that found nothing is
-  now a *determined* result reported within its stated boundary, where v0.9.1
-  called it undetermined. Undetermined survives, narrowed to the state that
-  genuinely is: no configured root could be read, so there was no second source.
+  **Undetermined means one thing only:** no configured root could be read, so
+  there was no second source to compare the registry against. An empty registry
+  is not that state — the scan answers it, and finding nothing within a stated
+  boundary is a result rather than an unknown.
 - **`upgrade.sh` reads the same two sources.** `report_repos` read the registry
   alone, so a machine with rendered repos the registry does not name was told
   "all 1 checkable repo(s) are up to date" immediately before a switch that would
@@ -910,7 +933,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.7.0...v0.8.0

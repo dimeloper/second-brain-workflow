@@ -340,9 +340,9 @@ ${SBW_SCAN_SKIPPED}
 EOF
 
   # No usable root means no second source, so there is nothing to compare the
-  # registry against. This is the only state still called undetermined, and it is
-  # narrower than the one v0.9.1 used the word for: an empty registry is now
-  # answerable, an unrunnable scan is not.
+  # registry against. This is the only state the word undetermined is used for,
+  # and it is narrower than "the registry is empty" — that question the scan
+  # answers, this one it cannot.
   if [ "${SBW_SCAN_USABLE}" -eq 0 ]; then
     warn "onboarded repo set is undetermined — no scan root could be read
         ${file} is not a second opinion: it holds what renders recorded, so with
@@ -399,9 +399,9 @@ EOF
   if [ "${stale}" -eq 0 ] && [ "${unregistered}" -eq 0 ]; then
     if [ "${registered}" -eq 0 ]; then
       # Determined, not unknown. The scan ran, found nothing, and states the
-      # boundary it ran inside — which is a measurement. What v0.9.1 refused to
-      # print was a count with no boundary at all, and that is still refused
-      # above whenever the scan cannot run.
+      # boundary it ran inside — which is a measurement. What is refused is a
+      # count with no boundary at all, and that is what happens above whenever
+      # the scan cannot run.
       ok "no repos carry rendered output here, and the registry names none"
     else
       ok "${registered} onboarded repo(s) registered, all still rendered, and none unregistered"

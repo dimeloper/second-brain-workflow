@@ -188,7 +188,7 @@ report_version() {
   case "${TARGET_VERSION}" in
     [0-9]*.[0-9]*.[0-9]*) ;;
     *)
-      echo "  ERROR --ref must name a release tag like v0.9.1 (got ${TARGET_REF})." >&2
+      echo "  ERROR --ref must name a release tag like v0.9.0 (got ${TARGET_REF})." >&2
       note "the changelog range and the vault ENGINE_REF comparison are both"
       note "computed from the version, and a branch name carries none."
       exit 2
