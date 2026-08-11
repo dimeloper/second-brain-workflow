@@ -289,7 +289,21 @@ def render_claude_md(sha):
     )
 
 
-def plan(rules, targets, sha, warn=None):
+def agents_is_writable(repo):
+    """Will this repo's AGENTS.md actually be written by us?
+
+    Absent (we create it) or carrying our marker (we own it) — but a
+    hand-written AGENTS.md is skipped by the writer, and folding the always-on
+    rules into a file that is never written drops them entirely. This has to be
+    a fact about the *target*, not about the engine, because that is where the
+    answer differs: one onboarded repo took the fold correctly and the other
+    keeps its own AGENTS.md and would have lost the rule.
+    """
+    path = repo / "AGENTS.md"
+    return not path.exists() or is_generated(path)
+
+
+def plan(rules, targets, sha, warn=None, fold_always_on=True):
     """-> {relative path: content} for every configured target.
 
     AGENTS.md is optional. A fresh engine with no conventions yet should render
@@ -302,7 +316,11 @@ def plan(rules, targets, sha, warn=None):
     # for Claude Code. With no AGENTS.md there is nowhere to fold it into, so the
     # per-rule files stay — dropping them would be the silent gap this change
     # exists to close, reintroduced from the other side.
-    have_agents = AGENTS_SRC.is_file()
+    # Two conditions, and both are necessary. There has to be a source AGENTS.md
+    # to append to, *and* the target repo has to be one whose AGENTS.md we
+    # actually write — a hand-written one is skipped, and folding into a file
+    # that is never written drops the rule from every claude-code consumer.
+    have_agents = AGENTS_SRC.is_file() and fold_always_on
     if "cursor" in targets:
         # Cursor does not read AGENTS.md, so its always-on rules keep their own
         # files with alwaysApply: true. Nothing to fold, nothing duplicated.
@@ -428,8 +446,14 @@ def main():
     if not repo.is_dir():
         sys.exit(f"Target repo not found: {repo}")
 
+    fold = agents_is_writable(repo)
     rendered = plan(rules, targets, content_sha,
-                    warn=lambda m: print(f"warning: {m}", file=sys.stderr))
+                    warn=lambda m: print(f"warning: {m}", file=sys.stderr),
+                    fold_always_on=fold)
+    if not fold and any(r["always"] for r in rules) and "claude-code" in targets:
+        print("note: AGENTS.md here is hand-written, so the always-on rules stay "
+              "as their own files under .claude/rules/ rather than being folded "
+              "into it.", file=sys.stderr)
     mode = "check" if args.check else ("dry-run" if args.dry_run else "write")
     print(f"Engine: {ENGINE} @ {sha} (v{engine_version()})")
     if split:

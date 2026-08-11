@@ -17,6 +17,29 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-08-11
+
+### Fixed
+- **An always-on rule reached nothing in a repo whose `AGENTS.md` is
+  hand-written.** v0.20.0 folded always-on rules into `AGENTS.md` and stopped
+  writing them under `.claude/rules/`. It decided that from the *engine* — is
+  there a source `AGENTS.md` — when the fact that matters is about the *target*:
+  the writer skips a hand-written `AGENTS.md`, so the fold put the rule into a
+  file that is never written, and the fallback that would have carried it had
+  already been removed. Strictly worse than v0.19.0, where such a repo got the
+  per-rule file.
+
+  Found by doing the re-render v0.20.0's Major entry asks for. Of two onboarded
+  repos, one took the fold correctly and the other keeps its own `AGENTS.md` and
+  received the rule nowhere at all. No fixture would have caught it — both test
+  repos let the engine own `AGENTS.md`.
+
+  The fold is now conditional on the target's `AGENTS.md` being absent or ours,
+  and a repo that keeps its own is told, on the run, that its always-on rules
+  stay as their own files.
+
+- Suite 961 → 963 assertions.
+
 ## [0.20.0] - 2026-08-11
 
 ### Major
@@ -1466,7 +1489,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.17.0...v0.18.0

@@ -249,4 +249,18 @@ assert_file "${REPO_AO2}/.claude/rules/always-on.md" \
   "without AGENTS.md, an always-on rule falls back to its own claude-code file"
 assert_no_file "${REPO_AO2}/AGENTS.md" "still no AGENTS.md fabricated"
 
+# A hand-written AGENTS.md in the target is skipped by the writer, so folding
+# the always-on rules into it drops them from every claude-code consumer. Found
+# by re-rendering two real repos after v0.20.0: one took the fold, the other
+# keeps its own AGENTS.md and received the rule nowhere at all.
+REPO_AO3="${SANDBOX}/repo-ao3"
+make_target_repo "${REPO_AO3}"
+printf 'my own conventions, not yours\n' > "${REPO_AO3}/AGENTS.md"
+"${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" "${REPO_AO3}" >/dev/null 2>&1
+assert_file "${REPO_AO3}/.claude/rules/always-on.md" \
+  "a hand-written AGENTS.md keeps the always-on rule as its own file"
+assert_contains "${REPO_AO3}/AGENTS.md" "my own conventions" \
+  "a hand-written AGENTS.md is still never overwritten"
+
+
 finish
