@@ -94,7 +94,7 @@ bad_case '{"sources":[{"name":"f","repo":"r","allow":[]}]}' \
 bad_case "{\"sources\":[{\"name\":\"a\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[]},{\"name\":\"a\",\"repo\":\"r2\",\"ref\":\"${SHA2}\",\"allow\":[]}]}" \
   "duplicate source name" "two sources cannot share a name"
 bad_case "{\"sources\":[{\"name\":\"a\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[\"x\"]},{\"name\":\"b\",\"repo\":\"r2\",\"ref\":\"${SHA2}\",\"allow\":[\"x\"]}]}" \
-  "also allowed by source 'a'" "two sources cannot offer the same skill name"
+  "sources 'a' and 'b' both allow skill 'x'" "two sources cannot offer the same skill name"
 bad_case "{\"sources\":[{\"name\":\"../escape\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[]}]}" \
   "single safe path segment" "a source name that escapes its directory is refused"
 bad_case '{"sources":{}}' "'sources' must be an array" \
@@ -952,7 +952,7 @@ bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"lic
 # Two sources offering one skill name have no resolution order, whatever shape
 # either one is written in.
 bad_case "{\"sources\":[{\"name\":\"a\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"x\"]},{\"name\":\"b\",\"repo\":\"r2\",\"ref\":\"${SHA2}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"x\"}]}]}" \
-  "also allowed by source 'a'" "a duplicate skill name is caught across both entry shapes"
+  "sources 'a' and 'b' both allow skill 'x'" "a duplicate skill name is caught across both entry shapes"
 
 # --- a source whose skills sit at the repo root ------------------------------
 # Undocumented until now, and worth pinning: several suites put skill directories
@@ -970,6 +970,52 @@ case "${out_flat}" in
   ok*design-review*) pass "skills_subdir '.' resolves a source whose skills are at its root" ;;
   *) fail "skills_subdir '.' resolves a source whose skills are at its root" "${out_flat}" ;;
 esac
+
+# --- one skill name, one slot ------------------------------------------------
+# A flat install directory holds one link per name. By the time linking runs both
+# candidate targets resolve inside the checkout, so both classify as ours and
+# neither of sync's refusals applies: ln -sfn repoints and the last source
+# iterated wins. Nothing downstream would say so — the declared-but-not-linked
+# check resolves by name, finds a link, and reports clean.
+collide="${SANDBOX}/collide.json"
+write_manifest "${collide}" "{\"sources\":[{\"name\":\"one\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"animate\"]},{\"name\":\"two\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"animate\"]}]}"
+
+# Raised at parse, before anything touches disk, which is what makes it every
+# caller's refusal rather than one script's. Asserted through each of the four
+# separately: a behaviour that exists in one path and not another is exactly the
+# shape doctor's roster check and v0.17.0's mode split both turned out to have.
+E="${SANDBOX}/skills-e"
+SBW_SKILLS_MANIFEST="${collide}" python3 "${MANIFEST_PY}" relevant --repo "${ROOTED}" >/dev/null 2>&1
+assert_exit 2 $? "skills-for refuses a name two sources both allow"
+out="$(SKILLS_DIRS="${E}" sync_eng "${collide}" 2>&1)"
+assert_exit 2 $? "sync refuses a name two sources both allow"
+assert_no_file "${E}/animate" "the refused manifest links nothing at all"
+out="$(SBW_SKILLS_MANIFEST="${collide}" "${ENG}/scripts/fetch-skill-sources.sh" 2>&1)"
+assert_exit 2 $? "fetch refuses a name two sources both allow"
+assert_no_file "${ENG}/vendor/external/two" "the refused manifest clones nothing"
+out="$(doctor_out "${collide}" "${A}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"skill manifest unusable"*) pass "doctor reports the collision as misconfiguration" ;;
+  *) fail "doctor reports the collision as misconfiguration" "${out}" ;;
+esac
+
+# The same name twice inside one source is a different mistake with a different
+# fix, so it gets its own message rather than one that names that source as
+# though it were two. An error, not a silent dedup: the two entries can differ in
+# applies_to or license, only one of them can be honoured, and nothing in the
+# file says which.
+bad_case "{\"sources\":[{\"name\":\"solo\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"x\",{\"name\":\"x\",\"applies_to\":[\"**/*.py\"]}]}]}" \
+  "source 'solo' allows 'x' twice" "one source cannot allow the same skill twice"
+
+# The scope of that refusal, pinned by a test rather than by a comment: the one
+# name collision this system is built around still resolves the way it always
+# has. A local skill of your own shadows a vendored one — asserted above on the
+# install itself, and asserted here as the case the refusal must not reach.
+shadow="${SANDBOX}/shadow.json"
+write_manifest "${shadow}" "{\"sources\":[{\"name\":\"fix\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"update-second-brain\"]}]}"
+SBW_SKILLS_MANIFEST="${shadow}" python3 "${MANIFEST_PY}" validate >/dev/null 2>&1
+assert_exit 0 $? "a manifest skill named like a local one is not a collision"
 
 # --- a source name is declared, and it is what keeps two checkouts apart ------
 # `name` becomes the directory under vendor/external/, so two entries sharing one

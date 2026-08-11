@@ -241,14 +241,42 @@ def parse(text, origin="manifest"):
 
         entries = _parse_allow(raw["allow"], where, name, source_globs,
                                source_license)
+        # Refused here, at parse, rather than left to sync-skills.sh. Both
+        # declarations are visible without touching disk, so every caller
+        # inherits the refusal; and by the time linking runs, both candidate
+        # targets resolve inside the checkout, so both classify as ours and
+        # neither of sync's two refusals applies — `ln -sfn` would simply
+        # repoint, and the source iterated last would win.
+        #
+        # Flatly, with no declared-reason escape. Unlike one repo pinned at two
+        # refs, there is no legitimate version of this: the install directory has
+        # one slot for the name, so one of the two declarations cannot be
+        # honoured under any layout. And the drift checks would not say so — the
+        # declared-but-not-linked check resolves by name, finds a link and
+        # reports clean, while the wrong-sha check has one ref it can match and
+        # one it cannot.
+        #
+        # Scoped to manifest sources. A local skill of the same name deliberately
+        # shadows a vendored one, and that is the one collision this system is
+        # built around.
         for entry in entries:
             skill = entry["name"]
+            if seen_skills.get(skill) == name:
+                # Not silently deduped: the two entries may differ in
+                # `applies_to` or `license`, only one can be honoured, and
+                # nothing here says which.
+                raise ManifestError(
+                    "%s: source '%s' allows '%s' twice — one skill name is one "
+                    "link, so a second entry cannot mean anything the first does "
+                    "not. If they differ, only one of the two can be honoured"
+                    % (where, name, skill))
             if skill in seen_skills:
                 raise ManifestError(
-                    "%s: skill '%s' is also allowed by source '%s' — skills "
+                    "%s: sources '%s' and '%s' both allow skill '%s' — skills "
                     "install by name into one flat directory, so two sources "
-                    "offering the same name have no resolution order"
-                    % (where, skill, seen_skills[skill]))
+                    "offering the same name have no resolution order and the one "
+                    "linked last would win"
+                    % (where, seen_skills[skill], name, skill))
             seen_skills[skill] = name
 
         # Absent is a warning, not an error. You are installing someone else's
