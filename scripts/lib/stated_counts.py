@@ -13,6 +13,15 @@ first bullet, so a nested list is measured against its own heading. Fenced code
 blocks are skipped: sample output is a transcript, not a claim about the
 document.
 
+What it deliberately does NOT cover, so its green is not read as broader than
+it is: **sample output inside a fenced block.** Skipping fences is correct — a
+transcript is a record of what a tool printed, not a claim the document makes —
+but it means a pasted `make skills-for` sample can drift from the tool's real
+output with nothing checking it. That is the shape v0.4.2 recorded: a printed
+example beside real behaviour, where the example was what misled a reader. One
+such sample said `Adopted and scoped to this repo: 5` above two entries, and was
+fixed by hand rather than by this.
+
 Usage: stated_counts.py FILE [FILE ...]   -> lines, or "clean". Exit 1 if any.
 """
 import re, sys, pathlib

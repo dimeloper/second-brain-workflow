@@ -108,6 +108,16 @@ assert_not_contains() {
   if grep -q -- "$2" "$1" 2>/dev/null; then fail "$3" "'$2' found in $1"; else pass "$3"; fi
 }
 
+# String equality naming both sides. assert_exit exists for the same shape, but
+# its failure text says "want exit N" — accurate for a status and misleading for
+# a sha, a path or a classification. Lived in one test file until three wanted
+# it, and a helper each file redefines is one the next file forgets to define.
+assert_str() {
+  local want="$1" got="$2" name="$3"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if [ "$want" = "$got" ]; then pass "$name"; else fail "$name" "want '$want', got '$got'"; fi
+}
+
 assert_exit() {
   local want="$1" got="$2" name="$3"
   TESTS_RUN=$((TESTS_RUN + 1))

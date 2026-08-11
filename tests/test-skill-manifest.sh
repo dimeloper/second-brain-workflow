@@ -12,19 +12,6 @@ setup_sandbox
 MANIFEST_PY="${ENGINE}/scripts/lib/skill_manifest.py"
 SYNC="${ENGINE}/scripts/sync-skills.sh"
 
-# String equality with a message that names both sides. lib.sh has assert_exit
-# for the same shape, but its failure text says "want exit N" — accurate for a
-# status and misleading for a sha or a classification.
-assert_str() {
-  local want="$1" got="$2" name="$3"
-  TESTS_RUN=$((TESTS_RUN + 1))
-  if [ "${want}" = "${got}" ]; then
-    pass "${name}"
-  else
-    fail "${name}" "want '${want}', got '${got}'"
-  fi
-}
-
 # Sorted directory entry names, without ls — shellcheck is right that parsing ls
 # is fragile, and these are fixture paths a test controls, so there is no reason
 # to be clever.
