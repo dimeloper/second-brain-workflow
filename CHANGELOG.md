@@ -17,6 +17,104 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-11
+
+No **Major** entry: one refusal is narrowed rather than widened, one new
+optional key, and three messages reworded. Every manifest that parsed under
+v0.17.0 still parses — one that did not may now, since `status: adopted` beside
+an `allow` entry has stopped being fatal.
+
+### Added
+- **`pinned_apart`: hold one skill at a sha of its own, by declaring the repo
+  twice.** v0.17.0 excluded per-skill `ref` on the grounds that a second sha for
+  one skill needs a second checkout, which changes the directory shape
+  `skill_link_engine_layout` matches — and deferred that layout as a decision to
+  make first.
+
+  **That decision is superseded rather than made.** Two source entries naming one
+  `repo` at different `ref`s, with disjoint `allow` lists, already express it, and
+  nothing in the engine changes shape: one checkout per source name, one declared
+  `ref` per checkout, the wrong-sha check still comparing one against one, the
+  leftover report still keyed on the set of declared names. The cost is the repo
+  cloned twice, which is documented rather than engineered around. A reader
+  following v0.17.0's entry to an open design question will not find one.
+
+  The single thing the pattern cannot say for itself is that the duplication is
+  *deliberate* — without which it is indistinguishable from a source added twice
+  with one `ref` then edited. `pinned_apart` says it, in **prose, never `true`**:
+  a boolean records that someone once had a reason and nothing about what it was,
+  which is the exemption `check-rules.py` already refuses for `provisional: true`.
+  A `//` comment does not work either — the check cannot see one, so the pair
+  would warn anyway and the reason would sit in the only place in the file that
+  nothing reads. Blank is an error, as `license` is.
+
+  Undeclared, one repo at two refs **warns**, naming both entries and both shas;
+  it is sometimes exactly right, and which it is here is the operator's call.
+  One repo at the **same** ref in two entries also warns, named as mergeable —
+  both declarations are honoured there, so the cost is a second clone of one
+  commit rather than a declaration that cannot be kept. `make skills-for` prints
+  each reason where the roster is listed, at the moment the decision is read.
+
+  Sha-keyed checkout directories were the alternative and are rejected: nothing
+  removes an undeclared checkout by design, so every `ref` bump would leave one
+  behind and the leftover report would grow until nobody read it. Git worktrees
+  are worse — a worktree's admin data lives in the parent clone, so a hand-deleted
+  `vendor/external` leaves broken metadata rather than a missing directory.
+
+### Changed
+- **A candidate that is also allowed is decided by its `status`, not by its
+  presence.** v0.13.0 refused any skill both allowed by a source and listed as a
+  candidate, on two grounds: contradictory states, and onboarding pitching
+  something already linked. v0.15.0 falsified both for `adopted` — that is one
+  fact recorded twice, and only `suggested` is ever pitched — but the refusal
+  read `status` nowhere, and in fact parsed it *after* the check. All three
+  statuses got a message describing a fault two of them do not have.
+
+  `suggested` still refuses, message unchanged. `declined` refuses with its own,
+  because *declined yet linked* and *pitched yet linked* are different faults:
+  one decline was never carried out, the other roster contradicts itself.
+  `adopted` **warns** — harmless duplication today, and tomorrow the allow entry
+  is dropped and the candidate still claims adopted with nothing reconciling
+  them — naming both records and which one linking actually reads. Exit code
+  unchanged from a clean run.
+
+  Nothing that parsed before can newly fail: the old rule refused all three, so
+  every change here either keeps a refusal or lifts one.
+- **The licence warning states the scope of its own claim.** One warning per
+  source is right and unchanged — the number of unanswered questions did not move
+  when entries gained their own field. But the line named the source only, and
+  after v0.17.0 nine of twelve unanswered and twelve of twelve are the same
+  sentence. It now says which, **always**, including at twelve of twelve: a count
+  that appears only when partial is one nobody learns to read, the same argument
+  as printing the decided-candidates section at zero. A source with nothing
+  adopted from it yet says so rather than counting to zero of zero.
+- **A skill-name collision names both sources.** The refusal itself was already
+  right and already at parse, where both declarations are visible without
+  touching disk, so every caller inherits it. What it did not do was say which
+  two entries collided — `sources[1]: skill 'x' is also allowed by source 'a'`
+  gave one name and one index. And the same name listed twice inside *one* source
+  hit that message too, reading as a source colliding with itself; that is now
+  its own error rather than a silent dedup, since the two entries can differ in
+  `applies_to` or `license` with only one of them honourable.
+
+### Fixed
+- Nothing behavioural. Recorded here because three review items turned out to be
+  already-correct behaviour that had never been asserted: the candidate/allow
+  refusal against an object allow entry (v0.17.0 had covered it), a duplicate
+  source `name` (a hard error since v0.11.0), and `name` being declared rather
+  than derived from `repo` — which is the precondition the `pinned_apart` pattern
+  rests on. None of the three had ever been exercised with a second entry
+  present, so each was a claim about a shape the code had not been shown. The
+  drift and leftover assertions now run in **both entry orders**, since
+  order-dependence was the defect being ruled out rather than a detail of it.
+- `skills.json.example` was only ever validated as far as its first placeholder
+  `ref`, so nothing after `sources[0]` — every field the file exists to
+  demonstrate — was parsed by any test. It is now also validated with the
+  placeholders filled in, and asserted warning-free. A second placeholder ref was
+  added, because a one-repo-at-two-refs pattern demonstrated with one ref written
+  twice is not the pattern.
+- Suite 894 → 944 assertions.
+
 ## [0.17.0] - 2026-08-11
 
 No **Major** entry: an allowlist entry may still be a bare string, and the
@@ -1258,7 +1356,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.14.0...v0.15.0
