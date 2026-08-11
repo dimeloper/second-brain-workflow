@@ -62,6 +62,34 @@ target bash and the skills directories are POSIX paths.
 
 ---
 
+## The short way
+
+```bash
+git clone git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
+cd ~/second-brain-workflow && make init
+```
+
+`make init` explains what this engine does, prints every configuration key with
+its current value and where that value came from, reports what it found on this
+machine, and shows the config it would write. It changes nothing until you add
+`YES=1`, and it ends by running `doctor`.
+
+It will not choose `SBW_EXPECTED_VAULT_ID` for you — that key is what makes the
+commit guard's identity check non-circular, and a script that read it from the
+vault's own `vault.json` would be answering the question the check exists to
+ask. Pass it:
+
+```bash
+make init YES=1 VAULT_ID=personal
+```
+
+It also never overwrites a value already in your config; it appends only the
+keys that are missing. Creating the vault itself is still step 4 below, and
+`init` names the command when the vault is not there yet.
+
+The rest of this document is the long way — every step spelled out, and the
+reference for anything `init` reports that you want to understand or change.
+
 ## Fresh start
 
 ### 1. Clone the engine

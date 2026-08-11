@@ -1,5 +1,6 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
         vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain guard doctor audit \
+        init \
         verify-claude check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
@@ -14,7 +15,7 @@ ifeq ($(origin VAULT),undefined)
   VAULT := $(shell $(ENGINE_DIR)scripts/lib/resolve-vault.sh)
 endif
 
-SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh \
+SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh scripts/init.sh \
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
                  scripts/lib/registry.sh scripts/upgrade.sh \
@@ -35,6 +36,8 @@ help:
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make guard               run the vault commit guard against VAULT"
+	@echo "make init              explain this engine, detect the machine, preview a config"
+	@echo "                         (make init YES=1 VAULT_ID=... writes it, then runs doctor)"
 	@echo "make doctor              report gaps: commit-guard hook, skill parity, submodule drift"
 	@echo "make audit               lineage + stale follow-ups + always-on rule token budget"
 	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
@@ -96,6 +99,10 @@ guard:
 
 # Not part of `make check`: needs a real vault, same reasoning as
 # vault-index-check below — CI has none.
+init:
+	@./scripts/init.sh $(if $(YES),--yes,) \
+	  $(if $(VAULT_ID),--vault-id $(VAULT_ID),) $(if $(VAULT),--vault $(VAULT),)
+
 doctor:
 	@./scripts/doctor.sh --vault "$(VAULT)"
 
