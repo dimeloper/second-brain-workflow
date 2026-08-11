@@ -971,6 +971,84 @@ case "${out_flat}" in
   *) fail "skills_subdir '.' resolves a source whose skills are at its root" "${out_flat}" ;;
 esac
 
+# --- a source name is declared, and it is what keeps two checkouts apart ------
+# `name` becomes the directory under vendor/external/, so two entries sharing one
+# would put a single clone behind two declared refs: fetch leaves it detached at
+# whichever ran last, and the drift check then answers about fetch order rather
+# than about the manifest. It is declared rather than derived from `repo`, which
+# is what makes one repo at two refs expressible at all.
+bad_case "{\"sources\":[{\"name\":\"same\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"animate\"]},{\"name\":\"same\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA2}\",\"license\":\"MIT\",\"allow\":[\"review-animations\"]}]}" \
+  "duplicate source name 'same'" "two entries cannot share a checkout directory"
+
+# One repo, two refs, two names, disjoint allow lists. Each checkout is drift-
+# checked against its own ref — and the whole point is that the answer does not
+# depend on which entry came first, so every assertion below runs twice with the
+# order reversed.
+apart_fixture() {
+  printf '{"sources":[%s,%s]}\n' "$1" "$2" > "${SANDBOX}/apart.json"
+}
+APART_NEW="{\"name\":\"pair-new\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA2}\",\"license\":\"MIT\",\"allow\":[\"animate\"]}"
+APART_OLD="{\"name\":\"pair-old\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"review-animations\"]}"
+
+for order in "forward" "reversed"; do
+  rm -rf "${ENG}/vendor/external/pair-new" "${ENG}/vendor/external/pair-old"
+  if [ "${order}" = "forward" ]; then
+    apart_fixture "${APART_NEW}" "${APART_OLD}"
+  else
+    apart_fixture "${APART_OLD}" "${APART_NEW}"
+  fi
+  apart="${SANDBOX}/apart.json"
+
+  SBW_SKILLS_MANIFEST="${apart}" "${ENG}/scripts/fetch-skill-sources.sh" --yes >/dev/null 2>&1
+  got="$(git -C "${ENG}/vendor/external/pair-new" rev-parse HEAD 2>/dev/null)"
+  assert_str "${SHA2}" "${got}" "one repo at two refs: the newer checkout is at its own ref (${order})"
+  got="$(git -C "${ENG}/vendor/external/pair-old" rev-parse HEAD 2>/dev/null)"
+  assert_str "${SHA1}" "${got}" "one repo at two refs: the older checkout is at its own ref (${order})"
+
+  sync_eng "${apart}" >/dev/null 2>&1
+  out="$(doctor_out "${apart}" "${A}")"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  case "${out}" in
+    *"but the manifest pins"*)
+      fail "a pinned-apart pair reports no drift (${order})" "${out}" ;;
+    *) pass "a pinned-apart pair reports no drift (${order})" ;;
+  esac
+
+  # Move only the older one. The finding has to name that entry and its ref, not
+  # the pair's repo — which the two share and which therefore identifies neither.
+  git -C "${ENG}/vendor/external/pair-old" checkout -q --detach "${SHA2}"
+  out="$(doctor_out "${apart}" "${A}")"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  case "${out}" in
+    *"source 'pair-old' is checked out at ${SHA2}"*"manifest pins ${SHA1}"*)
+      pass "drift is reported against the entry that drifted (${order})" ;;
+    *) fail "drift is reported against the entry that drifted (${order})" "${out}" ;;
+  esac
+  TESTS_RUN=$((TESTS_RUN + 1))
+  case "${out}" in
+    *"source 'pair-new'"*) fail "the entry that did not drift is not reported (${order})" "${out}" ;;
+    *) pass "the entry that did not drift is not reported (${order})" ;;
+  esac
+  git -C "${ENG}/vendor/external/pair-old" checkout -q --detach "${SHA1}"
+done
+
+# Dropping one half of the pair leaves one leftover, named. The leftover report
+# keys on the set of declared names, so the surviving entry — same repo, same
+# clone contents, different name — must not absorb the other's checkout.
+solo="${SANDBOX}/apart-solo.json"
+printf '{"sources":[%s]}\n' "${APART_NEW}" > "${solo}"
+out="$(SBW_SKILLS_MANIFEST="${solo}" "${ENG}/scripts/fetch-skill-sources.sh" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"pair-old: checked out but no longer declared"*)
+    pass "dropping one entry of a pinned-apart pair reports its checkout as leftover" ;;
+  *) fail "dropping one entry of a pinned-apart pair reports its checkout as leftover" "${out}" ;;
+esac
+leftovers="$(printf '%s\n' "${out}" | grep "no longer declared" | grep -c "pair-")"
+assert_str "1" "${leftovers}" "the surviving half of the pair is not reported as leftover"
+rm -rf "${ENG}/vendor/external/pair-new" "${ENG}/vendor/external/pair-old"
+sync_eng "${good}" >/dev/null 2>&1
+
 # --- candidate validation ---------------------------------------------------
 bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[\"animate\"]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
   "cannot be both adopted and merely suggested" \
