@@ -40,7 +40,7 @@ help:
 	@echo "                         (make init YES=1 VAULT_ID=... writes it, then runs doctor)"
 	@echo "make doctor              report gaps: commit-guard hook, skill parity, submodule drift"
 	@echo "make audit               lineage + stale follow-ups + always-on rule token budget"
-	@echo "make verify-claude       prove Claude Code loads rendered rules (2 model calls)"
+	@echo "make verify-claude       prove Claude Code loads rendered rules (3 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
 	@echo "                         (skips shellcheck if it isn't installed)"
 	@echo ""

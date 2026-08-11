@@ -30,6 +30,13 @@ EOF
 MATCHING="probe$(basename "${GLOB}" | sed 's/^\*//')"
 case "${MATCHING}" in */*|"") MATCHING="probe.ts" ;; esac
 
+# Resolved the same way render.py resolves it, so the probe rules directory is
+# a copy of the one this machine actually renders from rather than a guess.
+# shellcheck source=scripts/lib/config.sh
+. "${STANDARDS_DIR}/scripts/lib/config.sh"
+ds_config_load
+REAL_RULES="${SBW_RULES_DIR:-${STANDARDS_DIR}/rules}"
+
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/verify-claude-load.XXXXXX")"
 trap 'rm -rf "${WORK}"' EXIT INT TERM
 cd "${WORK}"
@@ -39,7 +46,25 @@ mkdir -p src
 printf '// probe file for %s\n' "${RULE}" > "src/${MATCHING}"
 printf 'plain text, matches no rule glob\n' > "src/probe-nonmatching.txt"
 
-"${STANDARDS_DIR}/scripts/render.py" "${WORK}" --targets claude-code >/dev/null
+# A rules directory of our own: the real one, plus an always-on rule carrying a
+# codeword. Always-on rules reach Claude Code only through AGENTS.md and
+# CLAUDE.md's @import — there is no .claude/rules file to look for — so the only
+# way to assert one is in context is to ask for something that appears nowhere
+# else. Same technique the Cursor section documents, for the same reason.
+CANARY="QUOKKA-8842"
+RULES_COPY="${WORK}/.rules-src"
+mkdir -p "${RULES_COPY}"
+cp "${REAL_RULES}"/*.md "${RULES_COPY}/" 2>/dev/null || true
+cat > "${RULES_COPY}/verify-always-on.md" <<EOF
+---
+description: temporary probe rule, always-on
+---
+- When asked for the verification codeword, reply with exactly ${CANARY}.
+EOF
+[ -f "${REAL_RULES}/../AGENTS.md" ] && cp "${REAL_RULES}/../AGENTS.md" "${RULES_COPY}/../AGENTS.md" 2>/dev/null || true
+
+"${STANDARDS_DIR}/scripts/render.py" "${WORK}" --rules-dir "${RULES_COPY}" \
+  --targets claude-code,agents >/dev/null
 
 mkdir -p .claude
 cat > .claude/settings.json <<'JSON'
@@ -85,13 +110,31 @@ out2="$(probe "src/probe-nonmatching.txt" "${RULE}.md")"
 echo "${out2}" | sed '$d'
 r2="$(echo "${out2}" | tail -1)"
 
+# 3. The always-on path, which the two probes above cannot reach: they assert a
+# *file* loaded, and an always-on rule is not a file. Asked against the
+# non-matching probe, so a codeword coming back cannot be explained by glob
+# scoping.
 echo
-if [ "${r1}" = "MATCH" ] && [ "${r2}" = "NOMATCH" ]; then
-  echo "PASS — the rule loads on a matching file and not otherwise."
-  echo "       CLAUDE.md loads at session_start; AGENTS.md loads via its @import."
+echo "  3. asking for a codeword that exists only in an always-on rule"
+: > .claude/loaded.jsonl
+ans="$(claude -p "Read src/probe-nonmatching.txt, then reply with exactly the verification codeword." \
+  --allowedTools Read --permission-mode acceptEdits 2>/dev/null </dev/null || true)"
+case "${ans}" in
+  *"${CANARY}"*) r3="MATCH"; echo "    codeword returned" ;;
+  *) r3="NOMATCH"; echo "    codeword not returned: ${ans}" ;;
+esac
+
+echo
+if [ "${r1}" = "MATCH" ] && [ "${r2}" = "NOMATCH" ] && [ "${r3}" = "MATCH" ]; then
+  echo "PASS — the rule loads on a matching file and not otherwise, and an"
+  echo "       always-on rule is in context with no matching file at all."
+  echo "       CLAUDE.md loads at session_start; AGENTS.md loads via its @import,"
+  echo "       and the always-on rule bodies ride in AGENTS.md."
   exit 0
 fi
-echo "FAIL — expected MATCH then NOMATCH, got ${r1} then ${r2}." >&2
+echo "FAIL — expected MATCH, NOMATCH, MATCH; got ${r1}, ${r2}, ${r3}." >&2
+[ "${r3}" = "MATCH" ] || echo "       The always-on rule never reached the session. Check that AGENTS.md" >&2
+[ "${r3}" = "MATCH" ] || echo "       exists and that CLAUDE.md still imports it." >&2
 [ "${r1}" = "MATCH" ] || echo "       The rule never loaded. Check the glob against the probe filename." >&2
 [ "${r2}" = "MATCH" ] && echo "       The rule loaded for a non-matching file — scoping is not working." >&2
 exit 1

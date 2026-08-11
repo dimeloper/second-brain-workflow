@@ -144,4 +144,31 @@ case "${QS}" in
   *) fail "and vault_path is derived from it, so the two cannot disagree" "${QS}" ;;
 esac
 
+# --- a heading that states a count over a list of another length -------------
+# "Three rules worth knowing:" over five bullets. Prose and list drift because
+# one grows and the other is a sentence nobody re-reads — four instances across
+# two files by the time this was written, including a heading that said "Three
+# times now" above four entries in a list *about* wrong counts. Proofreading is
+# not the fix; a claim about a list being checkable is.
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" \
+  "${ENGINE}/README.md" "${ENGINE}/docs/NEW-MACHINE.md" "${ENGINE}/docs/GUARD.md" \
+  "${ENGINE}/docs/AUDIT.md" "${ENGINE}/CHANGELOG.md" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "no heading states a count its list does not have"
+else
+  fail "no heading states a count its list does not have" "${out}"
+fi
+
+# ...and the checker reports something, so the assertion above cannot pass on a
+# scanner that never finds anything.
+bad_counts="${SANDBOX}/bad-counts.md"
+printf 'Three things to know:\n\n- one\n- two\n' > "${bad_counts}"
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" "${bad_counts}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"claims 3, list has 2"*) pass "the stated-count checker finds a real mismatch" ;;
+  *) fail "the stated-count checker finds a real mismatch" "${out}" ;;
+esac
+
 finish

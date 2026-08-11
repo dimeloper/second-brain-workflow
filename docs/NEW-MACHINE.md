@@ -413,7 +413,7 @@ error (something is misconfigured and finishing setup won't fix it). See
 ```bash
 make test               # the toolchain itself, against fixtures — needs no extra tools
 make check              # the above plus shellcheck, if it is installed
-make verify-claude      # if you use Claude Code — costs two model calls
+make verify-claude      # if you use Claude Code — costs three model calls
 ```
 
 `make test` is the one to reach for first: it touches no real vault, no real

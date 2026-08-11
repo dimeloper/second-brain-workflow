@@ -50,47 +50,39 @@ points at.
 - **A vault per machine, safely isolated** — a per-commit guard blocks a
   practice learned on employer work from ever landing in a personal or
   public repo. See [A vault per machine](#a-vault-per-machine).
+- **`make doctor` says what this machine cannot do** — including whether it has
+  any rules to render at all, and whether an empty rules directory is a decision
+  or an unfinished setup. It names an unreferenced rules directory it finds
+  rather than leaving you to guess, which is the first thing a second machine
+  hits.
 
 ## Quickstart
 
-Three commands, in this order. `make init` explains what the engine does, prints
+The whole setup is below. `make init` explains what the engine does, prints
 every configuration key with its current value and where that value came from,
 and shows the config it would write — changing nothing until you add `YES=1`.
-
-```bash
-git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
-cd second-brain-workflow && make init        # read this; it writes nothing
-```
-
-**Create the vault before writing the config.** `init-vault.sh` writes the vault
-path and its id *together*, which is what stops the two disagreeing — and it
-leaves an existing config file untouched, so a config written first would not be
-corrected afterwards. `make init` refuses to write `SBW_VAULT` for a vault that
-does not exist yet, and says so, rather than recording a default that points
-nowhere. Follow the vault steps below, then:
-
-```bash
-make init YES=1 VAULT_ID=personal            # appends what is missing, runs doctor
-```
-
-It never overwrites a value already in your config — it appends only the keys
-that are absent, so it is safe on a machine that was set up months ago. It will
-not choose `SBW_EXPECTED_VAULT_ID` for you: that key is what makes the commit
-guard's identity check non-circular, and reading it from the vault's own
-`vault.json` would answer the question the check exists to ask.
-
-The rest of this section is what those commands are doing, and the reference for
-anything you want to change by hand.
 
 ```bash
 git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 echo "latest = $latest"                       # empty means no release yet
-[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
+[ -z "$latest" ] || git checkout "$latest"    # omit these two lines to track main
 git submodule update --init --recursive
 
-# This machine's role. VAULT_ID is a placeholder, like YOUR_ACCOUNT below.
+make init                                     # read this; it writes nothing
+```
+
+**The vault comes before the config**, because `init-vault.sh` writes the vault
+path and its id *together* and that pairing is what stops them disagreeing. It
+also leaves an existing config file untouched, so a config written first would
+not be corrected afterwards — and `make init` refuses to record `SBW_VAULT` for
+a vault that does not exist yet rather than writing a default that points
+nowhere.
+
+`VAULT_ID` is a placeholder, like `YOUR_ACCOUNT` below:
+
+```bash
 vault_id=VAULT_ID                             # personal | work | …
 vault_path=~/vaults/${vault_id}-brain         # derived, so the two can't disagree
 ```
@@ -109,9 +101,18 @@ git clone "git@github.com:YOUR_ACCOUNT/${vault_id}-brain.git" "$vault_path"
 ./scripts/init-vault.sh --path "$vault_path" --id "$vault_id" --adopt
 ```
 
+Then finish the machine:
+
 ```bash
 ./scripts/sync-skills.sh
+make init YES=1 VAULT_ID="$vault_id"          # appends what is missing, runs doctor
 ```
+
+`make init` never overwrites a value already in your config — it appends only
+the keys that are absent, so it is safe on a machine set up months ago. It will
+not choose `SBW_EXPECTED_VAULT_ID` for you: that key is what makes the commit
+guard's identity check non-circular, and reading it from the vault's own
+`vault.json` would answer the question the check exists to ask.
 
 Substitute `VAULT_ID` and `YOUR_ACCOUNT`; the rest is paste-and-run. Getting
 the branch wrong is not cosmetic: running **A** against a vault that already
@@ -410,7 +411,7 @@ make sync-skills           # link the allowed skills in
 make doctor                # reports unfetched, wrong-sha, or undeclared links
 ```
 
-Three rules worth knowing before you write one:
+Worth knowing before you write one:
 
 - **`ref` is required, and should be a full sha.** An unpinned source means two
   machines reading the same manifest install different skills on different days,
@@ -503,7 +504,7 @@ Two lists, both from your own `skills.json`:
 skills relevant to /path/to/repo  (412 file(s) considered)
 roster: /Users/me/dev-conventions/skills.json (from SBW_SKILLS_MANIFEST in …/config)
 
-Adopted and scoped to this repo: 5
+Adopted and scoped to this repo: 2
   - animate  (matched App.tsx, app/(onboarding)/_layout.tsx, …; scope inherited from source 'motion')
   - app-store-screenshots  (matched app.json, eas.json; scope from this entry)
 
@@ -573,6 +574,7 @@ evidence the bar exists to measure. Apply one, then record it through
 Cross-cutting notes without a matching glob are excluded and the count is
 printed — they apply everywhere, so listing a hundred of them would bury the
 repo-specific ones.
+
 
 **Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
 runs `sync-skills.sh` before a machine config exists, so the default applies and
@@ -685,8 +687,27 @@ description: Angular component and reactivity conventions
 | Target | Output | Always-on | Scoped |
 |--------|--------|-----------|--------|
 | `cursor` | `.cursor/rules/*.mdc` | `alwaysApply: true` | derived `globs` string |
-| `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | rule with no `paths` | `paths:` passed through |
-| `agents` | `AGENTS.md` | whole file | — |
+| `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | via `AGENTS.md` — see below | `paths:` passed through |
+| `agents` | `AGENTS.md` | its own body **plus every always-on rule** | — |
+
+**Where an always-on rule lands depends on the other targets.** `AGENTS.md` is
+the portable output — the one an editor this engine renders no native format for
+still reads — so a rule with no `paths:` is appended to it, and the generated
+`CLAUDE.md` reaches it through `@AGENTS.md`. That import is the **sole delivery
+path** for always-on rules to Claude Code, not a convenience to avoid
+duplication, which is why no `.claude/rules/<name>.md` is written for one.
+
+Two cases where it falls back to a per-rule file instead, because there is
+nothing to fold into:
+
+- `RENDER_TARGETS=claude-code` **without** `agents`. The same rules directory
+  therefore produces a different file set than `claude-code,agents` does.
+- A target repo whose `AGENTS.md` is hand-written, which the writer never
+  overwrites. The run says so when it happens.
+
+`rule-budget.py` mirrors this exactly, and its *undeliverable* report is scoped
+to `agents` alone for the same reason: `claude-code` always has a fallback and
+`agents` has no carrier but `AGENTS.md`.
 
 For a full worked example — one source file next to the exact `.mdc` and
 `.claude/rules/*.md` it produces — see
@@ -734,12 +755,11 @@ The checks above prove the *files* are right, not that an agent read them.
 make verify-claude
 ```
 
-Renders into a throwaway repo and runs two headless sessions with an
-`InstructionsLoaded` hook attached: reading a file that matches a rule's globs
+Renders into a throwaway repo and runs three headless sessions with an
+`InstructionsLoaded` hook attached. Reading a file that matches a rule's globs
 must load the rule, and reading one that matches nothing must not. The second
 case is the one that matters — without it, "the rule loaded" is equally
 consistent with every rule always loading, which would make scoping decorative.
-Verified 2026-08-02 on macOS against Claude Code 2.1.220:
 
 ```
     session_start    CLAUDE.md
@@ -747,8 +767,20 @@ Verified 2026-08-02 on macOS against Claude Code 2.1.220:
     path_glob_match  frontend-angular.md
 ```
 
-and, for a non-matching file, the first two only. Run it on any new machine
-before trusting the toolchain there.
+and, for a non-matching file, the first two only.
+
+The third session covers the path the other two cannot reach. An always-on rule
+is **not a file** in a Claude Code render — it rides inside `AGENTS.md` — so no
+`load_reason` line can attest to it, and the `include AGENTS.md` above proves the
+import resolves, not that a rule inside it is in context. The probe puts a
+codeword in a temporary always-on rule and asks for it while reading the
+*non-matching* file, so a codeword coming back cannot be explained by glob
+scoping. Same technique as the Cursor canary below, for the same reason.
+
+Verified 2026-08-11 on macOS against Claude Code 2.1.220. Re-run and re-date it
+after anything that changes what reaches a session — v0.20.0 changed exactly
+that, and a date older than the change vouches for the previous shape. Run it on
+any new machine before trusting the toolchain there.
 
 **Cursor — manual.** Cursor has no headless agent and its logs record nothing
 about rule attachment, so this one needs eyes. Do not test it by asking the
