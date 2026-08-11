@@ -289,4 +289,76 @@ case "${out}" in
   *) fail "names the uninitialized submodule" "${out}" ;;
 esac
 
+# --- the rules directory: a decision, or an unfinished setup -----------------
+# Seven checks could pass on a machine that renders nothing at all, because none
+# of them looked here. "All checks passed" was true of every check that ran and
+# false of the question a reader asks a health report. Same distinction the
+# roster check already drew, one check further down.
+RD_OK="${SANDBOX}/rules-populated"
+mkdir -p "${RD_OK}"
+printf -- '---\ndescription: fixture\n---\nbody\n' > "${RD_OK}/one.md"
+out="$(SBW_RULES_DIR="${RD_OK}" "${DOCTOR}" --vault "${SANDBOX}/no-vault" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"1 rule(s) in ${RD_OK}"*"SBW_RULES_DIR"*)
+    pass "doctor counts the rules it would render, and names where the path came from" ;;
+  *) fail "doctor counts the rules it would render, and names where the path came from" "${out}" ;;
+esac
+
+# Empty is a supported state — a machine that renders only a vault guard is a
+# real way to run this — so it stays `ok` and says so rather than staying quiet.
+RD_EMPTY="${SANDBOX}/rules-empty"
+mkdir -p "${RD_EMPTY}"
+out="$(SBW_RULES_DIR="${RD_EMPTY}" "${DOCTOR}" --vault "${SANDBOX}/no-vault" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no rules to render"*"SBW_RULES_DIR"*)
+    pass "an empty rules directory is named, not passed over in silence" ;;
+  *) fail "an empty rules directory is named, not passed over in silence" "${out}" ;;
+esac
+# grep -c exits 1 on zero matches, and under set -e that aborted the run here —
+# dropping this check and every one after it in the exact state it exists for.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"vendored submodule"*) pass "an empty rules directory does not abort the remaining checks" ;;
+  *) fail "an empty rules directory does not abort the remaining checks" "${out}" ;;
+esac
+
+# A rules directory sitting unreferenced beside the engine is the whole
+# explanation for the empty case, and it is a fact about the disk rather than an
+# inference about intent — so it is offered as a candidate and never adopted.
+RD_CAND="${HOME}/some-conventions/rules"
+mkdir -p "${RD_CAND}"
+printf -- '---\ndescription: fixture\n---\nbody\n' > "${RD_CAND}/rule.md"
+out="$(SBW_RULES_DIR="${RD_EMPTY}" "${DOCTOR}" --vault "${SANDBOX}/no-vault" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"exists elsewhere on this machine"*"${RD_CAND}"*)
+    pass "an unreferenced rules directory is offered as a candidate" ;;
+  *) fail "an unreferenced rules directory is offered as a candidate" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Point SBW_RULES_DIR at one"*) pass "the candidate is offered, never adopted" ;;
+  *) fail "the candidate is offered, never adopted" "${out}" ;;
+esac
+
+# Configured and absent is an error, never the quiet line above: it names a
+# rules directory that should be there, and no amount of finishing setup fixes
+# a wrong path.
+out="$(SBW_RULES_DIR="${SANDBOX}/nowhere/rules" "${DOCTOR}" --vault "${SANDBOX}/no-vault" 2>&1)"
+rc=$?
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"rules directory not found"*) pass "a configured rules directory that is absent is an error" ;;
+  *) fail "a configured rules directory that is absent is an error" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no rules to render"*) fail "absent and empty are different findings" "${out}" ;;
+  *) pass "absent and empty are different findings" ;;
+esac
+rm -rf "${RD_CAND%/rules}"
+
+
 finish

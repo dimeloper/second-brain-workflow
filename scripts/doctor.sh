@@ -4,6 +4,8 @@
 #   - the vault's commit guard is wired in as a pre-commit hook, and it's ours
 #   - commits here would be authored as the identity vault.json declares
 #   - a skill installed into one configured skills dir isn't missing from another
+#   - the rules directory this machine renders from has rules in it, and when
+#     it has none, whether that is a decision or an unfinished setup
 #   - every third-party skill the manifest declares is fetched, at its pinned
 #     sha, and linked — and nothing is linked that no source declares
 #   - a vendored submodule isn't left at the wrong commit after a tag switch
@@ -61,7 +63,7 @@ while [ $# -gt 0 ]; do
     # the closing paragraph mid-sentence each time a bullet was added.
     # tests/test-registry-scan.sh asserts the final line still reaches the
     # reader, so the next edit here cannot truncate it silently.
-    -h|--help) sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -443,6 +445,101 @@ roster_say_scope() {
 # and check_orphaned_skills: "you have not installed this yet" is only meaningful
 # about directories you asked for, while "this is left over" is meaningful
 # anywhere it landed.
+# Which rules this machine would render, and — when the answer is none — whether
+# that is a decision or an unfinished setup.
+#
+# Seven checks could pass on a machine that renders nothing at all, because none
+# of them looked at the rules directory. "All checks passed" is true of every
+# check that ran and false of the question the reader is asking, which is whether
+# this machine is ready. Exactly the distinction v0.17.0 drew for the roster, in
+# the same report, one check further down; there was simply no equivalent line
+# for rules.
+#
+# Severity `ok` throughout and the exit code unchanged: an engine with no rules
+# is the state a fresh clone is in and stays in, and a machine that renders only
+# a vault guard is a supported way to run this. The finding is the *silence*, not
+# the absence.
+check_rules() {
+  local dir count origin candidate found=""
+
+  dir="${SBW_RULES_DIR}"
+  origin="SBW_RULES_DIR in $(ds_config_path)"
+  if [ -z "${dir}" ]; then
+    dir="${STANDARDS_DIR}/rules"
+    origin="the default — SBW_RULES_DIR is unset"
+  fi
+
+  # Configured and not there is a fault, never the quiet line below: it names a
+  # rules directory that should exist, and rendering nothing from it is how a
+  # repo ends up with no conventions nobody notices are missing. Same reading as
+  # a configured-but-absent manifest.
+  if [ ! -d "${dir}" ]; then
+    # Only a *configured* path that points nowhere is a misconfiguration. An
+    # engine checkout with no rules/ directory of its own is just an engine with
+    # no rules, and grading that as an error is how a fixture engine's submodule
+    # drift gets re-graded from "setup unfinished" (1) to "misconfigured" (2) by
+    # a rules directory it never had — the identical mistake this file already
+    # records against the roster check, made again one check higher up.
+    if [ -n "${SBW_RULES_DIR}" ]; then
+      err "rules directory not found: ${dir}
+        set by ${origin}. Fix the path, or unset SBW_RULES_DIR to fall back to
+        ${STANDARDS_DIR}/rules."
+    else
+      ok "no rules to render — ${STANDARDS_DIR}/rules does not exist
+        (from ${origin}). Set SBW_RULES_DIR in $(ds_config_path) to point at a
+        rules directory."
+    fi
+    return 0
+  fi
+
+  # `|| true`: grep -c exits 1 on zero matches, and under `set -e` an empty
+  # rules directory would abort the run — silently dropping this check and
+  # every one after it, in the exact state the check was added for.
+  count="$(find "${dir}" -maxdepth 1 -name '*.md' -type f 2>/dev/null | grep -c . || true)"
+  if [ "${count}" -gt 0 ]; then
+    ok "${count} rule(s) in ${dir}
+        (from ${origin})"
+    return 0
+  fi
+
+  # Empty. Say so, name the key, and — because this is the one state where a
+  # clone sitting unreferenced beside the engine is the whole explanation — look
+  # for one rather than leaving the reader to guess. A directory holding *.md
+  # under rules/ is a fact about the disk, not an inference about intent, so it
+  # is reported as a candidate and never adopted: which rules a machine renders
+  # is a decision, and a check that made it silently would be deciding what an
+  # employer's laptop loads on every turn.
+  local resolved configured
+  configured="$(cd "${dir}" && pwd)"
+  for candidate in "${HOME}"/*/rules "${STANDARDS_DIR}"/../*/rules; do
+    [ -d "${candidate}" ] || continue
+    # Resolved before comparing, and before printing: the engine checkout's
+    # sibling and the home-directory glob reach the same directory by two
+    # spellings, and one location listed twice reads as two options.
+    resolved="$(cd "${candidate}" && pwd)"
+    [ "${resolved}" != "${configured}" ] || continue
+    case "
+${found}" in *"
+        ${resolved}
+"*) continue ;; esac
+    find "${resolved}" -maxdepth 1 -name '*.md' -type f 2>/dev/null | grep -q . || continue
+    found="${found}        ${resolved}
+"
+  done
+
+  if [ -n "${found}" ]; then
+    ok "no rules to render — ${dir} holds none (from ${origin}),
+        but a rules directory with content exists elsewhere on this machine:
+${found}        Point SBW_RULES_DIR at one in $(ds_config_path) if that was the intent."
+  else
+    ok "no rules to render — ${dir} holds none (from ${origin})
+        This machine renders nothing into a repo. That is a supported way to run
+        the engine; set SBW_RULES_DIR in $(ds_config_path) if it is not what you
+        wanted."
+  fi
+  return 0
+}
+
 check_roster() {
   local rows sources status name path source current clean=1
   local dir linked ok_paths="" sname sref sdir target
@@ -577,6 +674,7 @@ check_hook
 check_author
 check_skills
 check_orphaned_skills
+check_rules
 check_roster
 check_submodules
 check_registry
