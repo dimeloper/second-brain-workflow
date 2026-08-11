@@ -17,6 +17,55 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-11
+
+### Major
+- **Re-render every onboarded repo (`make render` in each, or `make upgrade`).
+  The rendered `AGENTS.md` shape has changed.** It now carries the body of every
+  always-on rule appended to it, and Claude Code's `.claude/rules/<name>.md` file
+  for an always-on rule is no longer written. A repo rendered by v0.19.0 and left
+  alone keeps working — the old files are valid, nothing is removed from under it
+  — but its `AGENTS.md` will not contain always-on rules until it is re-rendered,
+  and a stale `.claude/rules/<name>.md` for one will linger until a render prunes
+  it. First Major entry since v0.10.0, and the action is the whole of it.
+
+  Repos rendering only `cursor` are unaffected in every respect.
+
+  **What it fixes.** `AGENTS.md` was emitted as a verbatim copy of its source, so
+  an always-on rule reached `.cursor/rules/` and `.claude/rules/` and never the
+  one output that is *portable* — the format an editor this engine renders no
+  native shape for still reads. One repo therefore enforced different rules
+  depending on what you opened it in, with nothing anywhere saying so. The rule
+  that exposed it, `verify-integrations`, is exactly the kind that has to survive
+  a tool switch: it constrains when work may be called done, which is true
+  regardless of editor.
+
+  The gap was silent rather than biting — a machine rendering `claude-code,agents`
+  still received the rule through `.claude/rules/`, so nothing failed. That is
+  what made it worth taking now.
+
+### Changed
+- **An always-on rule is rendered once per target, not twice.** It is appended to
+  `AGENTS.md` under its own `description` as a heading, with its own provenance
+  header naming the source file. Claude Code reads it through `CLAUDE.md`'s
+  `@AGENTS.md` import, so the separate `.claude/rules/` file would have loaded the
+  same text a second time and charged the budget for both. Cursor keeps its own
+  `.mdc` with `alwaysApply: true`, because Cursor does not read `AGENTS.md` and
+  there is nothing to fold into. With **no** `AGENTS.md` present, the per-rule
+  Claude Code file stays — dropping it there would reintroduce the same silent
+  gap from the other side.
+- **`rule-budget.py` no longer reports an undeliverable always-on set as a cost of
+  zero.** The `agents` target's only carrier is `AGENTS.md`; with none, a rule
+  that is always-on in every other target does not arrive at all, and a total of
+  zero reads as *this set is free here* — the confident-wrong-answer shape the
+  check exists to catch, in the check itself. It now names the target and every
+  rule that misses it, and prints no total, because there is no cost to report.
+
+  Scoped to `agents` alone: `claude-code` falls back to per-rule files and still
+  receives them. Asserted separately so the two cannot be collapsed into one
+  branch again — that collapse was written, and caught, while making this change.
+- Suite 950 → 961 assertions.
+
 ## [0.19.0] - 2026-08-11
 
 No **Major** entry, and the question was live enough to answer with a run rather
@@ -1417,7 +1466,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.16.0...v0.17.0
