@@ -17,6 +17,69 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-08-11
+
+No **Major** entry: a new `make` target, a pinned CI dependency, two checks, and
+documentation corrections. Nothing rendered changes.
+
+### Added
+- **`make render REPO=…`, because a Major entry already named it.** v0.20.0's
+  entry says *"re-render every onboarded repo (`make render` in each, or
+  `make upgrade`)"* — and no such target existed; every other reference was
+  `./scripts/render.py <repo>`. `upgrade.sh` prints `### Major` sections
+  **verbatim**, so every reader upgrading past v0.20.0 is handed a command that
+  fails. `scripts/lib/major_commands.py` now checks that every `make …` and
+  `./scripts/…` a Major entry names resolves. `test-release-consistency.sh`
+  covered `VERSION`/changelog/`ENGINE_REF`; nothing covered the part a reader is
+  asked to type.
+- **`scripts/lib/doc_links.py`** — every same-document `#anchor` link resolves to
+  a heading. `[rules/](#the-rules-live-somewhere-else)` pointed at nothing, in the
+  paragraph explaining why the engine ships no rules of its own.
+
+### Changed
+- **CI's shellcheck is pinned to v0.11.0**, the version this repo develops
+  against, instead of whatever `apt-get` supplies. The two disagree about which
+  checks fire, which is how v0.23.0 and v0.24.0 were both tagged with a failing
+  lint while `make check` was green locally. *Cutting a release* gains the step
+  that was missing: **open the run.** Pinning removes one disagreement, not the
+  class.
+- **`docs/NEW-MACHINE.md` step 5's expected `doctor` output was three releases
+  stale** — four lines, missing the rules-directory line (v0.21.0), the roster
+  line (v0.17.0) and the orphaned-skills line. Regenerated from a real run
+  against a fixture machine, and it now shows the **warning this walkthrough
+  actually produces**: step 3 installs into both skills directories before any
+  config exists, step 5 narrows `SKILLS_DIRS` to one, and `doctor` reports the
+  links left outside it. The check was correct; the page claimed `All checks
+  passed` and exit `0` for a path that exits `1`.
+- **Step 5's pasteable config block pre-decided two choices.** It set
+  `RENDER_TARGETS=claude-code,agents` and `SKILLS_DIRS=~/.claude/skills` inside a
+  heredoc introduced as "paste the whole block", so a Cursor user following it
+  rendered for Claude Code. Only `SBW_VAULT` and `SBW_EXPECTED_VAULT_ID` — the
+  two keys with no sensible default — stay in it; the rest are appended
+  deliberately underneath.
+- **Cursor's always-on delivery is named as never verified.** The canary tests a
+  *scoped* rule on matching and non-matching files. `alwaysApply: true` is a
+  different mechanism and nothing has exercised it — the same gap v0.23.0 closed
+  on the Claude Code side. Cursor having no headless agent is why it stays
+  manual, not why it stays unasserted.
+
+### Fixed
+- `docs/NEW-MACHINE.md`'s *short way* cloned without resolving a tag while its own
+  step 1 pinned the newest release — the two-version-stories split v0.23.0 fixed
+  in the README, in the other document.
+- The README said *"omit these two lines to track main"* over three, disagreeing
+  with `NEW-MACHINE`'s identical block. Inside a fenced block, which
+  `stated_counts.py` deliberately does not read.
+- A sentence framing `CLAUDE.md`'s `@AGENTS.md` import as avoiding duplication
+  still stood nine paragraphs below the v0.23.0 block written to replace it.
+- The Quickstart's sample config output showed `SBW_VAULT=…/second-brain` while
+  the block above it derives `…/${vault_id}-brain`.
+- *"clone it and let `make init` find it"* read as though `init` sets
+  `SBW_RULES_DIR`. It reports and refuses to adopt, deliberately.
+- Two troubleshooting rows for things that happened this week: `doctor` green on
+  a machine rendering nothing, and `make init YES=1` before the vault existed.
+- Suite 1012 → 1015 assertions.
+
 ## [0.24.1] - 2026-08-11
 
 ### Fixed
@@ -1742,7 +1805,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.1...v0.23.0
