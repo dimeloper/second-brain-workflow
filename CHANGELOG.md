@@ -17,6 +17,73 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-08-11
+
+No **Major** entry: an allowlist entry may still be a bare string, and the
+skipped-check lines change no exit code.
+
+### Added
+- **`applies_to` and `license` per allowlist entry.** `ref`, `applies_to` and
+  `license` attach to a **source**; what gets allowlisted, linked and reasoned
+  about is a **skill**. A twelve-skill repo of which three are Next.js-specific
+  could declare that scope for all twelve or for none, and both are honest
+  readings of a declaration that cannot say the true thing — scoped, the nine
+  generic skills read as misses on a Python repo; unscoped, the three Next-only
+  ones are reported as applying everywhere.
+
+  An entry may now be an object — `name` required, `applies_to` and `license`
+  optional — with a bare string coerced to `{"name": ...}`, the same coercion
+  `source:` and `repos:` already use, so every existing manifest parses
+  unchanged.
+
+  **Replace, not merge.** An entry's value supersedes the source's. The case
+  this exists for is *narrowing*, and a merge can only widen — which is the
+  direction omitting the key already covers.
+
+  `[]` and `""` are errors at the entry level for the reason `""` is one at the
+  source level: they look answered and are not, where an omitted key at least
+  warns and names what is missing. The empty-array error names both of the
+  things it might have meant, since omitting it here means "inherit".
+
+  **The licence warning stays per source.** A manifest with one unlicensed
+  twelve-skill source keeps producing one warning, not twelve — the number of
+  unanswered questions did not change. An entry recording its own does not
+  contribute to it.
+
+  `make skills-for` names the **origin** of each resolved scope, the way
+  `ds_origin_describe` does for config keys: a wrong glob inherited from a source
+  is otherwise indistinguishable in the report from one declared on the entry,
+  and the two are fixed in different places.
+
+  Per-skill `ref` is deliberately excluded — a second sha for one skill means a
+  second checkout of the same repo under `vendor/external/`, changing the
+  directory shape `skill_link_engine_layout` matches. That layout is a decision
+  to make first, so "upgrade one skill" stays a documented limitation.
+
+### Changed
+- **`doctor` and `onboard-repo` name a roster check they skipped.** With no
+  manifest configured, `doctor` said "no third-party skill sources declared" and
+  `skills-for` printed nothing at all — both of which read as *no candidates are
+  relevant here* when the fact is *no roster was consulted*. That is the
+  undetermined-versus-empty distinction `SBW_SCAN_ROOTS` in v0.10.0 and the
+  lineage coverage in v0.9.0 were both about, and the fifth appearance of the
+  shape: a check that cannot determine something produces the plausible answer
+  instead of naming the gap.
+
+  One line each, naming `SBW_SKILLS_MANIFEST`. Severity `ok` and **exit codes
+  unchanged** — an unconfigured roster is a supported state, not a finding.
+  Printed in `relevant` and `validate` modes only; `resolve` and `sources` are
+  parsed by the shell callers, where a courtesy line on stdout is read as a row.
+
+  Where a manifest *is* configured, both reports now name which one answered and
+  where that setting came from, on clean runs too.
+
+  A configured-but-unreadable manifest stays an **error**, now asserted to be
+  distinguishable from the skipped line. `onboard-repo` step 2b said to skip on
+  "prints nothing or exits non-zero", which folded that fault into the supported
+  state; they are now separate outcomes with separate instructions.
+- Suite 861 → 894 assertions.
+
 ## [0.16.0] - 2026-08-10
 
 No **Major** entry: a new read-only command and a new optional step in a skill.
@@ -1191,7 +1258,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.13.0...v0.14.0
