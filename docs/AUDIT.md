@@ -46,15 +46,28 @@ Reports, read-only, never writes: an **unpromoted note** (`enforced`, no rule
 traces back to it), an **orphaned rule** (its source note is gone or demoted
 below `enforced`), a **stale claim** (`enforced`, unreviewed past
 `--stale-months`, default 6 — the same 180-day window `review-queue.md` uses
-for a different purpose), and **thin evidence** (`enforced` with fewer repos
-than the vault's own idea→trialing→enforced bar, read from
+for a different purpose), **maturity above its evidence** (a maturity whose
+entry bar the note's repo count does not meet — `trialing` under the
+idea→trialing bar, `enforced` under the trialing→enforced one, both read from
 `00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
-number — exempting a note whose `**Observed in:**` line says exactly
-"enforced by preference," this vault's own way of marking a personal default
-that was never meant to clear that bar; a note that's close but doesn't
-match exactly is still counted as thin evidence *and* named separately as a
-near-miss, so a typo can't silently cost a note its exemption). If that
-threshold can't be read unambiguously — the file is missing, reworded past
+numbers; `idea` is the floor and has no bar to miss — exempting a note whose
+`**Observed in:**` line says exactly "enforced by preference," this vault's own
+way of marking a personal default that was never meant to clear that bar; a
+note that's close but doesn't match exactly is still counted *and* named
+separately as a near-miss, so a typo can't silently cost a note its exemption),
+and **ready to promote** (the same comparison the other way: a repo count that
+already clears the *next* bar while the maturity still says otherwise).
+
+`promotion-candidates.md` computes that last one in Dataview, which renders in
+Obsidian and nowhere else — so until it was reported here, neither `make audit`
+nor CI could answer it, which is where a backlog actually gets read. It is
+reported and never acted on: automated promotion was rejected deliberately, and
+a report is what keeps a human gate being exercised rather than quietly
+stopping. The count is **distinct `repos:` entries**; the vault's own
+one-lineage-counts-once rule is prose in that same map note and is not applied,
+so the report says so on every run rather than only when it bites.
+
+If either threshold can't be read unambiguously — the file is missing, reworded past
 recognition, or states two different numbers — the script exits with a
 named, specific error rather than silently skipping the check.
 

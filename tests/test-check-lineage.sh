@@ -68,7 +68,7 @@ esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"thin (1 repo(s))"*) pass "flags thin evidence against the real promotion-candidates.md threshold" ;;
+  *"thin (enforced, 1 of 3 repo(s))"*) pass "flags thin evidence against the real promotion-candidates.md threshold" ;;
   *) fail "flags thin evidence against the real promotion-candidates.md threshold" "${out}" ;;
 esac
 
@@ -78,8 +78,66 @@ esac
 # note its exemption without anyone noticing.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"near-miss (1 repo(s))"*) pass "a near-miss preference marker still counts as thin evidence" ;;
+  *"near-miss (enforced, 1 of 3 repo(s))"*) pass "a near-miss preference marker still counts as thin evidence" ;;
   *) fail "a near-miss preference marker still counts as thin evidence" "${out}" ;;
+esac
+
+# Every rung with an entry bar, not only `enforced`. A note promoted to
+# `trialing` on one repo is the same claim unsupported by the same evidence,
+# and while this check knew one bar it could judge one rung — the label said
+# `enforced` honestly and the number underneath read as the whole vault.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"under-bar-trialing (trialing, 1 of 2 repo(s))"*)
+    pass "a trialing note below the idea->trialing bar is reported too" ;;
+  *) fail "a trialing note below the idea->trialing bar is reported too" "${out}" ;;
+esac
+# `idea` is the floor, so it has no entry bar to miss. Without this, a check
+# that reported every note at zero repos would pass the assertion above.
+# Sliced to that one section: the slug appears again under "Ready to promote"
+# further down, and a whole-output glob would match it there and pass for the
+# wrong reason.
+above_section="$(printf '%s\n' "${out}" | awk '/^Maturity above its evidence/{f=1;next} /^$/{f=0} f')"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${above_section}" in
+  *"ready-to-promote"*) fail "an idea note is never above its evidence" "${above_section}" ;;
+  *) pass "an idea note is never above its evidence" ;;
+esac
+# Both bars are named in the heading, so the reader can tell which number each
+# note was judged against without knowing the vault's own map note.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Maturity above its evidence (trialing needs 2, enforced needs 3)"*)
+    pass "the heading names both bars it judged against" ;;
+  *) fail "the heading names both bars it judged against" "${out}" ;;
+esac
+
+# The other direction: a repo count that already clears the next bar while the
+# maturity still says otherwise. promotion-candidates.md computes this in
+# Dataview, which renders in Obsidian and nowhere else — so `make audit` and CI,
+# where the backlog is actually read, could not answer it at all.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"ready-to-promote: idea -> trialing (2 repo(s))"*)
+    pass "a note whose repo count clears the next bar is reported" ;;
+  *) fail "a note whose repo count clears the next bar is reported" "${out}" ;;
+esac
+# Reported, never acted on: automated promotion was rejected deliberately.
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q "^maturity: idea" "${LVAULT}/practices/cross-cutting/ready-to-promote.md"; then
+  pass "reporting a ready note does not promote it"
+else
+  fail "reporting a ready note does not promote it" "the fixture's maturity changed"
+fi
+# The count is distinct `repos:` entries, and the vault's one-lineage-counts-once
+# rule is prose that nothing here applies. Said on every run, including when the
+# list is empty — a caveat printed only when it bites is one the reader has
+# already taken the number without.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"one-lineage-counts-once rule is prose"*)
+    pass "the ready count names the rule it does not apply" ;;
+  *) fail "the ready count names the rule it does not apply" "${out}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
@@ -112,7 +170,7 @@ esac
 # appears under "Unpromoted notes" — that exemption is narrower than that.)
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"- preference (0 repo(s))"*) fail "an enforced-by-preference note is exempt from thin evidence" "unexpectedly listed" ;;
+  *"- preference (enforced, 0 of 3 repo(s))"*) fail "an enforced-by-preference note is exempt from thin evidence" "unexpectedly listed" ;;
   *) pass "an enforced-by-preference note is exempt from thin evidence" ;;
 esac
 
@@ -315,7 +373,7 @@ esac
 # Failing closed on coverage must not take the checks that still work with it.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nosrc}" in
-  *"thin (1 repo(s))"*) pass "undetermined coverage still reports thin evidence" ;;
+  *"thin (enforced, 1 of 3 repo(s))"*) pass "undetermined coverage still reports thin evidence" ;;
   *) fail "undetermined coverage still reports thin evidence" "${out_nosrc}" ;;
 esac
 
