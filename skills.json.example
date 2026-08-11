@@ -53,6 +53,14 @@
     "                 are allowed to do with someone else's content is asked once",
     "                 at adoption and then never again, so it wants a mechanical",
     "                 prompt. An unlicensed repo is all-rights-reserved by default.",
+    "  pinned_apart   optional prose, and only meaningful when two sources name",
+    "                 the same repo at different refs — see example-pinned-apart",
+    "                 below. It says the duplication is deliberate, which is the",
+    "                 one thing the pattern cannot say for itself: without it,",
+    "                 two entries for one repo are indistinguishable from a",
+    "                 source added twice with one ref then edited, so the pair",
+    "                 warns. Never `true`: a boolean records that someone once",
+    "                 had a reason and nothing about what it was.",
     "  applies_to     optional path globs. Purely for reporting: `make skills-for",
     "                 REPO=...` and the onboard-repo skill use it to say which",
     "                 skills are scoped to a repo. Omit it and the skill is",
@@ -119,6 +127,25 @@
           "license": "MIT (the skills/ dir carries its own notice)"
         }
       ]
+    },
+    {
+      "//": [
+        "The same repo as example-mixed, held at an older ref for one skill.",
+        "This is how a single skill gets a sha of its own: a second entry, a",
+        "name of its own, and an allow list disjoint from the first's. Nothing",
+        "in the engine changes shape — one checkout per source name, one",
+        "declared ref per checkout — and the cost is the repo cloned twice.",
+        "",
+        "pinned_apart is the one thing the pattern cannot say for itself.",
+        "Without it, two entries for one repo look exactly like a source added",
+        "twice with one ref then edited, so the pair warns."
+      ],
+      "name": "example-mixed-legacy",
+      "repo": "https://github.com/example/agent-skills",
+      "ref": "1111111111111111111111111111111111111111",
+      "license": "MIT",
+      "pinned_apart": "legacy-report reads the pre-2.0 config format; the rest of this repo tracks current",
+      "allow": ["legacy-report"]
     }
   ],
   "//candidates": [

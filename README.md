@@ -411,7 +411,43 @@ Three rules worth knowing before you write one:
   license of their own` — always, including at twelve of twelve, because a count
   that shows up only when it is partial is one nobody learns to read.
 - **A skill of yours wins.** A same-named local skill shadows the adopted one,
-  and the sync says so rather than silently preferring one.
+  and the sync says so rather than silently preferring one. Two *manifest*
+  sources allowing one name is refused instead: the install directory has one
+  slot for it, so one of the two declarations could not be honoured under any
+  layout, and the drift checks would report clean while the last source linked
+  quietly won.
+- **One skill can be held at its own sha** by declaring the repo twice, with
+  disjoint `allow` lists and a `pinned_apart` reason:
+
+  ```json
+  {
+    "sources": [
+      {
+        "name": "agent-skills",
+        "repo": "https://github.com/someone/agent-skills",
+        "ref": "0dd13f5be1c4a2f7e9b8d6c5a4930817264f5abc",
+        "license": "MIT",
+        "allow": ["a11y-audit", "design-linter"]
+      },
+      {
+        "name": "agent-skills-screenshot",
+        "repo": "https://github.com/someone/agent-skills",
+        "ref": "9e2c1a70b4f3d85a6c07e1b29d4f8a3061c5d2e4",
+        "license": "MIT",
+        "pinned_apart": "screenshot needs the pre-2.0 skills/ layout; the rest track current",
+        "allow": ["screenshot"]
+      }
+    ]
+  }
+  ```
+
+  Nothing about the engine changes shape — one checkout per source name, one
+  declared ref per checkout, the leftover report still keyed on names. The cost
+  is the repo cloned twice, which is cheaper than a layout that made every path
+  in the system move. `pinned_apart` is what tells `doctor` the duplication is
+  deliberate rather than a source added twice with one ref then edited; without
+  it the pair warns. It is **prose, never `true`** — a boolean records that
+  someone once had a reason and nothing about what it was.
 
 Sources are cloned into `vendor/external/`, which is **gitignored**. That is
 deliberately not a submodule: a submodule records its pin in `.gitmodules`, and

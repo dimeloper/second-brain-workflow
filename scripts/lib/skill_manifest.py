@@ -73,7 +73,8 @@ SOURCE_KEYS_REQUIRED = ("name", "repo", "allow")
 # still be a valid manifest. An example that has to be edited before it parses is
 # an example whose first run fails for a reason that has nothing to do with the
 # reader's own mistake.
-SOURCE_KEYS_OPTIONAL = ("ref", "skills_subdir", "//", "applies_to", "license")
+SOURCE_KEYS_OPTIONAL = ("ref", "skills_subdir", "//", "applies_to", "license",
+                        "pinned_apart")
 
 
 # Any key starting with "//" is a comment and is ignored, at every level. JSON has
@@ -118,7 +119,10 @@ CANDIDATE_KEYS = CANDIDATE_KEYS_REQUIRED + CANDIDATE_KEYS_OPTIONAL
 # well-formed sha, so nothing downstream would question it, and the failure it
 # produces is a git error about an unknown object several steps later — which
 # reads as a broken source rather than as "you did not fill this in".
-PLACEHOLDER_REFS = ("0" * 40,)
+#
+# Two of them, because the example has to show one repo declared at two refs and
+# a pattern demonstrated with one ref written twice is not the pattern.
+PLACEHOLDER_REFS = ("0" * 40, "1" * 40)
 
 DEFAULT_SKILLS_SUBDIR = "skills"
 
@@ -323,7 +327,10 @@ def parse(text, origin="manifest"):
             "allow": entries,
             "applies_to": source_globs,
             "license": source_license,
+            "pinned_apart": _pinned_apart(raw.get("pinned_apart"), where),
         })
+
+    warnings.extend(_repeated_repo_warnings(sources, origin))
 
     candidates, candidate_warnings = _parse_candidates(
         data.get("candidates"), origin, seen_skills)
@@ -339,6 +346,68 @@ def _license(value, where):
             "%s: 'license' must be a non-empty string; omit the key if you have "
             "not checked yet, which warns rather than passing silently" % where)
     return value.strip()
+
+
+def _pinned_apart(value, where):
+    """Why one repo is declared twice at two refs. Prose, never `true`.
+
+    A boolean would say that someone once had a reason, and nothing more. That is
+    the same exemption `check-rules.py` refuses for `provisional: true`, for the
+    same reason: the flag outlives the reason it was added for, with nothing left
+    to read. A `//` comment is not an alternative either — the check cannot see
+    one, so the warning would fire anyway and the reason would end up in the only
+    place in this file that nothing reads.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        raise ManifestError(
+            "%s: 'pinned_apart' must say why, not that. `true` records that "
+            "someone once had a reason and nothing about what it was, which is "
+            "the state it exists to prevent" % where)
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError(
+            "%s: 'pinned_apart' must be a non-empty string; omit the key if the "
+            "duplication is not deliberate" % where)
+    return value.strip()
+
+
+def _repeated_repo_warnings(sources, origin):
+    """One repo declared by more than one source.
+
+    Two entries naming one repo at different refs is how a second sha for a
+    single skill is expressed without a second layout: nothing about the engine
+    changes shape — one checkout per source name, one declared ref per checkout,
+    the leftover report still keyed on names — and the cost is the repo cloned
+    twice. What the pattern cannot say for itself is that it is deliberate, which
+    is what `pinned_apart` is for and why its absence warns rather than passing.
+    """
+    out = []
+    by_repo = {}
+    for source in sources:
+        by_repo.setdefault(source["repo"], []).append(source)
+
+    for repo, group in by_repo.items():
+        if len(group) < 2:
+            continue
+        listed = ", ".join("'%s' at %s" % (s["name"], s["ref"]) for s in group)
+        if len({s["ref"] for s in group}) == 1:
+            # Not pinning apart — one entry written as two. Both declarations are
+            # honoured, so this is a warning and not an error: the cost is a
+            # second clone of the same commit and a reader wondering what the
+            # difference is. `pinned_apart` cannot excuse it, because the thing it
+            # declares deliberate is a difference of refs, and there is none.
+            out.append(
+                "%s: one repo (%s) is declared by %d sources at the same ref — "
+                "%s. Nothing separates them, so their allow lists can be merged "
+                "into one entry and one checkout" % (origin, repo, len(group), listed))
+        elif not any(s["pinned_apart"] for s in group):
+            out.append(
+                "%s: one repo (%s) is declared by %d sources at different refs — "
+                "%s. If that is deliberate, say why in 'pinned_apart' on one of "
+                "them; if it is not, a ref was edited on a source that was added "
+                "twice" % (origin, repo, len(group), listed))
+    return out
 
 
 def _globs(value, where, empty_ok=True):
@@ -738,6 +807,15 @@ def _report_relevant(repo, sources, candidates, path=None, origin=None):
     # different rosters print the same headings.
     if path is not None:
         print("roster: %s (from %s)" % (path, origin or "the configured value"))
+    # A source held at a ref of its own, and why. Printed here for the same
+    # reason a candidate's license is printed beside its repo: it is a decision,
+    # and the moment it is read is the moment it can be questioned. Without it,
+    # two entries naming one repo look like a roster someone edited twice.
+    for source in sources:
+        if source.get("pinned_apart"):
+            print("pinned apart: '%s' holds %s at %s — %s"
+                  % (source["name"], source["repo"], source["ref"],
+                     source["pinned_apart"]))
     print()
     print("Adopted and scoped to this repo: %d" % len(a_match))
     for entry in a_match:

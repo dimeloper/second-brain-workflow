@@ -1034,7 +1034,7 @@ apart_fixture() {
   printf '{"sources":[%s,%s]}\n' "$1" "$2" > "${SANDBOX}/apart.json"
 }
 APART_NEW="{\"name\":\"pair-new\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA2}\",\"license\":\"MIT\",\"allow\":[\"animate\"]}"
-APART_OLD="{\"name\":\"pair-old\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"review-animations\"]}"
+APART_OLD="{\"name\":\"pair-old\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"pinned_apart\":\"review-animations needs the pre-rewrite layout; animate tracks current\",\"allow\":[\"review-animations\"]}"
 
 for order in "forward" "reversed"; do
   rm -rf "${ENG}/vendor/external/pair-new" "${ENG}/vendor/external/pair-old"
@@ -1095,6 +1095,94 @@ assert_str "1" "${leftovers}" "the surviving half of the pair is not reported as
 rm -rf "${ENG}/vendor/external/pair-new" "${ENG}/vendor/external/pair-old"
 sync_eng "${good}" >/dev/null 2>&1
 
+# --- pinning a source apart, and saying so -----------------------------------
+# The pattern above needs no layout change: the same skill_link_engine_layout
+# matches, the wrong-sha check still compares one checkout against one declared
+# ref, the leftover report still keys on source names. The one thing it cannot
+# say for itself is that the duplication is deliberate — without which it is
+# indistinguishable from a source added twice with one ref then edited.
+apart_fixture "${APART_NEW}" "$(printf '%s' "${APART_OLD}" | sed 's/"pinned_apart":"[^"]*",//')"
+out="$(SBW_SKILLS_MANIFEST="${SANDBOX}/apart.json" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"declared by 2 sources at different refs"*"'pair-new' at ${SHA2}"*"'pair-old' at ${SHA1}"*)
+    pass "one repo at two refs with no reason warns, naming both entries and both shas" ;;
+  *) fail "one repo at two refs with no reason warns, naming both entries and both shas" "${out}" ;;
+esac
+# Warning, not error: it is sometimes exactly right, and which one it is here is
+# the operator's call and not this script's.
+SBW_SKILLS_MANIFEST="${SANDBOX}/apart.json" python3 "${MANIFEST_PY}" validate >/dev/null 2>&1
+assert_exit 0 $? "an undeclared repeat is a warning, not a refusal"
+warns="$(printf '%s\n' "${out}" | grep -c "declared by 2 sources")"
+assert_str "1" "${warns}" "one warning for the pair, not one per entry"
+
+apart_fixture "${APART_NEW}" "${APART_OLD}"
+out="$(SBW_SKILLS_MANIFEST="${SANDBOX}/apart.json" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"declared by 2 sources"*) fail "a declared reason silences the warning" "${out}" ;;
+  *) pass "a declared reason silences the warning" ;;
+esac
+
+# And the reason is read out where the decision is read, the same argument as
+# printing a candidate's license beside its repo.
+out="$(SBW_SKILLS_MANIFEST="${SANDBOX}/apart.json" python3 "${MANIFEST_PY}" \
+  relevant --repo "${ROOTED}" 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"pinned apart: 'pair-old' holds"*"needs the pre-rewrite layout"*)
+    pass "skills-for prints why a source is held at a ref of its own" ;;
+  *) fail "skills-for prints why a source is held at a ref of its own" "${out}" ;;
+esac
+
+# Prose, never `true`. A boolean records that someone once had a reason and
+# nothing about what it was, which outlives the reason — the same exemption
+# check-rules.py refuses for `provisional: true`, refused here by name.
+bad_case "{\"sources\":[{\"name\":\"a\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"pinned_apart\":true,\"allow\":[\"x\"]}]}" \
+  "must say why, not that" "pinned_apart: true is refused by name"
+bad_case "{\"sources\":[{\"name\":\"a\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"pinned_apart\":\"\",\"allow\":[\"x\"]}]}" \
+  "'pinned_apart' must be a non-empty string" "a blank pinned_apart is an error"
+
+# Same repo, same ref: not pinning apart at all, just one entry written as two.
+# Both declarations are honoured, so this warns rather than refusing — the cost
+# is a second clone of one commit and a reader wondering what differs.
+same_ref="${SANDBOX}/same-ref.json"
+write_manifest "${same_ref}" "{\"sources\":[{\"name\":\"twin-a\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"animate\"]},{\"name\":\"twin-b\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"review-animations\"]}]}"
+out="$(SBW_SKILLS_MANIFEST="${same_ref}" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null)"
+rc_same=0
+SBW_SKILLS_MANIFEST="${same_ref}" python3 "${MANIFEST_PY}" validate >/dev/null 2>&1 || rc_same=$?
+assert_exit 0 "${rc_same}" "two entries at one ref validate"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"at the same ref"*"can be merged into one entry and one checkout"*)
+    pass "two entries at one ref are named as mergeable" ;;
+  *) fail "two entries at one ref are named as mergeable" "${out}" ;;
+esac
+
+# The README shows the pattern, and a snippet that does not parse is worse than
+# no snippet: it is copied first and debugged second.
+snip_dir="${SANDBOX}/readme-snippets"
+mkdir -p "${snip_dir}"
+awk -v out="${snip_dir}" '
+  /^[ \t]*```json/ { f = 1; buf = ""; next }
+  /^[ \t]*```/     { if (f && buf ~ /"sources"/) { n++; printf "%s", buf > (out "/s" n ".json") }
+                     f = 0; next }
+  f                { buf = buf $0 "\n" }
+' "${ENGINE}/README.md"
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -rq "pinned_apart" "${snip_dir}"; then
+  pass "the README documents the pinned-apart pattern"
+else
+  fail "the README documents the pinned-apart pattern" "no manifest fence mentions it"
+fi
+snippet_bad=""
+for snip in "${snip_dir}"/*.json; do
+  [ -f "${snip}" ] || continue
+  SBW_SKILLS_MANIFEST="${snip}" python3 "${MANIFEST_PY}" validate >/dev/null 2>&1 \
+    || snippet_bad="${snippet_bad}${snip} "
+done
+assert_str "" "${snippet_bad}" "every manifest snippet in the README is a valid manifest"
+
 # --- candidate validation ---------------------------------------------------
 bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[\"animate\"]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
   "cannot be both adopted and merely suggested" \
@@ -1131,7 +1219,8 @@ esac
 # say: the placeholder is refused at the first source, so everything after it —
 # including every field the example exists to demonstrate — was never parsed.
 edited="${SANDBOX}/example-edited.json"
-sed "s/0000000000000000000000000000000000000000/${SHA1}/g" \
+sed -e "s/0000000000000000000000000000000000000000/${SHA1}/g" \
+    -e "s/1111111111111111111111111111111111111111/${SHA2}/g" \
   "${ENGINE}/skills.json.example" > "${edited}"
 out_example="$(SBW_SKILLS_MANIFEST="${edited}" python3 "${MANIFEST_PY}" validate 2>&1)"
 rc=$?
