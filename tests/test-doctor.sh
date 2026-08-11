@@ -47,6 +47,26 @@ case "${out}" in
   *) fail "reports the hook as installed" "${out}" ;;
 esac
 
+# setup_sandbox blanks SBW_SKILLS_MANIFEST, so every run in this file already
+# takes the unconfigured-roster path — it just passed unremarked. The line has to
+# name the key: "no third-party skill sources declared" reads as a roster that
+# was consulted and came back empty, when nothing was read at all.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"roster checks skipped"*"SBW_SKILLS_MANIFEST"*)
+    pass "an unconfigured roster is named as skipped, not reported as empty" ;;
+  *) fail "an unconfigured roster is named as skipped, not reported as empty" "${out}" ;;
+esac
+# One line, not a paragraph per check that stood down. A skipped check earns a
+# mention; it does not earn more room than a check that ran.
+roster_lines="$(printf '%s\n' "${out}" | grep -c "roster")"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${roster_lines}" -eq 1 ]; then
+  pass "the skipped roster is mentioned exactly once"
+else
+  fail "the skipped roster is mentioned exactly once" "${roster_lines} line(s): ${out}"
+fi
+
 # --- a vault with no hook at all --------------------------------------------
 rm -f "${V}/.git/hooks/pre-commit"
 out="$("${DOCTOR}" --vault "${V}" 2>&1)"
@@ -56,6 +76,17 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
   *"no pre-commit hook"*) pass "names the missing hook" ;;
   *) fail "names the missing hook" "${out}" ;;
+esac
+
+# The exit code is the assertion. An unconfigured roster is a supported state,
+# so saying so must not promote a clean run to 1 (asserted above) nor an
+# unrelated warning to 2 — the line is the difference between a reader knowing
+# the roster is empty and knowing nothing was read, and nothing else.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"roster checks skipped"*)
+    pass "the skipped-roster line rides alongside an unrelated finding without regrading it" ;;
+  *) fail "the skipped-roster line rides alongside an unrelated finding without regrading it" "${out}" ;;
 esac
 
 # The remediation names the vault's own id, not the literal "VAULT_ID" it used

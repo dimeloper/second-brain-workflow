@@ -413,6 +413,14 @@ EOF
   return 0
 }
 
+# Which roster answered, printed on clean runs too — the same reason
+# sbw_scan_say_scope states the scanned scope whether or not the scan found
+# anything. "Everything is at its pin" is only useful once you know which
+# manifest was read; two machines with different rosters both print that line.
+roster_say_scope() {
+  echo "        roster: ${SBW_SKILLS_MANIFEST} (from $(ds_origin_describe SBW_SKILLS_MANIFEST))"
+}
+
 # Whether the machine actually holds the third-party skills its manifest
 # declares. Three distinct drifts, none of which anything else reports:
 #
@@ -445,11 +453,23 @@ check_roster() {
   # reader instead of the machine, and this one did — every fixture engine
   # without scripts/lib/skill_manifest.py had its submodule drift re-graded from
   # "setup unfinished" (1) to "misconfigured" (2) by a roster it never had.
+  #
+  # It names the key rather than only the state. "no third-party skill sources
+  # declared" reads as a measurement — as though a roster was consulted and came
+  # back empty — when the fact is that none was read at all. That is the
+  # undetermined-versus-empty distinction SBW_SCAN_ROOTS and the lineage
+  # coverage were both about; a reader who cannot tell the two apart cannot tell
+  # whether there is anything to do. Severity stays `ok` and the exit code is
+  # unchanged: an unconfigured roster is a supported state, not a finding.
   if [ -z "${SBW_SKILLS_MANIFEST}" ]; then
-    ok "no third-party skill sources declared"
+    ok "no skills manifest configured — roster checks skipped
+        (set SBW_SKILLS_MANIFEST in $(ds_config_path) to declare one)"
     return 0
   fi
 
+  # A configured manifest that cannot be read is an error, never the line above:
+  # the roster it names should be there, and running on without it is how a
+  # machine ends up missing skills nobody notices are missing.
   if ! rows="$(python3 "${STANDARDS_DIR}/scripts/lib/skill_manifest.py" \
                  resolve --engine "${STANDARDS_DIR}")"; then
     err "skill manifest unusable (see the error above) — fix it, or unset
@@ -458,11 +478,8 @@ check_roster() {
   fi
 
   if [ -z "${rows}" ]; then
-    if [ -n "${SBW_SKILLS_MANIFEST}" ]; then
-      ok "skill manifest declares no skills (${SBW_SKILLS_MANIFEST})"
-    else
-      ok "no third-party skill sources declared"
-    fi
+    ok "skill manifest declares no skills"
+    roster_say_scope
     return 0
   fi
 
@@ -548,8 +565,9 @@ ${SKILLS_DIRS_ALL}
 EOF
 
   [ "${clean}" -eq 1 ] && ok "every declared third-party skill is fetched at its pin and linked"
-  # Same reason as check_skills and check_submodules: the test above is the last
-  # command, so a finding would make this return 1 and `set -e` would abort the
+  roster_say_scope
+  # Same reason as check_skills and check_submodules: without an explicit return
+  # a finding would make this function exit non-zero and `set -e` would abort the
   # run before the summary and before the warning/error exit-code split.
   return 0
 }

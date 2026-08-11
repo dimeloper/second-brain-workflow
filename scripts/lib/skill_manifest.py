@@ -472,7 +472,7 @@ def _main(argv):
     args = parser.parse_args(argv)
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from lib.config import load as load_config  # noqa: E402
+    from lib.config import load as load_config, origin_describe  # noqa: E402
 
     try:
         path, sources, candidates, warnings = load(args.manifest, load_config())
@@ -483,7 +483,20 @@ def _main(argv):
     for warning in warnings:
         sys.stderr.write("warning: %s\n" % warning)
 
+    origin = ("the --manifest flag" if args.manifest
+              else origin_describe("SBW_SKILLS_MANIFEST"))
+
     if path is None:
+        # Said, not left silent — but only in the two modes a person reads.
+        # `resolve` and `sources` are parsed by shell callers, and a courtesy
+        # line on stdout there would be read as a row.
+        #
+        # An empty report and an unread roster look identical, and they have
+        # different next actions: one means nothing here is relevant, the other
+        # means nothing was consulted. Naming the key is what separates them.
+        if args.mode in ("relevant", "validate"):
+            print("no skills manifest configured — skill roster skipped (%s)"
+                  % origin)
         return 0
 
     if args.mode == "validate":
@@ -496,7 +509,7 @@ def _main(argv):
         if not args.repo:
             sys.stderr.write("error: relevant mode needs --repo\n")
             return 2
-        return _report_relevant(args.repo, sources, candidates)
+        return _report_relevant(args.repo, sources, candidates, path, origin)
 
     if args.mode == "sources":
         # Tab-separated for the fetch script: name, repo, ref, checkout dir.
@@ -510,7 +523,7 @@ def _main(argv):
     return 0
 
 
-def _report_relevant(repo, sources, candidates):
+def _report_relevant(repo, sources, candidates, path=None, origin=None):
     """Human-readable, for onboard-repo to read out. Not machine-parsed.
 
     Adopted skills are flattened out of their sources because relevance is a
@@ -536,6 +549,11 @@ def _report_relevant(repo, sources, candidates):
     d_match, d_unscoped, _ = relevant(decided, files)
 
     print("skills relevant to %s  (%d file(s) considered)" % (repo, len(files)))
+    # Which roster answered, on every run and not only on an interesting one.
+    # Every count below is a count *from this manifest*, and two machines with
+    # different rosters print the same headings.
+    if path is not None:
+        print("roster: %s (from %s)" % (path, origin or "the configured value"))
     print()
     print("Adopted and scoped to this repo: %d" % len(a_match))
     for entry in a_match:

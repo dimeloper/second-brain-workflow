@@ -379,9 +379,36 @@ out="$(env -u SBW_SKILLS_MANIFEST SKILLS_DIRS="${A}" \
   "${ENG}/scripts/doctor.sh" --vault "${SANDBOX}/no-vault" 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"no third-party skill sources declared"*)
-    pass "doctor says so plainly when no roster is configured" ;;
-  *) fail "doctor says so plainly when no roster is configured" "${out}" ;;
+  *"no skills manifest configured — roster checks skipped"*"SBW_SKILLS_MANIFEST"*)
+    pass "doctor names the key when no roster is configured" ;;
+  *) fail "doctor names the key when no roster is configured" "${out}" ;;
+esac
+
+# The pair that has to stay distinguishable. Unconfigured is a supported state
+# and says so at `ok`; configured-and-unreadable is a fault and says so at ERROR.
+# Collapsing them is how a machine ends up missing skills nobody notices are
+# missing — the manifest names a roster that should be there.
+out="$(SBW_SKILLS_MANIFEST="${SANDBOX}/absent.json" SKILLS_DIRS="${A}" \
+  "${ENG}/scripts/doctor.sh" --vault "${SANDBOX}/no-vault" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"roster checks skipped"*)
+    fail "a configured-but-missing manifest is an error, not the skipped line" "${out}" ;;
+  *"skill manifest unusable"*)
+    pass "a configured-but-missing manifest is an error, not the skipped line" ;;
+  *) fail "a configured-but-missing manifest is an error, not the skipped line" "${out}" ;;
+esac
+
+# Which roster answered, on clean runs too. Every finding above is a finding
+# *from this manifest*, and two machines with different rosters print the same
+# headings — so the report is only readable once it names the one it read.
+sync_eng "${good}" >/dev/null 2>&1
+out="$(doctor_out "${good}" "${A}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"roster: ${good}"*"environment variable"*)
+    pass "doctor names the manifest it read, and where the setting came from" ;;
+  *) fail "doctor names the manifest it read, and where the setting came from" "${out}" ;;
 esac
 
 # doctor's --help is a hardcoded line range over its own header, and adding a
@@ -451,6 +478,34 @@ case "${out_rel}" in
   *"add it to skills.json sources"*) pass "a candidate with no install command still says how" ;;
   *) fail "a candidate with no install command still says how" "${out_rel}" ;;
 esac
+
+# Which roster answered. onboard-repo reads this report out loud, and every
+# count in it is a count from one particular manifest.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_rel}" in
+  *"roster: ${rel}"*"environment variable"*)
+    pass "the relevance report names the manifest it read and its origin" ;;
+  *) fail "the relevance report names the manifest it read and its origin" "${out_rel}" ;;
+esac
+
+# Nothing configured is not the same fact as nothing relevant, and step 2b of
+# onboard-repo used to see them as one silence. Exit 0 either way — an
+# unconfigured roster is supported — but the reader is told which one it is.
+out_none="$(env -u SBW_SKILLS_MANIFEST python3 "${MANIFEST_PY}" relevant --repo "${REPO}" 2>&1)"
+assert_exit 0 $? "relevant mode with no manifest configured exits 0"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_none}" in
+  *"no skills manifest configured"*"SBW_SKILLS_MANIFEST"*)
+    pass "relevant mode names the skipped roster instead of printing nothing" ;;
+  *) fail "relevant mode names the skipped roster instead of printing nothing" "${out_none}" ;;
+esac
+# ...and only in the modes a person reads. `resolve` and `sources` are parsed by
+# sync-skills.sh and fetch-skill-sources.sh, where a courtesy line on stdout is
+# read as a row — which is exactly how a source named "no" would get fetched.
+out_none="$(env -u SBW_SKILLS_MANIFEST python3 "${MANIFEST_PY}" resolve 2>/dev/null)"
+assert_str "" "${out_none}" "machine-readable modes stay silent with no manifest"
+out_none="$(env -u SBW_SKILLS_MANIFEST python3 "${MANIFEST_PY}" sources 2>/dev/null)"
+assert_str "" "${out_none}" "sources mode stays silent with no manifest"
 
 # A repo the globs do not touch reports nothing rather than everything.
 BARE="${SANDBOX}/bare-repo"

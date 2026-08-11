@@ -123,8 +123,19 @@ recommendation:
   design linter registering an edit-time hook, a screenshot tool scaffolding a
   whole Next.js app. Name it, name the cost, let the user decide.
 
-Skip the whole step if the command prints nothing or exits non-zero: no manifest
-is configured on this machine, which is a supported state and not a gap to fill.
+It also prints which roster answered, as a `roster:` line naming the manifest
+path and where that setting came from. Two machines with different manifests
+print the same headings, so the counts below them mean nothing without it.
+
+Two outcomes that are not the same thing, and the command distinguishes them:
+
+- **`no skills manifest configured — skill roster skipped`**, exit 0. No roster
+  was consulted. Supported state, not a gap to fill: say so in the Done report
+  and move on. Do not read it as "no skills apply here" — nothing was read.
+- **Exits non-zero.** A manifest *is* configured and cannot be used — missing
+  file, bad JSON, an unknown key. That is a real fault on this machine. Report
+  the error verbatim rather than skipping; onboarding this repo against a roster
+  that failed to load would silently under-report.
 
 If the user does adopt one, the loop is theirs to run, not yours to assume:
 `make fetch-skills YES=1` then `make sync-skills`, and a **session restart** —
