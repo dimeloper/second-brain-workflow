@@ -65,8 +65,14 @@ target bash and the skills directories are POSIX paths.
 ## The short way
 
 ```bash
-git clone git@github.com:dimeloper/second-brain-workflow.git ~/second-brain-workflow
-cd ~/second-brain-workflow && make init
+git clone --recurse-submodules git@github.com:dimeloper/second-brain-workflow.git \
+  ~/second-brain-workflow
+cd ~/second-brain-workflow
+latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
+git submodule update --init --recursive
+
+make init
 ```
 
 `make init` explains what this engine does, prints every configuration key with
@@ -358,17 +364,31 @@ cat > "$config" <<'EOF'
 # Comments must be on their own line — a trailing `# ...` becomes part of the
 # value. Write ~/... not $HOME/..., since this file gets no shell expansion.
 SBW_VAULT=~/vaults/VAULT_NAME
-# or cursor,agents — or all three
-RENDER_TARGETS=claude-code,agents
-# narrow it if only one agent is installed
-SKILLS_DIRS=~/.claude/skills
-# only if rules live in a separate repo
-SBW_RULES_DIR=~/dev-conventions/rules
 # must match --id from step 4
 SBW_EXPECTED_VAULT_ID=VAULT_ID
 EOF
 cat "$config"      # confirm what actually landed
 ```
+
+Those two are the only keys with no sensible default for this machine. The rest
+have working defaults and are **choices**, so they are not in a block described
+as paste-and-run — pasting a choice is how a Cursor user ends up rendering
+`claude-code,agents`. Add the ones you actually want:
+
+```bash
+# Only the agents you use. Default: cursor,claude-code,agents
+echo 'RENDER_TARGETS=cursor,agents'                >> "$config"
+
+# Only the skills directories you use. Default: both.
+# Read the SKILLS_DIRS note under step 3 first — narrowing does not uninstall.
+echo 'SKILLS_DIRS=~/.cursor/skills'                >> "$config"
+
+# Only if rules live in a separate repo.
+echo 'SBW_RULES_DIR=~/dev-conventions/rules'       >> "$config"
+```
+
+`make init` writes the same keys, previews first, and appends only what is
+missing — see [the short way](#the-short-way).
 
 See `config.example` for every key. Precedence is CLI flag > environment > this
 file > defaults. Two format rules that bite if broken: the file is parsed, not
@@ -392,12 +412,37 @@ make doctor VAULT="$HOME/vaults/VAULT_NAME"
 ```
 second-brain-workflow doctor — vault: ~/vaults/work-brain
   ok    commit guard installed as a pre-commit hook in ~/vaults/work-brain
-  ok    vault.json declares no commit identity — commits are not checked against an author (optional)
+  ok    vault.json pins no commit author — the check is opt-in, so it is not running here
+        a vault created before this feature has no identity block; add one to enable it:
+          "identity": { "email": "you@example.com" }
   ok    only one skills directory configured — nothing to compare across
+  warn  1 of our skill link(s) in ~/.cursor/skills, which is not in SKILLS_DIRS
+  ok    no rules to render — <engine>/rules holds none (from the default — SBW_RULES_DIR is unset)
+        This machine renders nothing into a repo. That is a supported way to run
+        the engine; set SBW_RULES_DIR in <config> if it is not what you wanted.
+  ok    no skills manifest configured — roster checks skipped
+        (set SBW_SKILLS_MANIFEST in <config> to declare one)
   ok    vendored submodule(s) match the commit this checkout pins
+  ok    no repos carry rendered output here, and the registry names none
+        scanned scope: roots=~ depth=5
 
-All checks passed.
+1 thing(s) worth a look — setup unfinished, nothing misconfigured.
 ```
+
+**That `warn` is produced by this walkthrough**, and it is correct. Step 3 ran
+`sync-skills.sh` before any config existed, so it installed into the built-in
+default — *both* `~/.cursor/skills` and `~/.claude/skills`. Narrowing
+`SKILLS_DIRS` above does not uninstall anything; it stops the tooling looking at
+the other directory, and this check exists to say so rather than let an install
+go quietly unmanaged. Either widen `SKILLS_DIRS` again, or run
+`./scripts/uninstall.sh` and re-run `sync-skills.sh` with the config in place.
+
+**Exit `1`, not `0`.** A first run through these steps ends with warnings, which
+is the *setup unfinished* code and not a failure.
+
+If your rules live elsewhere, the `no rules to render` line is where you will see
+it — it names any rules directory it finds on the machine that `SBW_RULES_DIR`
+does not point at.
 
 Write `$HOME`, not `~`: make performs no tilde expansion, and neither does zsh
 in a variable argument, so `VAULT=~/vaults/...` stats nothing. Plain
@@ -565,6 +610,8 @@ a hypothetical.
 
 | Symptom | Cause and fix |
 |---|---|
+| `make doctor` says **All checks passed** on a machine that renders nothing into any repo | Before v0.21.0 no check looked at the rules directory, so a machine with `SBW_RULES_DIR` unset and an unreferenced rules repo cloned beside the engine reported clean. `doctor` now prints a rules line in all four states and names any rules directory it finds. Set `SBW_RULES_DIR`. |
+| `make init YES=1` wrote `SBW_VAULT` pointing at a vault that does not exist, and the first commit fails on an id mismatch | Running `init` before creating the vault, on a version before v0.22.1. `init-vault.sh` writes the vault path and its id together and leaves an existing config alone, so a config written first is never corrected. Create the vault first; current `init` refuses to write the key and says so. |
 | `zsh: no such file or directory: account` | You pasted a snippet containing `<account>`; zsh read `<account>` as a redirection and aborted the command *before* the script ran — while the next line of the block still executed, leaving a half-finished setup. The docs no longer contain such placeholders; if you are following an older copy, replace every `<...>` before pasting. |
 | `zsh: no such file or directory: /Users/…/config` right after a `mkdir` | An unset `$EDITOR` expanded to nothing, so the shell tried to execute the path. Nothing is wrong with the directory. Use step 5's heredoc, which needs no editor. |
 | `fatal: empty string is not a valid pathspec` | `git checkout "$latest"` with no release tag resolved. Step 1's snippet echoes `latest` and skips the checkout when it is empty. |

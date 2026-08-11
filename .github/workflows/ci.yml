@@ -12,8 +12,18 @@ jobs:
         with:
           submodules: true   # vendor/obsidian-skills is a pinned submodule
 
+      # Pinned, not apt's. Ubuntu's package is older than a developer's brew
+      # install, and the two disagree about which checks fire — v0.23.0 and
+      # v0.24.0 both shipped with a failing lint because `make check` was green
+      # locally and nobody opened the run. A lint whose verdict depends on which
+      # machine ran it is not a gate.
       - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+        env:
+          SHELLCHECK_VERSION: v0.11.0
+        run: |
+          curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJf - --strip-components=1 -C /usr/local/bin "shellcheck-${SHELLCHECK_VERSION}/shellcheck"
+          shellcheck --version | sed -n 2p
 
       - name: Show versions
         run: |

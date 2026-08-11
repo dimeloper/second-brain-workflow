@@ -67,7 +67,7 @@ git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workfl
 cd second-brain-workflow
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 echo "latest = $latest"                       # empty means no release yet
-[ -z "$latest" ] || git checkout "$latest"    # omit these two lines to track main
+[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
 git submodule update --init --recursive
 
 make init                                     # read this; it writes nothing
@@ -134,7 +134,7 @@ exists yet, and prints what it wrote:
 ```
 Wrote /Users/you/.config/second-brain-workflow/config:
     # Written by init-vault.sh. See config.example for every key.
-    SBW_VAULT=/Users/you/vaults/second-brain
+    SBW_VAULT=/Users/you/vaults/personal-brain
     SBW_EXPECTED_VAULT_ID=personal
 ```
 
@@ -156,9 +156,10 @@ name **warns** — usually the sign of a Quickstart followed verbatim, keeping
 `vault_id=personal` next to a work remote.
 
 `SBW_RULES_DIR` is not in the block above, because a fresh clone renders from its
-own `rules/`. If yours live in a separate repo, clone it and let `make init` find
-it — it reports any rules directory it sees on the machine, and `make doctor`
-does the same afterwards.
+own `rules/`. If yours live in a separate repo, clone it and then set the key —
+`make init` and `make doctor` both *report* a rules directory they find and
+name `SBW_RULES_DIR`, but neither adopts one: which rules a machine renders is a
+decision, not something a script should make quietly.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
@@ -379,7 +380,7 @@ VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-ski
 
 The engine ships five skills of its own and tracks one pinned upstream set. It
 does **not** ship a roster of other people's skills, for the same reason
-[`rules/`](#the-rules-live-somewhere-else) ships empty: a curated selection of
+[`rules/`](#one-rule-set-every-agent) ships empty: a curated selection of
 someone else's craft skills is an opinion, and the engine's job is the mechanism.
 
 Declare the ones you want in a `skills.json` next to your own `rules/`, and point
@@ -724,7 +725,8 @@ A rule with `paths` is scoped; a rule without is always-on. There is no
 something a check has to catch.
 
 Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so the generated `CLAUDE.md`
-imports `@AGENTS.md` rather than forking it.
+imports `@AGENTS.md` — which, since v0.20.0, is how always-on rules reach it at
+all. See the table above.
 
 ```bash
 ./scripts/render.py /path/to/repo                      # all configured targets
@@ -801,6 +803,16 @@ matching file as the active tab, once with a non-matching one. Answering
 instantly means the rule was in context; searching the repo first means it was
 not.
 
+**Not covered: Cursor's always-on path.** This canary tests a *scoped* rule, on
+a matching file and a non-matching one. An always-on rule reaches Cursor by a
+different mechanism — `alwaysApply: true` in the `.mdc`, not the `AGENTS.md`
+import Claude Code uses — and nothing has ever exercised it. v0.23.0 closed
+exactly this gap on the Claude Code side, where the two scoping probes could not
+attest that an always-on rule arrives; the same gap is open here, and Cursor
+having no headless agent is why it stays manual rather than why it stays
+unasserted. To check it by hand, put a second canary in a rule with no `paths:`
+and ask for it while editing a file that matches no glob.
+
 Verified 2026-08-02 on Cursor 3.14.7: known immediately on `*.component.ts`, and
 on a `.txt` file the agent had to grep for it. Scoping confirmed on both agents.
 
@@ -828,6 +840,13 @@ can't supply on its own. `tests/test-release-consistency.sh` enforces the
 `VERSION`/changelog/`ENGINE_REF` half of that list, because a template pinned
 several releases back gives an adopter a workflow that quietly runs fewer
 checks than they think.
+
+**Then open the CI run for the tag.** A green `make check` locally is not
+evidence the pipeline passed: a linter's verdict is specific to its version, and
+v0.23.0 and v0.24.0 were both tagged with a failing lint that no local run could
+have shown. CI's shellcheck is now pinned to the same version this repo
+develops against, which removes that particular disagreement — it does not
+remove the class, and reading the run is the step that does.
 
 Every rendered file's provenance comment names both the commit and the
 engine version it came from, and a plain `.sbw-version` file is written at

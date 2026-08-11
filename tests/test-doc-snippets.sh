@@ -171,4 +171,39 @@ case "${out}" in
   *) fail "the stated-count checker finds a real mismatch" "${out}" ;;
 esac
 
+# --- an anchor link that resolves to no heading -----------------------------
+# `[rules/](#the-rules-live-somewhere-else)` pointed at a heading that does not
+# exist, in the paragraph explaining why the engine ships no rules of its own. A
+# link that silently does nothing is the same class as a heading that states a
+# count its list does not have.
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" \
+  "${ENGINE}/README.md" "${ENGINE}/docs/NEW-MACHINE.md" "${ENGINE}/docs/GUARD.md" \
+  "${ENGINE}/docs/AUDIT.md" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "every in-document anchor link resolves to a heading"
+else
+  fail "every in-document anchor link resolves to a heading" "${out}"
+fi
+bad_link="${SANDBOX}/bad-link.md"
+printf '# Real heading\n\nSee [this](#no-such-heading).\n' > "${bad_link}"
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" "${bad_link}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"link to #no-such-heading"*) pass "the anchor checker finds a broken link" ;;
+  *) fail "the anchor checker finds a broken link" "${out}" ;;
+esac
+
+# --- a command a Major changelog entry tells the reader to run --------------
+# upgrade.sh prints ### Major sections verbatim, so a command named there is
+# handed to every reader upgrading past that release. v0.20.0's entry named
+# `make render`, which did not exist.
+out="$(python3 "${ENGINE}/scripts/lib/major_commands.py" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "every command a Major entry names exists"
+else
+  fail "every command a Major entry names exists" "${out}"
+fi
+
 finish

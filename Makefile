@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
-        vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain render guard doctor audit \
         init \
         verify-claude check
 
@@ -35,6 +35,7 @@ help:
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
+	@echo "make render REPO=...     render rules into one repo (also registers it)"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make init              explain this engine, detect the machine, preview a config"
 	@echo "                         (make init YES=1 VAULT_ID=... writes it, then runs doctor)"
@@ -93,6 +94,13 @@ test:
 
 explain:
 	@./scripts/render.py --explain
+
+# Named by v0.20.0's Major entry, which `make upgrade` prints verbatim, so a
+# reader upgrading past it is handed this command as the required action. It did
+# not exist until then: every other reference was ./scripts/render.py <repo>.
+render:
+	@if [ -z "$(REPO)" ]; then echo "usage: make render REPO=/path/to/repo" >&2; exit 2; fi
+	@./scripts/render.py "$(REPO)"
 
 guard:
 	@./scripts/guard-vault-commit.sh --vault "$(VAULT)"
