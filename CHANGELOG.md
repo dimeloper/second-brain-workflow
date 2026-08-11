@@ -17,6 +17,67 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-08-11
+
+No **Major** entry: documentation corrections, one new verification case, and a
+check that runs in `make check`. No rendered output changes.
+
+### Added
+- **`verify-claude` proves an always-on rule reaches the session.** Its two
+  existing probes are both about *scoping* — a matching file loads the rule, a
+  non-matching one does not. Neither asserted that an always-on rule arrives at
+  all, and since v0.20.0 that is a two-hop path: `CLAUDE.md` → `@AGENTS.md` →
+  rule body. The `include AGENTS.md` line in the sample output proves the import
+  resolves and nothing more.
+
+  An always-on rule is **not a file** in a Claude Code render, so no
+  `load_reason` line can attest to it. The third probe puts a codeword in a
+  temporary always-on rule and asks for it while reading the *non-matching* file,
+  so a codeword coming back cannot be explained by glob scoping — the same
+  technique the Cursor section has used since v0.4.0.
+
+  **Three model calls now, not two.** And the *Verified* date moves to today,
+  with a note to re-date it after anything that changes what reaches a session:
+  it read `2026-08-02`, which predates v0.20.0, and a date older than the change
+  vouches for the previous shape.
+- **`scripts/lib/stated_counts.py`, run by `make check`** — finds a heading that
+  states a count over a list of a different length. *"Three rules worth knowing"*
+  above five bullets was the fourth instance across two files, one of which said
+  *"Three times now"* above four entries in a list **about** wrong counts.
+  Proofreading is not the fix; a claim about a list being checkable is. Fenced
+  blocks are skipped — sample output is a transcript, not a claim — and nested
+  lists are counted at their own indent.
+
+### Fixed
+- **The render table described the shape before v0.20.0.** `AGENTS.md` is no
+  longer "whole file": it carries every always-on rule body. And `claude-code`'s
+  "rule with no `paths`" named an output that is *not written* when `agents` is
+  also a target.
+
+  The conditional behind that was documented nowhere: `RENDER_TARGETS=claude-code`
+  and `claude-code,agents` produce **different file sets** from the same rules
+  directory. It is also the reason `rule-budget.py`'s undeliverable branch is
+  scoped to `agents` alone, and that scoping is only defensible if the fallback is
+  written down — so both fallbacks now are, including the hand-written-`AGENTS.md`
+  case from v0.20.1. `CLAUDE.md`'s `@AGENTS.md` import is named as the **sole
+  delivery path** for always-on rules rather than a way to avoid duplication.
+- **The Quickstart had two `git clone` blocks and two version stories.** Both
+  arrived with v0.22.1's edit. The headline path tracked `main` while the
+  reference block pinned the newest tag — which is what *Versioning* describes,
+  so the two disagreed about what a reader ends up on. One path now, pinning
+  once. *"Three commands, in this order"* also undercounted five steps with vault
+  creation between two of them; the count is gone rather than corrected.
+- The `skills-for` sample output claimed `Adopted and scoped to this repo: 5`
+  while listing two, with no ellipsis. Fixed by hand: a transcript is not
+  something the new checker should police.
+- The **`SKILLS_DIRS` narrowing** paragraph sat at the end of *Which practices a
+  repo has never had*, between `practices-for` content and *Removing them again*.
+  Moved next to the skills content it describes.
+- `make doctor`'s rules-directory check appeared only as a clause inside the
+  `SBW_RULES_DIR` paragraph. It is now in the capability list, since it is the
+  first thing a second machine hits.
+- Suite 1005 → 1007 assertions.
+
 ## [0.22.1] - 2026-08-11
 
 ### Fixed
@@ -1625,7 +1686,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.1...v0.21.0
