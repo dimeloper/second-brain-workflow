@@ -24,6 +24,20 @@ offered: every skill in it is charged against the same session budget as your
 own, and the one time that was decided by default (the vendored obsidian set)
 the right answer turned out to be three of six.
 
+An `allow` entry may be a bare skill name or an object carrying its own
+`applies_to` and `license`:
+
+    "allow": ["a11y-audit", {"name": "screenshot",
+                             "applies_to": ["**/next.config.*"]}]
+
+`ref`, `applies_to` and `license` attach to a *source*; what gets allowlisted,
+linked and reasoned about is a *skill*. Where a source's skills do not share one
+answer — a twelve-skill repo of which three are Next.js-specific — a source-level
+scope can only state something untrue in one direction or the other. An entry's
+value **replaces** the source's rather than merging, because the case this exists
+for is narrowing, and a merge can only widen, which omitting the key already
+does.
+
 Why validation is strict about unknown keys: a manifest is a plain mapping, so a
 misspelled key is not an error anywhere — it is just a key nobody reads.
 `"alow": [...]` would parse, install nothing, and look right in a diff. That is
@@ -72,6 +86,13 @@ def _is_comment(key):
     return isinstance(key, str) and key.startswith("//")
 SOURCE_KEYS = SOURCE_KEYS_REQUIRED + SOURCE_KEYS_OPTIONAL
 TOP_KEYS = ("sources", "candidates", "//")
+
+# An `allow` entry. A bare string coerces to {"name": ...} — the same coercion
+# `source:` and `repos:` already do on the note side, so every manifest written
+# before this existed parses unchanged and means exactly what it meant.
+ALLOW_ENTRY_KEYS_REQUIRED = ("name",)
+ALLOW_ENTRY_KEYS_OPTIONAL = ("applies_to", "license", "//")
+ALLOW_ENTRY_KEYS = ALLOW_ENTRY_KEYS_REQUIRED + ALLOW_ENTRY_KEYS_OPTIONAL
 
 # A candidate is a skill you have *not* adopted, recorded so onboarding can
 # mention it. `when` is required and `repo` is required; `install` is optional
@@ -215,16 +236,13 @@ def parse(text, origin="manifest"):
                 "%s: ref '%s' is not a full 40-character sha, so what it points "
                 "at can move under you" % (where, ref.strip()))
 
-        allow = raw["allow"]
-        if not isinstance(allow, list):
-            raise ManifestError("%s: 'allow' must be an array, got %s"
-                               % (where, _kind(allow)))
-        for entry in allow:
-            if not isinstance(entry, str) or not entry.strip():
-                raise ManifestError(
-                    "%s: 'allow' holds a blank or non-string entry (%r)"
-                    % (where, entry))
-            skill = entry.strip()
+        source_license = _license(raw.get("license"), where)
+        source_globs = _globs(raw.get("applies_to"), where)
+
+        entries = _parse_allow(raw["allow"], where, name, source_globs,
+                               source_license)
+        for entry in entries:
+            skill = entry["name"]
             if skill in seen_skills:
                 raise ManifestError(
                     "%s: skill '%s' is also allowed by source '%s' — skills "
@@ -239,8 +257,15 @@ def parse(text, origin="manifest"):
         # which is precisely the kind that wants a mechanical prompt. Not fatal,
         # because the answer is a judgement the operator makes, not one this
         # script can make for them.
-        license_ = _license(raw.get("license"), where)
-        if not license_:
+        #
+        # One warning per *source*, never one per skill. A twelve-skill source
+        # that records no license is one unanswered question, not twelve, and
+        # turning one line into twelve is a regression in noise for no new
+        # information. An entry that overrides is licensed and does not
+        # contribute; a source whose every entry overrides is fully answered and
+        # says nothing.
+        if not source_license and (not entries or
+                                   any(not e["license"] for e in entries)):
             warnings.append(
                 "%s: no 'license' recorded for '%s' (%s). Check it before "
                 "adopting — an unlicensed repo is all-rights-reserved by default"
@@ -257,9 +282,9 @@ def parse(text, origin="manifest"):
             "repo": repo.strip(),
             "ref": ref.strip(),
             "skills_subdir": subdir.strip().strip("/"),
-            "allow": [entry.strip() for entry in allow],
-            "applies_to": _globs(raw.get("applies_to"), where),
-            "license": license_,
+            "allow": entries,
+            "applies_to": source_globs,
+            "license": source_license,
         })
 
     candidates = _parse_candidates(data.get("candidates"), origin, seen_skills)
@@ -277,13 +302,22 @@ def _license(value, where):
     return value.strip()
 
 
-def _globs(value, where):
+def _globs(value, where, empty_ok=True):
     """An optional list of path globs. Absent means 'relevant everywhere'."""
     if value is None:
         return []
     if not isinstance(value, list):
         raise ManifestError("%s: 'applies_to' must be an array of globs, got %s"
                            % (where, _kind(value)))
+    if not value and not empty_ok:
+        # Same reason a blank `license` is an error at the source level: it looks
+        # answered and is not. An omitted key at least has a defined meaning here
+        # — inherit — and the two things it might have meant are different
+        # enough that guessing either one would be wrong.
+        raise ManifestError(
+            "%s: 'applies_to' is an empty array, which says nothing. Omit the "
+            "key to inherit the source's scope, or list the globs this skill "
+            "applies to" % where)
     out = []
     for entry in value:
         if not isinstance(entry, str) or not entry.strip():
@@ -291,6 +325,76 @@ def _globs(value, where):
                                % (where, entry))
         out.append(entry.strip())
     return out
+
+
+def _parse_allow(value, where, source_name, source_globs, source_license):
+    """Resolve a source's `allow` list into one record per adopted skill.
+
+    Each record carries the scope and licence that actually govern that skill,
+    and where each came from. The origin is not bookkeeping: a wrong scope
+    inherited from a source is otherwise indistinguishable in a report from one
+    declared on the entry, and those have different fixes — one edits the source,
+    the other edits the entry.
+    """
+    if not isinstance(value, list):
+        raise ManifestError("%s: 'allow' must be an array, got %s"
+                           % (where, _kind(value)))
+
+    entries = []
+    for index, raw in enumerate(value):
+        if isinstance(raw, str):
+            if not raw.strip():
+                raise ManifestError(
+                    "%s: 'allow' holds a blank entry at [%d]" % (where, index))
+            raw = {"name": raw}
+        elif not isinstance(raw, dict):
+            raise ManifestError(
+                "%s: 'allow'[%d] must be a skill name or an object with a "
+                "'name', got %s" % (where, index, _kind(raw)))
+
+        at = "%s: allow[%d]" % (where, index)
+        for key in raw:
+            if _is_comment(key):
+                continue
+            if key not in ALLOW_ENTRY_KEYS:
+                raise ManifestError(
+                    _unknown_key_message(key, ALLOW_ENTRY_KEYS, at))
+        if "name" not in raw:
+            raise ManifestError(
+                "%s: missing required key 'name' — an allow entry under source "
+                "'%s' has to say which skill it is about" % (at, source_name))
+
+        skill = raw["name"]
+        if not isinstance(skill, str) or not skill.strip():
+            raise ManifestError("%s: 'name' must be a non-empty string" % at)
+
+        # Replace, never merge. The case per-entry scope exists for is
+        # *narrowing* — three Next-only skills inside a repo of twelve — and a
+        # merge can only ever widen, which is the direction omitting the key
+        # already covers.
+        if "applies_to" in raw:
+            globs, scope_origin = _globs(raw["applies_to"], at, empty_ok=False), "entry"
+        elif source_globs:
+            globs, scope_origin = list(source_globs), "source"
+        else:
+            globs, scope_origin = [], ""
+
+        entry_license = _license(raw.get("license"), at)
+        if entry_license:
+            license_origin = "entry"
+        elif source_license:
+            entry_license, license_origin = source_license, "source"
+        else:
+            license_origin = ""
+
+        entries.append({
+            "name": skill.strip(),
+            "applies_to": globs,
+            "scope_origin": scope_origin,
+            "license": entry_license,
+            "license_origin": license_origin,
+        })
+    return entries
 
 
 def _parse_candidates(value, origin, adopted_skills):
@@ -425,7 +529,8 @@ def resolve(engine, sources):
     for source in sources:
         root = source_root(engine, source)
         skills_dir = root / source["skills_subdir"]
-        for skill in source["allow"]:
+        for entry in source["allow"]:
+            skill = entry["name"]
             target = skills_dir / skill
             if not root.is_dir():
                 status = "missing-source"
@@ -523,6 +628,16 @@ def _main(argv):
     return 0
 
 
+def _scope_origin_phrase(entry):
+    """Where the globs that matched came from. Mirrors ds_origin_describe's job
+    for config keys: name the knob, so the reader edits the right one."""
+    if entry.get("scope_origin") == "entry":
+        return "scope from this entry"
+    if entry.get("scope_origin") == "source":
+        return "scope inherited from source '%s'" % entry.get("source", "?")
+    return "scope from its own applies_to"
+
+
 def _report_relevant(repo, sources, candidates, path=None, origin=None):
     """Human-readable, for onboard-repo to read out. Not machine-parsed.
 
@@ -538,9 +653,8 @@ def _report_relevant(repo, sources, candidates, path=None, origin=None):
 
     adopted = []
     for source in sources:
-        for skill in source["allow"]:
-            adopted.append({"name": skill, "applies_to": source["applies_to"],
-                            "source": source["name"]})
+        for entry in source["allow"]:
+            adopted.append(dict(entry, source=source["name"]))
 
     a_match, a_unscoped, _ = relevant(adopted, files)
     undecided = [c for c in candidates if c["status"] == "suggested"]
@@ -557,7 +671,12 @@ def _report_relevant(repo, sources, candidates, path=None, origin=None):
     print()
     print("Adopted and scoped to this repo: %d" % len(a_match))
     for entry in a_match:
-        print("  - %s  (matched %s)" % (entry["name"], ", ".join(entry["matched_by"])))
+        # The scope's origin, not only the scope. A wrong glob inherited from the
+        # source reads identically to one declared on the entry, and the fixes
+        # are in different places.
+        print("  - %s  (matched %s; %s)"
+              % (entry["name"], ", ".join(entry["matched_by"]),
+                 _scope_origin_phrase(entry)))
     if a_unscoped:
         # Named, never dropped: an unscoped skill is available everywhere, and a
         # report that listed only the scoped matches would read as the full set.

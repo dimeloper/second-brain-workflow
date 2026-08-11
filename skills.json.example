@@ -34,6 +34,17 @@
     "                 charged against the same session budget as your own, and",
     "                 the one roster that was chosen wholesale turned out to want",
     "                 three of six.",
+    "                 An entry may be a bare name or an object carrying its own",
+    "                 applies_to and license — see example-mixed below. ref,",
+    "                 applies_to and license attach to a SOURCE; what you adopt",
+    "                 and reason about is a SKILL, and where a source's skills",
+    "                 do not share one answer, a source-level value can only",
+    "                 state something untrue in one direction or the other.",
+    "                 An entry's value REPLACES the source's, never merges: the",
+    "                 case it exists for is narrowing, and a merge can only",
+    "                 widen — which omitting the key already does. [] and \"\"",
+    "                 are errors for the same reason a blank license is; omit",
+    "                 the key to inherit.",
     "  skills_subdir  optional, defaults to 'skills'. Where in that repo the",
     "                 skill directories live. Use '.' for a suite that puts skill",
     "                 directories at its repo root.",
@@ -85,6 +96,29 @@
       "license": "MIT",
       "applies_to": ["app.json", "app.config.*", "eas.json"],
       "allow": ["app-store-screenshots"]
+    },
+    {
+      "//": [
+        "A source whose skills do not share one scope. Two of these apply",
+        "anywhere; the third scaffolds a Next app and must not run inside one.",
+        "Declared on the source, all three would read as misses on a Python",
+        "repo; declared nowhere, the Next-only one would read as applying",
+        "everywhere. Both are honest readings, and neither is true."
+      ],
+      "name": "example-mixed",
+      "repo": "https://github.com/example/agent-skills",
+      "ref": "0000000000000000000000000000000000000000",
+      "license": "MIT",
+      "allow": [
+        "a11y-audit",
+        "design-review",
+        {
+          "// why scoped": "scaffolds a Next app; must not run inside another",
+          "name": "next-scaffold",
+          "applies_to": ["**/next.config.*", "**/app/**"],
+          "license": "MIT (the skills/ dir carries its own notice)"
+        }
+      ]
     }
   ],
   "//candidates": [

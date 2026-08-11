@@ -428,6 +428,54 @@ case "${out}" in
   *) fail "--help still reaches the last line of the header" "${out}" ;;
 esac
 
+# --- the drift checks do not care what shape an allow entry has --------------
+# Every one of these compares names against what it believes is a list of
+# strings. An object entry is exactly the change that would make each of them
+# silently stop matching, so each is re-run against one.
+good_obj="${SANDBOX}/good-object.json"
+write_manifest "${good_obj}" "{\"sources\":[{\"name\":\"fix\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"animate\"},{\"name\":\"review-animations\"}]}]}"
+
+sync_eng "${good_obj}" >/dev/null 2>&1
+out="$(doctor_out "${good_obj}" "${A}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"every declared third-party skill is fetched at its pin and linked"*)
+    pass "doctor is clean against object allow entries" ;;
+  *) fail "doctor is clean against object allow entries" "${out}" ;;
+esac
+
+out="$(doctor_out "${good_obj}" "${D}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"not linked into any configured skills dir"*)
+    pass "declared-not-linked still fires on an object entry" ;;
+  *) fail "declared-not-linked still fires on an object entry" "${out}" ;;
+esac
+
+git -C "${ENG}/vendor/external/fix" checkout -q --detach "${SHA2}"
+out="$(doctor_out "${good_obj}" "${A}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"but the manifest pins ${SHA1}"*) pass "wrong-sha still fires on an object entry" ;;
+  *) fail "wrong-sha still fires on an object entry" "${out}" ;;
+esac
+git -C "${ENG}/vendor/external/fix" checkout -q --detach "${SHA1}"
+
+dropped_obj="${SANDBOX}/dropped-object.json"
+write_manifest "${dropped_obj}" "{\"sources\":[{\"name\":\"fix\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"animate\"}]}]}"
+sync_eng "${good_obj}" >/dev/null 2>&1
+out="$(doctor_out "${dropped_obj}" "${A}")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"review-animations"*"no manifest source declares it"*)
+    pass "linked-with-no-source still fires on an object entry" ;;
+  *) fail "linked-with-no-source still fires on an object entry" "${out}" ;;
+esac
+
+# Linking reads the same list, and a link is the thing an operator actually gets.
+assert_symlink "${A}/animate" "an object allow entry links its skill"
+sync_eng "${good}" >/dev/null 2>&1
+
 # --- applies_to and candidates: the onboarding report ------------------------
 # The gap this fills is the one the agent host cannot: it routes to installed
 # skills and can say nothing about one that exists and is not.
@@ -622,6 +670,147 @@ case "${out_unk}" in
   *"[license not recorded]"*) pass "a candidate with no license says so rather than staying quiet" ;;
   *) fail "a candidate with no license says so rather than staying quiet" "${out_unk}" ;;
 esac
+
+# --- per-entry applies_to and license ----------------------------------------
+# `ref`, `applies_to` and `license` attach to a source; what gets allowlisted and
+# reasoned about is a skill. A twelve-skill repo of which three are Next-only
+# could declare that scope for all twelve or for none, and both are honest
+# readings of a declaration that cannot say the true thing.
+NEXTREPO="${SANDBOX}/next-repo"
+mkdir -p "${NEXTREPO}/app"
+: > "${NEXTREPO}/next.config.js"
+: > "${NEXTREPO}/app/page.tsx"
+PYREPO="${SANDBOX}/py-repo"
+mkdir -p "${PYREPO}"
+: > "${PYREPO}/main.py"
+
+# A bare string and {"name": ...} are the same declaration written two ways, and
+# the coercion is the one `source:` and `repos:` already do on the note side.
+# Asserted on the report rather than on parse success: parsing both is not the
+# claim, meaning the same thing is.
+bare="${SANDBOX}/entry-bare.json"
+objd="${SANDBOX}/entry-object.json"
+write_manifest "${bare}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"applies_to\":[\"**/*.tsx\"],\"allow\":[\"animate\"]}]}"
+write_manifest "${objd}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"applies_to\":[\"**/*.tsx\"],\"allow\":[{\"name\":\"animate\"}]}]}"
+out_bare="$(SBW_SKILLS_MANIFEST="${bare}" python3 "${MANIFEST_PY}" relevant --repo "${NEXTREPO}" 2>&1 | grep -v '^roster:')"
+out_objd="$(SBW_SKILLS_MANIFEST="${objd}" python3 "${MANIFEST_PY}" relevant --repo "${NEXTREPO}" 2>&1 | grep -v '^roster:')"
+assert_str "${out_bare}" "${out_objd}" "an object entry naming only 'name' reports identically to the bare string"
+
+# Replace, not merge. The case this exists for is narrowing, and a merge can only
+# widen — which is what omitting the key already does. So a repo the *source's*
+# globs match is a miss for an entry that narrowed away from them.
+narrow="${SANDBOX}/entry-narrow.json"
+write_manifest "${narrow}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"applies_to\":[\"**/*.py\"],\"allow\":[\"a11y-audit\",{\"//\":\"scaffolds a Next app\",\"name\":\"screenshot\",\"applies_to\":[\"**/next.config.*\"]}]}]}"
+out_narrow="$(SBW_SKILLS_MANIFEST="${narrow}" python3 "${MANIFEST_PY}" relevant --repo "${PYREPO}" 2>&1)"
+assert_exit 0 $? "a per-entry override validates, and a // key inside it is a comment"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_narrow}" in
+  *"screenshot"*)
+    fail "an entry's applies_to replaces the source's rather than merging" "${out_narrow}" ;;
+  *"Adopted and scoped to this repo: 1"*)
+    pass "an entry's applies_to replaces the source's rather than merging" ;;
+  *) fail "an entry's applies_to replaces the source's rather than merging" "${out_narrow}" ;;
+esac
+
+# ...and the narrowed entry still matches where it said it did.
+out_next="$(SBW_SKILLS_MANIFEST="${narrow}" python3 "${MANIFEST_PY}" relevant --repo "${NEXTREPO}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_next}" in
+  *"screenshot  (matched next.config.js"*)
+    pass "a narrowed entry matches the repo it was narrowed to" ;;
+  *) fail "a narrowed entry matches the repo it was narrowed to" "${out_next}" ;;
+esac
+
+# The origin of a resolved scope, not only the scope. A wrong glob inherited from
+# the source reads identically in the report to one declared on the entry, and
+# the two have different fixes.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_next}" in
+  *"screenshot"*"scope from this entry"*)
+    pass "the report says a scope came from the entry" ;;
+  *) fail "the report says a scope came from the entry" "${out_next}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_narrow}" in
+  *"a11y-audit"*"scope inherited from source 's'"*)
+    pass "the report says an inherited scope came from its source, and names it" ;;
+  *) fail "the report says an inherited scope came from its source, and names it" "${out_narrow}" ;;
+esac
+
+# The validator's key-set check has to walk the level that did not exist when it
+# was written, or a misspelling here is a key nobody reads — the whole reason
+# unknown keys are fatal anywhere in this file.
+bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[{\"name\":\"x\",\"aplies_to\":[\"*\"]}]}]}" \
+  "did you mean 'applies_to'" "a misspelled key inside an allow entry names the key it meant"
+bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[{\"applies_to\":[\"*\"]}]}]}" \
+  "source 's'" "an allow entry with no name is an error naming its source"
+bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[[\"x\"]]}]}" \
+  "must be a skill name or an object" "an allow entry that is neither a string nor an object is an error"
+
+# Blank and empty look answered and are not. The error names both of the things
+# the writer might have meant, because an omitted key here has a real meaning.
+bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[{\"name\":\"x\",\"applies_to\":[]}]}]}" \
+  "Omit the key to inherit the source's scope, or list the globs" \
+  "an empty applies_to on an entry is an error naming both alternatives"
+bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[{\"name\":\"x\",\"license\":\"\"}]}]}" \
+  "'license' must be a non-empty string" "a blank license on an entry is an error"
+
+# Inheritance is silent. A source that recorded a licence answered the question
+# for every skill under it, and re-asking per skill is noise.
+inherit="${SANDBOX}/entry-inherit.json"
+write_manifest "${inherit}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"x\"},{\"name\":\"y\"}]}]}"
+out_inh="$(SBW_SKILLS_MANIFEST="${inherit}" python3 "${MANIFEST_PY}" validate 2>&1)"
+assert_exit 0 $? "an entry inheriting its source's license validates"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_inh}" in
+  *"no 'license' recorded"*) fail "inheriting a license warns about nothing" "${out_inh}" ;;
+  *) pass "inheriting a license warns about nothing" ;;
+esac
+
+# One warning per source, never one per skill. Twelve unlicensed skills under one
+# unlicensed source are one unanswered question, and turning that into twelve
+# lines is a regression in noise for no new information.
+twelve="${SANDBOX}/entry-twelve.json"
+allow_twelve=""
+for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  allow_twelve="${allow_twelve}${allow_twelve:+,}\"skill${n}\""
+done
+write_manifest "${twelve}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[${allow_twelve}]}]}"
+lic_warnings="$(SBW_SKILLS_MANIFEST="${twelve}" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null \
+  | grep -c "no 'license' recorded")"
+assert_str "1" "${lic_warnings}" "a twelve-skill unlicensed source warns exactly once"
+
+# A source every one of whose entries answers the question is fully answered.
+allover="${SANDBOX}/entry-all-override.json"
+write_manifest "${allover}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[{\"name\":\"x\",\"license\":\"MIT\"},{\"name\":\"y\",\"license\":\"none upstream\"}]}]}"
+out_all="$(SBW_SKILLS_MANIFEST="${allover}" python3 "${MANIFEST_PY}" validate 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_all}" in
+  *"no 'license' recorded"*) fail "a source whose every entry records a license does not warn" "${out_all}" ;;
+  *) pass "a source whose every entry records a license does not warn" ;;
+esac
+
+# ...and one that only partly answers it still asks. The unanswered skill is the
+# reason the question is open.
+partial="${SANDBOX}/entry-partial.json"
+write_manifest "${partial}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[{\"name\":\"x\",\"license\":\"MIT\"},{\"name\":\"y\"}]}]}"
+out_part="$(SBW_SKILLS_MANIFEST="${partial}" python3 "${MANIFEST_PY}" validate 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_part}" in
+  *"no 'license' recorded"*) pass "a source only some of whose entries record a license still warns" ;;
+  *) fail "a source only some of whose entries record a license still warns" "${out_part}" ;;
+esac
+
+# The adopted-and-suggested refusal compares names against what is now a list of
+# mappings, which is exactly the shape change that would make it stop firing.
+bad_case "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"animate\"}]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
+  "cannot be both adopted and merely suggested" \
+  "an object allow entry still collides with a candidate of the same name"
+
+# Two sources offering one skill name have no resolution order, whatever shape
+# either one is written in.
+bad_case "{\"sources\":[{\"name\":\"a\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[\"x\"]},{\"name\":\"b\",\"repo\":\"r2\",\"ref\":\"${SHA2}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"x\"}]}]}" \
+  "also allowed by source 'a'" "a duplicate skill name is caught across both entry shapes"
 
 # --- a source whose skills sit at the repo root ------------------------------
 # Undocumented until now, and worth pinning: several suites put skill directories

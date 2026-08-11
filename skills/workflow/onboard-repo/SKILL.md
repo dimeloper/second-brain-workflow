@@ -117,6 +117,9 @@ recommendation:
 
 - **Adopted and scoped to this repo.** Mention these in the Done report so the
   next session knows they are there. They are already installed; do not re-install.
+  Each names where its scope came from — the allow entry itself, or inherited
+  from its source. If one looks wrong for this repo, say which of the two to
+  edit; they are different fixes.
 - **Not adopted, worth considering.** Each carries the reason and its install
   command. **Report, never install.** Adopting a skill is a standing choice about
   every future session in every repo, and several write into the project — a

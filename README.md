@@ -384,11 +384,29 @@ Three rules worth knowing before you write one:
   is accepted with a warning; the placeholder from the example is refused.
 - **`allow` is required and per-source.** There is no "install everything" —
   every adopted skill is charged against the same session budget as your own.
+  An entry is a bare skill name, or an object with `name` plus its own
+  `applies_to` and `license`:
+
+  ```json
+  "allow": ["a11y-audit",
+            {"name": "next-scaffold", "applies_to": ["**/next.config.*"]}]
+  ```
+
+  `ref`, `applies_to` and `license` attach to a **source**; what you adopt and
+  reason about is a **skill**. Where a source's skills do not share one answer —
+  a twelve-skill repo of which three are Next-specific — a source-level scope can
+  only state something untrue in one direction or the other. An entry's value
+  **replaces** the source's rather than merging: the case it exists for is
+  *narrowing*, and a merge can only widen, which omitting the key already does.
+  `make skills-for` says whether a resolved scope came from the entry or the
+  source, since the two have different fixes.
 - **Record the `license`.** Omitting it warns on every run. What you are allowed
   to do with someone else's content gets asked once at adoption and then never
   again, which is exactly the kind of question that wants a mechanical prompt —
   an unlicensed repo is all-rights-reserved by default. Free text, so "there
-  isn't one" can be recorded as the finding it is.
+  isn't one" can be recorded as the finding it is. The warning is **per source**,
+  not per skill: a twelve-skill source recording no licence is one unanswered
+  question, not twelve. An entry that records its own does not contribute.
 - **A skill of yours wins.** A same-named local skill shadows the adopted one,
   and the sync says so rather than silently preferring one.
 
@@ -409,9 +427,12 @@ make skills-for REPO=/path/to/repo
 Two lists, both from your own `skills.json`:
 
 ```
+skills relevant to /path/to/repo  (412 file(s) considered)
+roster: /Users/me/dev-conventions/skills.json (from SBW_SKILLS_MANIFEST in …/config)
+
 Adopted and scoped to this repo: 5
-  - animate  (matched App.tsx, app/(onboarding)/_layout.tsx, …)
-  - app-store-screenshots  (matched app.json, eas.json)
+  - animate  (matched App.tsx, app/(onboarding)/_layout.tsx, …; scope inherited from source 'motion')
+  - app-store-screenshots  (matched app.json, eas.json; scope from this entry)
 
 Not adopted, worth considering here: 1
   - impeccable — design-heavy frontend wanting a visual-polish pass. Invasive:
