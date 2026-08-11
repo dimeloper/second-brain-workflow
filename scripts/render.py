@@ -251,9 +251,28 @@ def render_claude_rule(rule, sha):
     )
 
 
-def render_agents(sha):
-    body = AGENTS_SRC.read_text(encoding="utf-8")
-    return "AGENTS.md", header("AGENTS.md", sha) + "\n\n" + body
+def render_agents(sha, always_on=()):
+    """AGENTS.md carries the always-on rules, not only its hand-written body.
+
+    It is the *portable* output — the one an editor this engine renders no native
+    format for still reads. An always-on constraint that reached `.cursor/rules`
+    and `.claude/rules` but not here meant one repo enforcing different rules
+    depending on what you opened it in, with nothing anywhere saying so. A rule
+    that constrains when work may be called done is exactly the kind that has to
+    survive a tool switch.
+    """
+    body = AGENTS_SRC.read_text(encoding="utf-8").rstrip("\n")
+    parts = [header("AGENTS.md", sha), "", body]
+    for rule in always_on:
+        parts += [
+            "",
+            header(rule["source"], sha),
+            "",
+            "## " + (rule["description"] or rule["name"]),
+            "",
+            rule["body"].strip("\n"),
+        ]
+    return "AGENTS.md", "\n".join(parts) + "\n"
 
 
 def render_claude_md(sha):
@@ -278,17 +297,30 @@ def plan(rules, targets, sha, warn=None):
     adopter's first five minutes, not an error.
     """
     out = {}
+    always_on = [r for r in rules if r["always"]]
+    # Whether AGENTS.md can carry the always-on set decides where it is emitted
+    # for Claude Code. With no AGENTS.md there is nowhere to fold it into, so the
+    # per-rule files stay — dropping them would be the silent gap this change
+    # exists to close, reintroduced from the other side.
+    have_agents = AGENTS_SRC.is_file()
     if "cursor" in targets:
+        # Cursor does not read AGENTS.md, so its always-on rules keep their own
+        # files with alwaysApply: true. Nothing to fold, nothing duplicated.
         for r in rules:
             p, c = render_cursor(r, sha)
             out[p] = c
     if "claude-code" in targets:
         for r in rules:
+            if r["always"] and have_agents:
+                # Reaches Claude Code through CLAUDE.md's @AGENTS.md import.
+                # Emitting it here as well would load the same text twice and
+                # count it twice against the budget.
+                continue
             p, c = render_claude_rule(r, sha)
             out[p] = c
     if "agents" in targets or "claude-code" in targets:
-        if AGENTS_SRC.is_file():
-            p, c = render_agents(sha)
+        if have_agents:
+            p, c = render_agents(sha, always_on)
             out[p] = c
             if "claude-code" in targets:
                 p, c = render_claude_md(sha)

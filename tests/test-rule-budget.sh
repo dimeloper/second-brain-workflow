@@ -81,15 +81,36 @@ echo "999999" > "${BUDGETED}/.rule-budget"
 "${BUDGET}" --rules-dir "${BUDGETED}/rules" --targets claude-code --ceiling 1 >/dev/null 2>&1
 assert_exit 1 $? "--ceiling overrides .rule-budget"
 
-# --- no AGENTS.md present: gracefully counts nothing for it ------------------
+# --- no AGENTS.md, and an always-on rule: undeliverable, not free ------------
+# AGENTS.md is the `agents` target's only carrier. With no AGENTS.md, a rule
+# that is always-on in every other target does not reach this one at all — and
+# a total of zero for that state reads as "this set is free here", which is the
+# confident-wrong-answer shape this whole check exists to avoid.
 NOAGENTS="${SANDBOX}/no-agents"
 mkdir -p "${NOAGENTS}/rules"
 cp "${RULES}/always-on.md" "${NOAGENTS}/rules/"
 out_noagents="$("${BUDGET}" --rules-dir "${NOAGENTS}/rules" --targets agents 2>/dev/null)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_noagents}" in
-  *"AGENTS.md"*) fail "no AGENTS.md present: nothing counted for it" "unexpectedly listed" ;;
-  *) pass "no AGENTS.md present: nothing counted for it" ;;
+  *"CANNOT CARRY the always-on set"*"always-on does not reach this target"*)
+    pass "no AGENTS.md present: the always-on set is named undeliverable" ;;
+  *) fail "no AGENTS.md present: the always-on set is named undeliverable" "${out_noagents}" ;;
+esac
+# Never a number, because there is no cost to report — the rules do not arrive.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_noagents}" in
+  *"tokens  total"*) fail "an undeliverable set is not totalled at zero" "${out_noagents}" ;;
+  *) pass "an undeliverable set is not totalled at zero" ;;
+esac
+# Claude Code is *not* in that state: with no AGENTS.md it falls back to
+# per-rule files under .claude/rules and still receives the rule. Asserted so
+# the two targets cannot be collapsed into one branch again.
+out_noagents_cc="$("${BUDGET}" --rules-dir "${NOAGENTS}/rules" --targets claude-code 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_noagents_cc}" in
+  *"CANNOT CARRY"*) fail "claude-code still carries always-on rules without AGENTS.md" "${out_noagents_cc}" ;;
+  *"tokens  always-on"*) pass "claude-code still carries always-on rules without AGENTS.md" ;;
+  *) fail "claude-code still carries always-on rules without AGENTS.md" "${out_noagents_cc}" ;;
 esac
 
 # --- unknown target is an error, matching render.py's own validation --------

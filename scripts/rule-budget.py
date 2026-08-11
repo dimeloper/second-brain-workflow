@@ -77,23 +77,43 @@ def measure(targets, rules_dir, agents_src, sha):
     always_on = [r for r in rules if r["always"]]
 
     by_target = {}
+    have_agents = agents_src.is_file()
     for target in targets:
-        rows = []
+        rows, undeliverable = [], []
         if target == "cursor":
             for r in always_on:
                 _, content = render.render_cursor(r, sha)
                 rows.append((r["name"], len(content)))
         elif target == "claude-code":
+            # Mirrors plan(): folded into AGENTS.md when there is one, and only
+            # then. Measuring them separately as well would double-count text
+            # that is rendered once.
             for r in always_on:
+                if have_agents:
+                    continue
                 _, content = render.render_claude_rule(r, sha)
                 rows.append((r["name"], len(content)))
-            if agents_src.is_file():
+            if have_agents:
                 _, content = render.render_claude_md(sha)
                 rows.append(("CLAUDE.md", len(content)))
-        if target in ("agents", "claude-code") and agents_src.is_file():
-            _, content = render.render_agents(sha)
-            rows.append(("AGENTS.md", len(content)))
-        by_target[target] = rows
+        if target in ("agents", "claude-code"):
+            if have_agents:
+                _, content = render.render_agents(sha, always_on)
+                rows.append(("AGENTS.md", len(content)))
+            elif always_on and target == "agents":
+                # Only `agents`. Claude Code falls back to per-rule files in
+                # .claude/rules and still receives them, which is why the rows
+                # above are conditional on have_agents rather than skipped
+                # outright. `agents` emits AGENTS.md and nothing else, so with no
+                # AGENTS.md it has no carrier at all.
+                # Not zero — *undeliverable*. This target's only always-on
+                # carrier is AGENTS.md, and there isn't one, so rules that are
+                # always-on everywhere else silently do not reach it. A target
+                # that cannot deliver the set is not a target the set is free on,
+                # and reporting it at zero is the shape this whole check exists
+                # to avoid.
+                undeliverable = [r["name"] for r in always_on]
+        by_target[target] = {"rows": rows, "undeliverable": undeliverable}
     return by_target
 
 
@@ -102,8 +122,20 @@ def report(by_target, ceiling):
     over_budget = []
 
     for target in sorted(by_target):
-        rows = by_target[target]
+        rows = by_target[target]["rows"]
+        undeliverable = by_target[target]["undeliverable"]
         lines.append(f"[{target}]")
+        if undeliverable:
+            # Named, and never folded into a zero. The cost is zero here only
+            # because the rules do not arrive at all.
+            lines.append(
+                "  CANNOT CARRY the always-on set — no AGENTS.md, which is this "
+                "target's only carrier."
+            )
+            for name in sorted(undeliverable):
+                lines.append(f"    {name} does not reach this target")
+            lines.append("")
+            continue
         if not rows:
             lines.append("  (nothing always-on)")
             lines.append("")

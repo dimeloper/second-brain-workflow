@@ -203,4 +203,50 @@ echo "0.0.0-stale" > "${REPO5}/.sbw-version"
 render "${REPO5}" --dry-run >/dev/null 2>&1
 assert_contains "${REPO5}/.sbw-version" "0.0.0-stale" "--dry-run does not touch .sbw-version"
 
+# --- an always-on rule reaches AGENTS.md, and reaches it once ----------------
+# AGENTS.md is the portable output — the one an editor this engine renders no
+# native format for still reads. An always-on rule that landed in .cursor/rules
+# and .claude/rules but not here meant one repo enforcing different rules
+# depending on what you opened it in, with nothing saying so.
+AO_RULES="${SANDBOX}/ao-rules/rules"
+mkdir -p "${AO_RULES}"
+cp "${RULES_FIXTURES}/frontend-angular.md" "${AO_RULES}/"
+cp "${FIXTURES}/budget/rules/always-on.md" "${AO_RULES}/"
+cp "${FIXTURES}/AGENTS.md" "${AO_RULES}/../AGENTS.md"
+REPO_AO="${SANDBOX}/repo-ao"
+make_target_repo "${REPO_AO}"
+"${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" "${REPO_AO}" >/dev/null 2>&1
+assert_exit 0 $? "renders with an always-on rule present"
+assert_contains "${REPO_AO}/AGENTS.md" "Fixture rule body" \
+  "an always-on rule's body is appended to AGENTS.md"
+assert_contains "${REPO_AO}/AGENTS.md" "always-on in every target" \
+  "the appended section is headed by the rule's description"
+
+# Once, not twice. Claude Code reads it through CLAUDE.md's @AGENTS.md import,
+# so a per-rule file as well would load the same text twice and charge the
+# budget for both.
+assert_no_file "${REPO_AO}/.claude/rules/always-on.md" \
+  "an always-on rule is not also emitted under .claude/rules"
+assert_file "${REPO_AO}/.claude/rules/frontend-angular.md" \
+  "a scoped rule still gets its own claude-code file"
+
+# Cursor does not read AGENTS.md, so its always-on rules keep their own file.
+assert_file "${REPO_AO}/.cursor/rules/always-on.mdc" \
+  "cursor still gets an always-on rule as its own .mdc"
+assert_contains "${REPO_AO}/.cursor/rules/always-on.mdc" "alwaysApply: true" \
+  "the cursor always-on rule is marked alwaysApply"
+
+# With no AGENTS.md there is nowhere to fold it into, so the per-rule file has
+# to stay — dropping it would reintroduce the same silent gap from the other
+# side.
+NO_AO="${SANDBOX}/ao-noagents/rules"
+mkdir -p "${NO_AO}"
+cp "${FIXTURES}/budget/rules/always-on.md" "${NO_AO}/"
+REPO_AO2="${SANDBOX}/repo-ao2"
+make_target_repo "${REPO_AO2}"
+"${ENGINE}/scripts/render.py" --rules-dir "${NO_AO}" "${REPO_AO2}" >/dev/null 2>&1
+assert_file "${REPO_AO2}/.claude/rules/always-on.md" \
+  "without AGENTS.md, an always-on rule falls back to its own claude-code file"
+assert_no_file "${REPO_AO2}/AGENTS.md" "still no AGENTS.md fabricated"
+
 finish
