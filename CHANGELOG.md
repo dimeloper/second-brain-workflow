@@ -17,6 +17,41 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-08-11
+
+No **Major** entry: two checks added to `make check`. Nothing rendered changes.
+
+### Added
+- **A check that every assertion helper a test calls is defined.** The harness's
+  worst failure mode, and it had been live: a test file calls an undefined
+  helper, bash prints `command not found` on stderr, the assertion never runs,
+  and the file still reports `N passed`. A broken test is then
+  **indistinguishable from a passing one**, which undercuts every count this
+  suite prints. `set -u` does not catch it — an undefined function is a command,
+  not a variable.
+
+  Three instances, all in one day, two of them inside tests written for checks
+  that exist *because things lie about themselves*. The first was caught by
+  noticing the assertion total had not moved, which is a side channel rather than
+  a check. Turning that side channel into a check found **two more on its first
+  run**, both in `test-init.sh`: the guard asserting every config key carries a
+  description, and the idempotency assertion. Neither had ever executed.
+
+  Same move as the `config.sh`/`config.py` key-set parity test: one set defined
+  by the harness, another used by its consumers, and a check that they agree.
+  `assert_str` is promoted from `test-skill-manifest.sh` into `lib.sh` rather
+  than copied a third time — a helper each file redefines is one the next file
+  forgets to define.
+
+### Changed
+- `stated_counts.py` documents what it deliberately does **not** cover: sample
+  output inside a fenced block. Skipping fences is right — a transcript is a
+  record, not a claim — but it leaves a pasted `make skills-for` sample able to
+  drift from the tool's real output with nothing checking it, which is the v0.4.2
+  shape where a printed example beside real behaviour was what misled a reader.
+  Named so the checker's green is not read as broader than it is.
+- Suite 1007 → 1012 assertions, **two of which already existed and did not run**.
+
 ## [0.23.0] - 2026-08-11
 
 No **Major** entry: documentation corrections, one new verification case, and a
@@ -1686,7 +1721,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.21.0...v0.22.0
