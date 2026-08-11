@@ -17,6 +17,27 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-08-11
+
+### Fixed
+- **CI was red from v0.23.0 to v0.24.0, and `make check` was green locally the
+  whole time.** The always-on probe added in v0.23.0 used
+  `[ -f x ] && cp … || true`. CI installs shellcheck from Ubuntu's package,
+  which is older than the 0.11.0 in use locally and reports `SC2015` on that
+  shape; the local run did not. So `shellcheck clean` on this machine was never
+  evidence CI would pass, and three tagged releases went out with a failing lint
+  because nobody looked at the runs. Rewritten as the `if` it meant.
+
+  Worth stating plainly for anyone checking out those tags: **v0.23.0 and
+  v0.24.0 fail `make check` on a machine with an older shellcheck.** The tags are
+  left where they are rather than moved — a released tag that failed is a fact,
+  and re-pointing it would hide it.
+- **The same block wrote its probe rules directory inside the target repo.** The
+  lint break hid it. `render.py` derives `AGENTS_SRC` from the rules directory's
+  *parent*, so with the probe rules under `${WORK}/.rules-src` the source
+  `AGENTS.md` and the rendered one were the same path — read and written in one
+  pass. It now lives in its own temp directory, removed with the rest.
+
 ## [0.24.0] - 2026-08-11
 
 No **Major** entry: two checks added to `make check`. Nothing rendered changes.
@@ -1721,7 +1742,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.0...v0.22.1
