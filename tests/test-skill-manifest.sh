@@ -476,6 +476,37 @@ esac
 assert_symlink "${A}/animate" "an object allow entry links its skill"
 sync_eng "${good}" >/dev/null 2>&1
 
+# --- guarantees older than the object form of an allow entry -----------------
+# Three of them, each written when `allow` held nothing but strings, each
+# claiming to cover a level that did not exist yet. None was asserted against an
+# object entry, so each was a claim about a shape the code had never been shown.
+
+# Strict unknown keys, one level further in. This is the exact failure the rule
+# frontmatter check exists for: a manifest is a plain mapping, so `applies_too`
+# is not an error anywhere — the entry parses, the scope silently falls back to
+# the source's, and the report is confident and wrong.
+bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"x\",\"applies_too\":[\"**/*.tsx\"]}]}]}" \
+  "did you mean 'applies_to'" "a misspelled key inside an allow entry names the key it meant"
+
+# "// is a comment at every level" now covers a level younger than the claim.
+# And an entry is where a note is most wanted: why this one is scoped and its
+# eleven siblings are not is the reasoning that decays fastest.
+cmt="${SANDBOX}/entry-comment.json"
+write_manifest "${cmt}" "{\"sources\":[{\"name\":\"f\",\"repo\":\"file://${SRC}\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"// why scoped\":\"Next only\",\"name\":\"animate\",\"applies_to\":[\"**/next.config.*\"]}]}]}"
+out="$(SBW_SKILLS_MANIFEST="${cmt}" python3 "${MANIFEST_PY}" validate 2>&1)"
+assert_exit 0 $? "a // key inside an allow entry is a comment, not an unknown key"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"1 skill(s) allowed"*) pass "a commented allow entry is still one skill, not two" ;;
+  *) fail "a commented allow entry is still one skill, not two" "${out}" ;;
+esac
+
+# The candidate/allow refusal compares a candidate's name against the names a
+# source allows. Those were strings; an entry is now a mapping, and a comparison
+# that silently matched nothing would leave the refusal reporting clean forever.
+bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"animate\",\"applies_to\":[\"**/*.tsx\"]}]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
+  "already allows it" "the candidate/allow refusal fires against an object entry"
+
 # --- applies_to and candidates: the onboarding report ------------------------
 # The gap this fills is the one the agent host cannot: it routes to installed
 # skills and can say nothing about one that exists and is not.
