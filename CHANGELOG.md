@@ -17,6 +17,66 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-11
+
+No **Major** entry: a new read-only check in an existing report. No exit code
+changes for any machine that was already rendering rules.
+
+### Added
+- **`doctor` reports the rules directory this machine renders from.** Seven
+  checks could pass on a machine that renders nothing at all, because none of
+  them looked. `All checks passed` was true of every check that ran and false of
+  the question a health report is asked, which is whether this machine is ready.
+  Observed on a fresh work machine where the rules repo had been cloned and the
+  config never learned about it — `render.py` said *no rules found* while
+  `doctor` said everything was fine.
+
+  It is the distinction v0.17.0 drew for the roster, in the same report, one
+  check further down. There was simply no equivalent line for rules.
+
+  Four states:
+
+  | state | severity |
+  |---|---|
+  | rules present | `ok`, counted, with the origin of the path named |
+  | `SBW_RULES_DIR` set and the directory absent | **error** |
+  | the directory exists and holds no rules | `ok` |
+  | `SBW_RULES_DIR` unset and the engine has no `rules/` | `ok` |
+
+  **The two `ok` rows are deliberate, and they mean a machine that renders
+  nothing exits 0.** Say that plainly, because the zero is the interesting part:
+  an engine running only a vault commit guard is a supported way to use this, and
+  the difference between "configured to render nothing" and "not finished setting
+  up" is not a fact `doctor` can determine — only the operator knows which one it
+  is. So the finding is the *silence*, not the absence, and the fix is that the
+  state is now named rather than passed over.
+
+  The consequence to know about: **a script treating `make doctor`'s 0 as
+  "ready to render" will be wrong on such a machine.** That was already true and
+  is now at least visible in the output. If you need that assertion, read the
+  rules line, or use `render.py --check` against a specific repo, which answers a
+  question about a repo rather than about a machine.
+
+  Only a *configured* path that points nowhere is an error, because no amount of
+  finishing setup fixes a wrong path — and because grading a missing default
+  `rules/` as a misconfiguration re-grades every fixture engine's submodule drift
+  from `1` to `2`, which is verbatim what `check_roster`'s own comment records
+  happening once before with the skills manifest.
+
+  When the directory is empty, a rules directory with content sitting
+  unreferenced elsewhere on the machine is **offered as a candidate**, deduped by
+  resolved path. Offered, never adopted: which rules a machine renders is a
+  decision, and a check that made it silently would be deciding what an
+  employer's laptop loads on every turn.
+
+### Changed
+- Suite 963 → 970 assertions. Both bugs written while adding this check were
+  caught by assertions rather than by care — `grep -c` exiting 1 on zero matches
+  and aborting the run under `set -e`, in the check written for the empty case;
+  and the fixture re-grading above. Neither was novel: one is a note in the
+  vault, the other a comment forty lines below the cursor. A comment is a message
+  to a reader who is looking at it; a test is a message to one who isn't.
+
 ## [0.20.1] - 2026-08-11
 
 ### Fixed
@@ -1489,7 +1549,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.18.0...v0.19.0
