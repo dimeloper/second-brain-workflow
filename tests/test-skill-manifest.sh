@@ -653,6 +653,74 @@ esac
 bad_case '{"sources":[],"candidates":[{"name":"x","repo":"r","when":"w","status":"maybe"}]}' \
   "'status' must be one of" "an unknown status is an error, not a silent default"
 
+# --- a candidate that is also allowed: three outcomes, not one ---------------
+# One rule keyed on presence was right while every candidate was a pitch.
+# `status` made the same overlap mean three different things, and only one of
+# them is the contradiction the original message describes.
+overlap() {
+  printf '{"sources":[{"name":"src","repo":"r","ref":"%s","license":"MIT","allow":["dup"]}],"candidates":[{"name":"dup","repo":"r","when":"w"%s}]}\n' \
+    "${SHA1}" "$1" > "${SANDBOX}/overlap.json"
+  SBW_SKILLS_MANIFEST="${SANDBOX}/overlap.json" python3 "${MANIFEST_PY}" validate 2>&1
+}
+
+suggested_msg="$(overlap '')"; rc=$?
+assert_exit 2 "${rc}" "suggested and allowed is still refused"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${suggested_msg}" in
+  *"cannot be both adopted and merely suggested"*)
+    pass "the suggested refusal keeps the message it has always had" ;;
+  *) fail "the suggested refusal keeps the message it has always had" "${suggested_msg}" ;;
+esac
+
+# Harmless duplication today; tomorrow the allow entry is dropped and the
+# candidate still claims adopted with nothing reconciling the two. So it warns,
+# and the warning has to say which of the two records linking actually reads.
+out="$(overlap ',"status":"adopted"')"; rc=$?
+assert_exit 0 "${rc}" "adopted and allowed exits exactly as a clean run does"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"warning:"*"recorded twice"*"source 'src' allows it"*"calls it adopted"*)
+    pass "adopted and allowed warns, naming both records" ;;
+  *) fail "adopted and allowed warns, naming both records" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"allow entry is what linking reads"*)
+    pass "the warning says which record is load-bearing" ;;
+  *) fail "the warning says which record is load-bearing" "${out}" ;;
+esac
+
+declined_msg="$(overlap ',"status":"declined"')"; rc=$?
+assert_exit 2 "${rc}" "declined and allowed is refused"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${declined_msg}" in
+  *"linked into every session anyway"*) pass "the declined refusal names its own fault" ;;
+  *) fail "the declined refusal names its own fault" "${declined_msg}" ;;
+esac
+# Asserted as *different*, not merely as present. Declined-yet-linked and
+# pitched-yet-linked have different fixes — one decline was never carried out,
+# the other roster contradicts itself — and one message reused for both would
+# pass a check that only asked whether each errored.
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${suggested_msg}" = "${declined_msg}" ]; then
+  fail "the two refusals do not share a message" "both said: ${declined_msg}"
+else
+  pass "the two refusals do not share a message"
+fi
+
+# The decision lives in the parser, so it reaches every mode. Asserted through a
+# second one because v0.17.0's skipped line is already scoped to two of four,
+# and a later split that dropped this warning would look like nothing at all.
+printf '{"sources":[{"name":"src","repo":"r","ref":"%s","license":"MIT","allow":["dup"]}],"candidates":[{"name":"dup","repo":"r","when":"w","status":"adopted"}]}\n' \
+  "${SHA1}" > "${SANDBOX}/overlap.json"
+out="$(SBW_SKILLS_MANIFEST="${SANDBOX}/overlap.json" python3 "${MANIFEST_PY}" \
+  relevant --repo "${ROOTED}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"recorded twice"*) pass "the double-bookkeeping warning is not scoped to one mode" ;;
+  *) fail "the double-bookkeeping warning is not scoped to one mode" "${out}" ;;
+esac
+
 # --- license: a warning, not a gate -----------------------------------------
 # "What am I allowed to do with this" gets asked once at adoption and then never
 # again, which is exactly the kind of question that wants a mechanical prompt.
@@ -890,6 +958,21 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_example}" in
   *"still the placeholder"*) pass "the example fails only on its unedited placeholder ref" ;;
   *) fail "the example fails only on its unedited placeholder ref" "${out_example}" ;;
+esac
+
+# ...and the rest of it is a valid manifest, which the assertion above cannot
+# say: the placeholder is refused at the first source, so everything after it —
+# including every field the example exists to demonstrate — was never parsed.
+edited="${SANDBOX}/example-edited.json"
+sed "s/0000000000000000000000000000000000000000/${SHA1}/g" \
+  "${ENGINE}/skills.json.example" > "${edited}"
+out_example="$(SBW_SKILLS_MANIFEST="${edited}" python3 "${MANIFEST_PY}" validate 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "the example validates once its refs are filled in"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_example}" in
+  *"warning:"*) fail "the edited example is warning-free" "${out_example}" ;;
+  *) pass "the edited example is warning-free" ;;
 esac
 
 # --- the two config implementations know the same keys ----------------------

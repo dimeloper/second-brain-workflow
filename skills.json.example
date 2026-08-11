@@ -134,6 +134,25 @@
       "when": "design-heavy frontend wanting a visual-polish pass. Invasive: writes files at the project root and registers an edit-time hook. Project scope only, never global.",
       "install": "npx example-design-linter install --scope=project",
       "applies_to": ["**/*.tsx", "**/*.css"]
+    },
+    {
+      "//": [
+        "The case `adopted` exists for: installed by its own vendor's installer,",
+        "into a real directory sync-skills.sh refuses to touch. Genuinely",
+        "adopted, and in no source's allow list — so without this entry the",
+        "roster could not describe what is actually installed here.",
+        "",
+        "It is NOT the way to record a skill you adopted through `allow` above.",
+        "That is the same fact written twice: the allow entry is what linking",
+        "reads, and the day it is deleted this would still claim adopted. The",
+        "manifest warns when it sees both."
+      ],
+      "name": "example-vendor-installed",
+      "repo": "https://github.com/example/vendor-suite",
+      "license": "MIT",
+      "status": "adopted",
+      "when": "installed by its own installer rather than from a source above",
+      "install": "npx example-vendor-suite install"
     }
   ]
 }

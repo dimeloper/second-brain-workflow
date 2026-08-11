@@ -287,8 +287,9 @@ def parse(text, origin="manifest"):
             "license": source_license,
         })
 
-    candidates = _parse_candidates(data.get("candidates"), origin, seen_skills)
-    return sources, candidates, warnings
+    candidates, candidate_warnings = _parse_candidates(
+        data.get("candidates"), origin, seen_skills)
+    return sources, candidates, warnings + candidate_warnings
 
 
 def _license(value, where):
@@ -404,14 +405,17 @@ def _parse_candidates(value, origin, adopted_skills):
     are installed, and can say nothing about one that exists and is not. That is
     knowledge only the person keeping the roster has, so it lives here beside the
     roster rather than being inferred.
+
+    Returns (candidates, warnings).
     """
     if value is None:
-        return []
+        return [], []
     if not isinstance(value, list):
         raise ManifestError("%s: 'candidates' must be an array, got %s"
                            % (origin, _kind(value)))
 
     candidates = []
+    warnings = []
     seen = {}
     for index, raw in enumerate(value):
         where = "%s: candidates[%d]" % (origin, index)
@@ -432,26 +436,54 @@ def _parse_candidates(value, origin, adopted_skills):
         if name in seen:
             raise ManifestError("%s: duplicate candidate '%s', already at candidates[%d]"
                                % (where, name, seen[name]))
-        # Adopted and merely-a-candidate are contradictory states, and the
-        # contradiction is silent: onboarding would suggest installing something
-        # already linked. Caught here rather than left to read oddly in a report.
-        if name in adopted_skills:
-            raise ManifestError(
-                "%s: '%s' is listed as a candidate but source '%s' already allows "
-                "it — a skill cannot be both adopted and merely suggested"
-                % (where, name, adopted_skills[name]))
         seen[name] = index
 
         for key in ("repo", "when"):
             if not isinstance(raw[key], str) or not raw[key].strip():
                 raise ManifestError("%s: '%s' must be a non-empty string" % (where, key))
 
+        # Read before the overlap check below, which is decided by it.
         status = raw.get("status", "suggested")
         if not isinstance(status, str) or status.strip() not in CANDIDATE_STATUSES:
             raise ManifestError(
                 "%s: 'status' must be one of %s, got %r"
                 % (where, ", ".join(CANDIDATE_STATUSES), status))
         status = status.strip()
+
+        # Overlap with a source's allow list. One rule keyed on *presence* was
+        # right while every candidate was a pitch; `status` made the same overlap
+        # mean three different things, and only one of them is a contradiction.
+        #
+        # Its original justification named two faults — contradictory states, and
+        # onboarding suggesting something already linked — and `status` falsified
+        # both for `adopted`: that is one fact recorded twice, and only
+        # `suggested` is ever pitched. An error naming a fault the file does not
+        # have is the shape that points the reader at the wrong fix.
+        if name in adopted_skills:
+            if status == "suggested":
+                raise ManifestError(
+                    "%s: '%s' is listed as a candidate but source '%s' already allows "
+                    "it — a skill cannot be both adopted and merely suggested"
+                    % (where, name, adopted_skills[name]))
+            if status == "declined":
+                # Declined yet linked, and pitched yet linked, are different
+                # faults with different fixes: this one means the decline was
+                # never carried out, not that the roster contradicts itself.
+                raise ManifestError(
+                    "%s: '%s' is recorded as declined, yet source '%s' allows it, so it "
+                    "is linked into every session anyway. Drop the allow entry to carry "
+                    "the decline out, or change the status to say it was reversed"
+                    % (where, name, adopted_skills[name]))
+            # `adopted` warns rather than refusing: the duplication is harmless
+            # today and rots tomorrow. Drop the skill from `allow` and the
+            # candidate still claims adopted, with nothing anywhere reconciling
+            # the two — so the warning has to say which record is load-bearing.
+            warnings.append(
+                "%s: '%s' is recorded twice — source '%s' allows it, and this candidate "
+                "calls it adopted. The allow entry is what linking reads; the candidate "
+                "is only descriptive. Delete one, or the day the allow entry goes the "
+                "candidate will still claim adopted"
+                % (where, name, adopted_skills[name]))
 
         install = raw.get("install", "")
         if not isinstance(install, str):
@@ -466,7 +498,7 @@ def _parse_candidates(value, origin, adopted_skills):
             "install": install.strip(),
             "applies_to": _globs(raw.get("applies_to"), where),
         })
-    return candidates
+    return candidates, warnings
 
 
 def manifest_path(flag=None, cfg=None):
