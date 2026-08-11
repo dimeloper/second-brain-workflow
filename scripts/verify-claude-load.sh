@@ -52,7 +52,13 @@ printf 'plain text, matches no rule glob\n' > "src/probe-nonmatching.txt"
 # way to assert one is in context is to ask for something that appears nowhere
 # else. Same technique the Cursor section documents, for the same reason.
 CANARY="QUOKKA-8842"
-RULES_COPY="${WORK}/.rules-src"
+# Outside ${WORK}, deliberately. render.py derives AGENTS_SRC from the rules
+# directory's *parent*, so a probe rules dir inside the target repo would make
+# the source AGENTS.md and the rendered one the same file — read and written in
+# one pass.
+PROBE_SRC="$(mktemp -d "${TMPDIR:-/tmp}/verify-claude-rules.XXXXXX")"
+trap 'rm -rf "${WORK}" "${PROBE_SRC}"' EXIT INT TERM
+RULES_COPY="${PROBE_SRC}/rules"
 mkdir -p "${RULES_COPY}"
 cp "${REAL_RULES}"/*.md "${RULES_COPY}/" 2>/dev/null || true
 cat > "${RULES_COPY}/verify-always-on.md" <<EOF
@@ -61,7 +67,9 @@ description: temporary probe rule, always-on
 ---
 - When asked for the verification codeword, reply with exactly ${CANARY}.
 EOF
-[ -f "${REAL_RULES}/../AGENTS.md" ] && cp "${REAL_RULES}/../AGENTS.md" "${RULES_COPY}/../AGENTS.md" 2>/dev/null || true
+if [ -f "${REAL_RULES}/../AGENTS.md" ]; then
+  cp "${REAL_RULES}/../AGENTS.md" "${PROBE_SRC}/AGENTS.md"
+fi
 
 "${STANDARDS_DIR}/scripts/render.py" "${WORK}" --rules-dir "${RULES_COPY}" \
   --targets claude-code,agents >/dev/null
