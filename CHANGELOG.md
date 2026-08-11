@@ -17,6 +17,56 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-08-11
+
+No **Major** entry: a new command. Nothing an already-set-up machine has to do.
+
+### Added
+- **`make init` — the setup verb, and an orientation.** Every stage of this
+  lifecycle was already a verb: `doctor`, `upgrade`, `uninstall`, `guard`,
+  `audit`. Setting a machine up was nine numbered steps in a 612-line document.
+  `upgrade.sh` was written for exactly this reason one stage later — *"upgrading
+  a set-up machine was seven sequenced commands"* — and the same argument applies
+  to step zero.
+
+  It leads with **what the engine does** — rules, vault, guard, skills, health,
+  each with the command that exercises it — then prints **every key in
+  `SBW_CONFIG_KEYS`** with a description, its current value, and where that value
+  came from, in `doctor`'s own origin wording so a reader comparing the two
+  reports never has to translate between them. A test asserts every key carries a
+  description: a convention living in a script and missing from what a person
+  reads is a failure this repo has already shipped four times.
+
+  Then what it found on this machine, then the config it would write. **Preview
+  by default**, `YES=1` to act, `doctor` last — the shape `fetch-skills`,
+  `uninstall` and `upgrade` already use.
+
+  Three refusals, each of them a decision rather than a step:
+
+  - **It will not choose `SBW_EXPECTED_VAULT_ID`.** That key is what makes the
+    commit guard's identity check non-circular. Reading it from the vault's own
+    `vault.json` would answer the question the check exists to ask, and the guard
+    would then pass on any vault that brought its own answer along. Pass
+    `VAULT_ID=`, or the key is left out and the run says why. Asserted against a
+    vault that declares an id of its own.
+  - **It will not overwrite a value in an existing config**, only append keys
+    that are missing. The failure this was built after was *adding two keys to a
+    config written months earlier* — a setup verb that solved the fresh-machine
+    case while clobbering that one would have moved the problem rather than
+    fixed it.
+  - **It clones nothing and declares no skills roster.** Which repo holds your
+    rules, and whether third-party skills belong on a given laptop, are decisions
+    about a machine, not steps in a setup.
+
+  Paths under `$HOME` are written in their `~` form: `config.sh` expands a
+  leading tilde and nothing else, and an absolute path is one more thing to edit
+  when the machine changes.
+
+  `docs/NEW-MACHINE.md` gains a short way at the top and keeps the long way
+  below it as the reference for anything `init` reports that you want to change.
+
+- Suite 970 → 1001 assertions.
+
 ## [0.21.0] - 2026-08-11
 
 No **Major** entry: a new read-only check in an existing report. No exit code
@@ -1549,7 +1599,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.0...v0.20.1
 [0.20.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.19.0...v0.20.0
