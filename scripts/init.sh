@@ -202,7 +202,14 @@ V_ID="${WANT_ID}"
 
 proposed_line() {
   case "$1" in
-    SBW_VAULT)             echo "SBW_VAULT=$(tildify "${V_VAULT}")" ;;
+    # Written only when the vault is really there, or when --vault named it
+    # explicitly. Writing the *default* path for a vault nobody has created is
+    # the plausible-looking answer: the key reads as configured and points
+    # nowhere, and init-vault.sh will not correct it later because it leaves an
+    # existing config file untouched. Omitted, SBW_VAULT resolves to the same
+    # default anyway — so nothing changes except that the file stops claiming it.
+    SBW_VAULT)             { [ -d "${V_VAULT}" ] || [ -n "${WANT_VAULT}" ]; } \
+                             && echo "SBW_VAULT=$(tildify "${V_VAULT}")" ;;
     RENDER_TARGETS)        echo "RENDER_TARGETS=${V_TARGETS}" ;;
     SKILLS_DIRS)           echo "SKILLS_DIRS=${V_SKILLS}" ;;
     SBW_RULES_DIR)         [ -n "${V_RULES}" ] && echo "SBW_RULES_DIR=$(tildify "${V_RULES}")" ;;
@@ -256,6 +263,19 @@ else
 fi
 echo
 
+VAULT_MISSING=0
+if [ ! -d "${V_VAULT}" ] && [ -z "${WANT_VAULT}" ] && ! config_has_key SBW_VAULT; then
+  VAULT_MISSING=1
+  NEEDS_HUMAN=1
+  echo "SBW_VAULT: no vault at ${V_VAULT}, and none named with --vault."
+  echo "  Not written, because the default path for a vault nobody created reads as"
+  echo "  configured and points nowhere. Create it first — init-vault.sh writes the"
+  echo "  vault and its id together, which is what keeps them from disagreeing:"
+  echo "    ./scripts/init-vault.sh --path ~/vaults/<id>-brain --id <id> --remote <url>"
+  echo "  then re-run this. Or pass --vault <path> if it lives somewhere else."
+  echo
+fi
+
 if [ "${YES}" -ne 1 ]; then
   echo "Preview only — nothing was written. Re-run with --yes (or make init YES=1)."
   exit 0
@@ -281,7 +301,10 @@ echo "Now checking the machine (doctor, verbatim)"
 echo
 
 if [ "${NEEDS_HUMAN}" -eq 1 ]; then
-  echo "Setup is not finished: SBW_EXPECTED_VAULT_ID is still unset (above)."
+  echo "Setup is not finished — see the notes above:"
+  [ "${VAULT_MISSING}" -eq 1 ] && echo "  - no vault yet, so SBW_VAULT was not written"
+  config_has_key SBW_EXPECTED_VAULT_ID || [ -n "${V_ID}" ] || \
+    echo "  - SBW_EXPECTED_VAULT_ID is unset"
   exit 1
 fi
 exit 0

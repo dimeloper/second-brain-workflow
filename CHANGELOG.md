@@ -17,6 +17,32 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-08-11
+
+### Fixed
+- **`make init YES=1` before the vault existed wrote a vault path that pointed
+  nowhere.** It recorded the *default* `SBW_VAULT`, and `init-vault.sh` then left
+  the config untouched — it only writes one when no config file exists at all —
+  so the two silently disagreed and the first commit would fail on an id
+  mismatch the reader had no way to explain. Found by running the two commands
+  in the order the Quickstart implied, which is what an adopter does.
+
+  `SBW_VAULT` is now written only when the vault is really there, or when
+  `--vault` names it. Omitted, the key resolves to the same default anyway —
+  nothing changes except that the file stops claiming a path nobody created. The
+  run says so, names `init-vault.sh`, and exits 1, so the ordering is stated
+  rather than left to be discovered.
+
+### Changed
+- **The README Quickstart leads with `make init`.** It was nine pasteable blocks
+  with the config written as a side effect of `init-vault.sh` and
+  `SBW_RULES_DIR` mentioned nowhere — which is the key a real work machine
+  turned out to be missing. The vault-creation steps stay exactly where they
+  were, and the order is now explicit about why: the vault comes first because
+  `init-vault.sh` writes the path and the id together, and that pairing is what
+  stops them disagreeing.
+- Suite 1001 → 1005 assertions.
+
 ## [0.22.0] - 2026-08-11
 
 No **Major** entry: a new command. Nothing an already-set-up machine has to do.
@@ -1599,7 +1625,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.1...HEAD
+[0.22.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.1...v0.21.0
 [0.20.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.20.0...v0.20.1

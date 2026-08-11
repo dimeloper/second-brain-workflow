@@ -81,7 +81,31 @@ case "${out_v}" in
   *) pass "an id is never taken from the vault's own vault.json" ;;
 esac
 
+# --- a vault that does not exist yet -----------------------------------------
+# Writing the *default* vault path for a vault nobody has created is the
+# plausible-looking answer: the key reads as configured and points nowhere, and
+# init-vault.sh will not correct it later because it leaves an existing config
+# file untouched. So the key is omitted and the run says why.
+out_nv="$("${INIT}" --yes --vault-id personal 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "a run with no vault yet exits 1 — something still needs a human"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nv}" in
+  *"no vault at"*"init-vault.sh"*) pass "the missing vault is named, with the command that makes one" ;;
+  *) fail "the missing vault is named, with the command that makes one" "${out_nv}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q '^SBW_VAULT=' "${CONFIG}"; then
+  fail "SBW_VAULT is not written for a vault that does not exist" "$(grep '^SBW_VAULT=' "${CONFIG}")"
+else
+  pass "SBW_VAULT is not written for a vault that does not exist"
+fi
+# The other keys still land — a missing vault is not a reason to write nothing.
+assert_contains "${CONFIG}" "SBW_EXPECTED_VAULT_ID=personal" "the rest of the config is still written"
+rm -f "${CONFIG}"
+
 # --- writing ----------------------------------------------------------------
+mkdir -p "${HOME}/vaults/second-brain"
 out="$("${INIT}" --yes --vault-id personal 2>&1)"
 rc=$?
 assert_exit 0 "${rc}" "a run with the guard anchor supplied exits 0"

@@ -53,6 +53,35 @@ points at.
 
 ## Quickstart
 
+Three commands, in this order. `make init` explains what the engine does, prints
+every configuration key with its current value and where that value came from,
+and shows the config it would write — changing nothing until you add `YES=1`.
+
+```bash
+git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
+cd second-brain-workflow && make init        # read this; it writes nothing
+```
+
+**Create the vault before writing the config.** `init-vault.sh` writes the vault
+path and its id *together*, which is what stops the two disagreeing — and it
+leaves an existing config file untouched, so a config written first would not be
+corrected afterwards. `make init` refuses to write `SBW_VAULT` for a vault that
+does not exist yet, and says so, rather than recording a default that points
+nowhere. Follow the vault steps below, then:
+
+```bash
+make init YES=1 VAULT_ID=personal            # appends what is missing, runs doctor
+```
+
+It never overwrites a value already in your config — it appends only the keys
+that are absent, so it is safe on a machine that was set up months ago. It will
+not choose `SBW_EXPECTED_VAULT_ID` for you: that key is what makes the commit
+guard's identity check non-circular, and reading it from the vault's own
+`vault.json` would answer the question the check exists to ask.
+
+The rest of this section is what those commands are doing, and the reference for
+anything you want to change by hand.
+
 ```bash
 git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
@@ -124,6 +153,11 @@ host, owner and repo, so `.git` and `ssh`/`https` spellings of one repository
 don't slip past as two. And an `--id` that doesn't appear in the repository's
 name **warns** — usually the sign of a Quickstart followed verbatim, keeping
 `vault_id=personal` next to a work remote.
+
+`SBW_RULES_DIR` is not in the block above, because a fresh clone renders from its
+own `rules/`. If yours live in a separate repo, clone it and let `make init` find
+it — it reports any rules directory it sees on the machine, and `make doctor`
+does the same afterwards.
 
 Then just work. Say **"onboard repo"** in a project to wire up rules, and
 **"update second brain"** at the end of a session to capture it. See
