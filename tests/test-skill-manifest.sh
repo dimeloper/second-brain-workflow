@@ -501,11 +501,9 @@ case "${out}" in
   *) fail "a commented allow entry is still one skill, not two" "${out}" ;;
 esac
 
-# The candidate/allow refusal compares a candidate's name against the names a
-# source allows. Those were strings; an entry is now a mapping, and a comparison
-# that silently matched nothing would leave the refusal reporting clean forever.
-bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"license\":\"MIT\",\"allow\":[{\"name\":\"animate\",\"applies_to\":[\"**/*.tsx\"]}]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \
-  "already allows it" "the candidate/allow refusal fires against an object entry"
+# The third guarantee — that the candidate/allow refusal still fires when the
+# entry is an object — is asserted with the rest of the per-entry behaviour
+# further down, where it was added alongside the object form itself.
 
 # --- applies_to and candidates: the onboarding report ------------------------
 # The gap this fills is the one the agent host cannot: it routes to installed
@@ -875,9 +873,54 @@ for n in 1 2 3 4 5 6 7 8 9 10 11 12; do
   allow_twelve="${allow_twelve}${allow_twelve:+,}\"skill${n}\""
 done
 write_manifest "${twelve}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[${allow_twelve}]}]}"
-lic_warnings="$(SBW_SKILLS_MANIFEST="${twelve}" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null \
-  | grep -c "no 'license' recorded")"
+out_twelve="$(SBW_SKILLS_MANIFEST="${twelve}" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null)"
+lic_warnings="$(printf '%s\n' "${out_twelve}" | grep -c "no 'license' recorded")"
 assert_str "1" "${lic_warnings}" "a twelve-skill unlicensed source warns exactly once"
+
+# ...and says how much of itself is unanswered. One line is right; one line that
+# reads identically at nine of twelve and at twelve of twelve is not, and after
+# per-entry licences those are different numbers behind the same words. Every
+# other report here states the scope of its own claim.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_twelve}" in
+  *"12 of the 12 skills allowed here have no license of their own"*)
+    pass "the license warning counts the entries that inherit it" ;;
+  *) fail "the license warning counts the entries that inherit it" "${out_twelve}" ;;
+esac
+
+# Printed at twelve of twelve as well as at nine, because a count that appears
+# only when it is partial is one nobody learns to read — the same argument as
+# printing the decided-candidates section at zero.
+three_over="${SANDBOX}/entry-three-override.json"
+allow_mixed=""
+for n in 1 2 3; do
+  allow_mixed="${allow_mixed}${allow_mixed:+,}{\"name\":\"skill${n}\",\"license\":\"MIT\"}"
+done
+for n in 4 5 6 7 8 9 10 11 12; do
+  allow_mixed="${allow_mixed},\"skill${n}\""
+done
+write_manifest "${three_over}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[${allow_mixed}]}]}"
+out_three="$(SBW_SKILLS_MANIFEST="${three_over}" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_three}" in
+  *"9 of the 12 skills allowed here have no license of their own"*)
+    pass "entries that record their own license are subtracted from the count" ;;
+  *) fail "entries that record their own license are subtracted from the count" "${out_three}" ;;
+esac
+lic_warnings="$(printf '%s\n' "${out_three}" | grep -c "no 'license' recorded")"
+assert_str "1" "${lic_warnings}" "a partly-answered source still warns exactly once"
+
+# A declared source with nothing adopted from it yet. "0 of 0" is not a
+# sentence, and the question is still open — the source is in the roster.
+empty_allow="${SANDBOX}/entry-empty-allow.json"
+write_manifest "${empty_allow}" "{\"sources\":[{\"name\":\"s\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[]}]}"
+out_empty="$(SBW_SKILLS_MANIFEST="${empty_allow}" python3 "${MANIFEST_PY}" validate 2>&1 >/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_empty}" in
+  *"nothing is allowed from it yet"*)
+    pass "a source with an empty allow list warns without counting to zero" ;;
+  *) fail "a source with an empty allow list warns without counting to zero" "${out_empty}" ;;
+esac
 
 # A source every one of whose entries answers the question is fully answered.
 allover="${SANDBOX}/entry-all-override.json"

@@ -264,12 +264,22 @@ def parse(text, origin="manifest"):
         # information. An entry that overrides is licensed and does not
         # contribute; a source whose every entry overrides is fully answered and
         # says nothing.
-        if not source_license and (not entries or
-                                   any(not e["license"] for e in entries)):
+        #
+        # But the line has to state the scope of its own claim, the way the scan
+        # prints its roots on clean runs and the lineage count labels itself an
+        # upper bound. Once entries can carry their own license, nine unanswered
+        # and twelve unanswered are the same sentence — and the count is printed
+        # always, including twelve of twelve, because a count that appears only
+        # when it is partial is one nobody learns to read.
+        inheriting = [e for e in entries if not e["license"]]
+        if not source_license and (not entries or inheriting):
+            scope = ("nothing is allowed from it yet" if not entries else
+                     "%d of the %d skills allowed here have no license of their own"
+                     % (len(inheriting), len(entries)))
             warnings.append(
-                "%s: no 'license' recorded for '%s' (%s). Check it before "
-                "adopting — an unlicensed repo is all-rights-reserved by default"
-                % (where, name, repo.strip()))
+                "%s: no 'license' recorded for '%s' (%s) — %s. Check it before "
+                "adopting: an unlicensed repo is all-rights-reserved by default"
+                % (where, name, repo.strip(), scope))
 
         subdir = raw.get("skills_subdir", DEFAULT_SKILLS_SUBDIR)
         if not isinstance(subdir, str) or not subdir.strip():

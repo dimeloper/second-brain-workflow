@@ -406,7 +406,10 @@ Three rules worth knowing before you write one:
   an unlicensed repo is all-rights-reserved by default. Free text, so "there
   isn't one" can be recorded as the finding it is. The warning is **per source**,
   not per skill: a twelve-skill source recording no licence is one unanswered
-  question, not twelve. An entry that records its own does not contribute.
+  question, not twelve. An entry that records its own does not contribute, and
+  the line says how many are left — `9 of the 12 skills allowed here have no
+  license of their own` — always, including at twelve of twelve, because a count
+  that shows up only when it is partial is one nobody learns to read.
 - **A skill of yours wins.** A same-named local skill shadows the adopted one,
   and the sync says so rather than silently preferring one.
 
