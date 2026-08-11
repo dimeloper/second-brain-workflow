@@ -17,6 +17,67 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-11
+
+No **Major** entry, and the question was live enough to answer with a run rather
+than with the contract. Three notes in a real 180-note vault become findings
+here that were reported by nothing before, so *if* any count in this check gated
+the exit status, the vault-CI audit job would go red on its first run after
+upgrading — the v0.9.0 `source:` shape exactly. It does not: `check-lineage.py`
+exits 1 for an orphaned rule or for undetermined coverage, and every count it
+prints is a backlog to notice. Checked against the same vault with both
+checkers, v0.18.0 and this one: **0 either way**, with `make audit` at 0 as well.
+
+### Changed
+- **`check-lineage.py` judges every rung, not only `enforced`.** Thin evidence
+  compared a note's repo count against the trialing→enforced bar and skipped
+  every other maturity — because that bar was the only one this script read. The
+  heading said `enforced` honestly, and the number underneath still read as a
+  statement about the vault. Three notes sit at `trialing` on one repo in the
+  vault this was found in: the same claim unsupported by the same evidence, and
+  nothing anywhere reported them.
+
+  Both bars are now read, from the same map note and failing the same way, and
+  every maturity with an entry bar is judged against its own. `idea` is the floor
+  and is **absent rather than zero** — a rung with no bar cannot be under it. The
+  heading names both numbers, so a reader can tell which one each note was judged
+  against without opening the vault's map note. Renamed to *maturity above its
+  evidence*, since "thin evidence" described the old, narrower set.
+
+### Added
+- **`Ready to promote`** — the same comparison in the other direction: a repo
+  count that already clears the *next* bar while the maturity still says
+  otherwise. `00-maps/promotion-candidates.md` has always computed this, in
+  Dataview, which renders in Obsidian and nowhere else. So `make audit` and CI —
+  where a backlog is actually read — could not answer it at all, and the two
+  notes that qualify today were visible only to someone with the vault open.
+
+  Reported, never acted on. Automated promotion was rejected deliberately: the
+  human gate is the point, and a report is what keeps a gate being exercised
+  rather than quietly stopping.
+
+- **A refusal, and the reasoning, because the next person will reach for it.**
+  The vault's own *one-lineage-counts-once* rule — three repo slugs that name one
+  history and must count once between them — is prose in that same map note. The
+  obvious way to apply it is an alias list in this script. That is declined.
+
+  It would be a second copy of a vault fact that can disagree with the vault,
+  which is the entire reason `promotion.py` reads the promotion bars from the
+  vault instead of hardcoding them; a roster of repo aliases drifts the same way
+  a threshold does, and drifts silently, because nothing compares the two. The
+  cost of the copy is not the copy — it is that the count computed from it looks
+  exactly like a count computed correctly.
+
+  So the report states its own basis instead: it counts distinct `repos:`
+  entries, and it names the rule it does not apply, **on every run, including
+  when nothing in the list is affected**. That is v0.12.0's argument for printing
+  the provisional section at zero: a caveat that appears only when it bites is
+  one the reader has already taken the number without. Encoding the rule properly
+  means making the lineage groups machine-readable in the vault, where the fact
+  lives — which is a vault-schema decision, not a thing to approximate here.
+
+- Suite 944 → 950 assertions.
+
 ## [0.18.0] - 2026-08-11
 
 No **Major** entry: one refusal is narrowed rather than widened, one new
@@ -1356,7 +1417,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.15.0...v0.16.0
