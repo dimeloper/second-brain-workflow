@@ -115,6 +115,34 @@ write release notes, not two to keep in sync by hand.
   not change that", which was accurate at 222 lines and would not have stayed
   so. This is the class `stated_counts.py` polices, one boundary outside what it
   can see — a count in prose rather than over a list.
+- **A release-consistency check that passed on both branches.** `v${version}
+  exists as a tag` called `pass` whether the tag was there or not, and
+  incremented the run count either way — so it contributed to the suite total
+  that exists precisely as a side-channel for silently-skipped tests, while
+  asserting nothing. The comment above it stated the invariant plainly and the
+  code below declined to enforce it.
+
+  What it let through is narrower than the typo'd pin the checks above it
+  catch, and more likely: `VERSION` and both templates agreeing on a release
+  nobody tagged, leaving the shipped templates pinning a ref
+  `actions/checkout` cannot resolve — a hard CI failure for an adopter, the
+  same family as the v0.4.2 defect this file exists for. Splitting the tag from
+  the merge, which v0.26.1's rebase-merge taught, is what makes it reachable:
+  it creates a window on `main` where nothing is tagged, and the only check
+  that would notice a forgotten tag was written to pass during exactly that
+  window.
+
+  The distinguishing signal is mechanical rather than intent: a release commit
+  may be untagged, a commit after one may not, and `VERSION` changing in `HEAD`
+  separates the two. Two scope limits are reported as **undetermined and not
+  counted** rather than allowed to degrade into a pass — `actions/checkout`
+  fetches no tags at its default depth, and `HEAD~1` does not exist in a
+  shallow clone. A run that could not ask the question no longer reports an
+  answer to it.
+- The skill count is stated as a number again, and checked against the skills
+  that carry a `SKILL.md`. Vaguer prose was the version that could not drift,
+  but the count is worth something to a reader deciding whether to adopt, and a
+  count over a list is exactly what this repo already knows how to assert.
 - Three assertions on a behaviour that was correct but unasserted: a heading
   inside a fenced block is not harvested as an anchor. The README's daily-note
   example carries `## Built`, `## Follow-ups` and three more, so without the
@@ -124,7 +152,8 @@ write release notes, not two to keep in sync by hand.
   a probe confirmed it holds; what was missing was anything that would notice if
   a refactor dropped it. Asserted in both directions, and across files, since
   that is the surface that made it matter.
-- Suite 1035 → 1046 assertions. The first pass of this restructure added none:
+- Suite 1035 → 1048 assertions, and one of the pre-existing 1035 was a
+  tautology, so the real gain is one larger than the arithmetic. The first pass of this restructure added none:
   the doc-check file lists grew to include `REFERENCE.md`, which is the right
   instinct, but those are single assertions over a list, so coverage did not
   actually rise alongside the largest reader-facing change in the repo's

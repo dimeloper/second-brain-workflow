@@ -11,12 +11,12 @@ convention a maturity gradient instead: it starts as an `idea`, becomes
 a few repos. Then you distill it into one short rule, and one source renders to
 Cursor, Claude Code, and `AGENTS.md`.
 
-Two artifacts, and the difference between them is the design. A **practice
+The two artifacts, and the difference between them is the design. A **practice
 note** is long-form: one convention, its evidence, and the repos it has held in,
-as an ordinary markdown file in a git repo — the *vault*. It is read on demand,
-so length is cheap. A **rule** is the distilled version: a few imperative lines,
-rendered into every repo you onboard and loaded on relevant turns, so every line
-is charged against a session budget. Notes accumulate; rules stay short. That
+as one file in the *vault*. It is read on demand, so length is cheap. A **rule**
+is the distilled version: a few imperative lines, rendered into every repo you
+onboard and loaded on relevant turns, so every line is charged against a
+session budget. Notes accumulate; rules stay short. That
 split is why the rules file stops growing. See
 [Hot path and cold path](docs/REFERENCE.md#hot-path-and-cold-path).
 
@@ -226,8 +226,8 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   load in your sessions and the remote never sees them. It refuses if a path it
   would write is already tracked, rather than half-keeping the promise. See
   [Rendering into a repo you do not own](docs/REFERENCE.md#rendering-into-a-repo-you-do-not-own).
-- **Bring your own skills.** The engine ships a handful of its own and no roster
-  of other people's. Declare the ones you want in a `skills.json`, pinned by sha
+- **Bring your own skills.** The engine ships five of its own and no roster of
+  other people's. Declare the ones you want in a `skills.json`, pinned by sha
   and allowlisted per source, so two machines reading the same manifest install
   the same thing. See
   [Bringing your own skills](docs/REFERENCE.md#bringing-your-own-skills).

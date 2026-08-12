@@ -67,14 +67,37 @@ for tmpl in guard.yml audit.yml; do
   fi
 done
 
-# A pinned ref is only useful if it names a tag that exists. Skipped where the
-# tag isn't there yet, which is the state during the release commit itself.
+# A pinned ref is only useful if it names a tag that exists. Until v0.27.0 this
+# passed on both branches — tagged or not — so it counted toward the suite total
+# while asserting nothing, which is the shape the total exists to make visible.
+# What it let through is narrower than a typo'd pin and more likely: VERSION and
+# both templates agreeing on a release nobody tagged, so the shipped templates
+# pin a ref actions/checkout cannot resolve. For an adopter that is a hard CI
+# failure, the same family as the v0.4.2 defect this file exists for. Splitting
+# the tag from the merge — correct, and what #4 taught — is exactly what makes
+# it reachable, by creating a window on main where nothing is tagged.
+#
+# The distinguishing signal is mechanical, not intent: a release commit may be
+# untagged; a commit after one may not.
 if git -C "${ENGINE}" rev-parse --git-dir >/dev/null 2>&1; then
-  TESTS_RUN=$((TESTS_RUN + 1))
-  if git -C "${ENGINE}" rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
-    pass "v${version} exists as a tag"
+  # Two scope limits, both reported as undetermined rather than allowed to
+  # degrade into a pass: actions/checkout fetches no tags at its default depth,
+  # and HEAD~1 does not exist in a shallow clone. Neither is counted, so a run
+  # that could not ask the question does not report an answer to it.
+  if ! git -C "${ENGINE}" rev-parse -q --verify 'HEAD~1' >/dev/null 2>&1; then
+    printf '  ??   undetermined: no HEAD~1 — shallow clone, cannot tell a release commit from a later one\n'
+  elif [ -z "$(git -C "${ENGINE}" tag 2>/dev/null | head -1)" ]; then
+    printf '  ??   undetermined: no tags visible — fetch tags before trusting this check\n'
   else
-    pass "v${version} is not tagged yet — expected while the release commit is being made"
+    TESTS_RUN=$((TESTS_RUN + 1))
+    if git -C "${ENGINE}" rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
+      pass "v${version} exists as a tag"
+    elif ! git -C "${ENGINE}" diff --quiet 'HEAD~1' HEAD -- VERSION 2>/dev/null; then
+      pass "v${version} untagged, but VERSION changed in HEAD — this is the release commit"
+    else
+      fail "v${version} exists as a tag" \
+        "VERSION and both templates name v${version}, which is not tagged — the templates pin a ref actions/checkout cannot resolve"
+    fi
   fi
 fi
 
