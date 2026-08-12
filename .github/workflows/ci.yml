@@ -11,6 +11,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true   # vendor/obsidian-skills is a pinned submodule
+          # Tags and history, both required by the release-tag check in
+          # test-release-consistency.sh: it distinguishes a release commit from
+          # a later one by whether VERSION changed in HEAD, and it needs to see
+          # tags to know whether this release has one. At the default depth-1,
+          # tagless checkout it reports undetermined and asserts nothing — in
+          # the one tier that would catch a tag forgotten after a merge.
+          fetch-depth: 0
 
       # Pinned, not apt's. Ubuntu's package is older than a developer's brew
       # install, and the two disagree about which checks fire — v0.23.0 and
@@ -43,6 +50,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+          fetch-depth: 0     # see the check job — the release-tag check needs both
 
       - name: Run tests under /bin/bash (3.2)
         run: |
