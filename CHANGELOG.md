@@ -17,6 +17,27 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-08-12
+
+### Fixed
+- **`make upgrade YES=1` reported using the version you upgraded *from*, and now
+  says so.** The script checks out the new tag partway through, but bash parsed
+  every function in it before `main()` ran — so every check after the switch is
+  the previous version's logic, reading a checkout that is now the new one.
+
+  Almost always invisible. It stops being invisible when the release being
+  installed fixes one of those checks: upgrading **to** v0.25.2 — which fixed
+  `upgrade` aborting on a machine with no onboarded repos — still aborted,
+  because the code doing the aborting was the copy already in memory. Reported
+  from a real machine, twice in a row, with the second failure looking identical
+  to the first and being a different thing.
+
+  The switch now prints that the remaining checks are the previous version's and
+  that re-running shows them as the new one implements them. The suite already
+  asserted that the run *completes* despite rewriting its own script mid-run; it
+  said nothing about which version produced the report.
+- Suite 1017 → 1018 assertions.
+
 ## [0.25.2] - 2026-08-12
 
 ### Fixed
@@ -1860,7 +1881,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.3...HEAD
+[0.25.3]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.1...v0.25.0

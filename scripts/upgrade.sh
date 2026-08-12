@@ -309,6 +309,18 @@ do_switch() {
   else
     warn "sync-skills.sh exited ${rc} — the conflicts it printed above are unresolved"
   fi
+
+  # This script just replaced itself on disk, and bash parsed every function in
+  # it before main() ran — so everything below is still the *previous* version's
+  # logic, reading a checkout that is now the new one. Usually that difference is
+  # invisible. It is not invisible when the release being installed fixes one of
+  # the checks below: v0.25.2 fixed `upgrade` aborting with no onboarded repos,
+  # and upgrading *to* it still aborted, because the code doing the aborting was
+  # the copy already in memory. Said out loud rather than left for the reader to
+  # deduce from a report that contradicts the release they just installed.
+  note "the checks below still run this script's previous version — it was"
+  note "already in memory when the checkout switched. Re-run \`make upgrade\` to"
+  note "see them as ${TARGET_REF} implements them."
 }
 
 # Step 6: doctor, inline. Its output is its own — summarising it here would put

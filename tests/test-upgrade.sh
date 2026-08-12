@@ -456,6 +456,13 @@ SCAN_ROOTS="${SCAN_ROOT}" upgrade --ref v0.9.1 --yes
 rc=$?
 out_has "checked out v0.9.1" "--yes switches the checkout"
 out_has "Summary" "and the run completes despite rewriting its own script mid-run"
+# ...and says so. Every function was parsed before the checkout switched, so the
+# checks below the switch are the previous version's logic reading the new
+# checkout. Invisible until the release being installed fixes one of those
+# checks: upgrading *to* v0.25.2, which fixed `upgrade` aborting with no
+# onboarded repos, still aborted — the code doing it was already in memory.
+out_has "still run this script's previous version" \
+  "and says the checks below the switch are the old logic"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "$(git -C "${FIX}" describe --tags --exact-match 2>/dev/null)" = "v0.9.1" ]; then
   pass "leaving the checkout at the target"
