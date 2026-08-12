@@ -265,6 +265,50 @@ else
   fail "an external link and an unresolvable path are both left alone" "${out}"
 fi
 
+# --- a heading inside a fence is sample data, not an anchor -----------------
+# The README's daily-note example contains `## Built`, `## Follow-ups` and three
+# more. If the harvester took them, five anchors would resolve green from any
+# file in the tree while pointing at sample data — and cross-file checking makes
+# that reachable from every doc, not just the one holding the fence. The
+# exclusion is original to this script; the assertion is not, and an unasserted
+# correct behaviour is one refactor from being wrong.
+fenced="${SANDBOX}/xfile/fenced.md"
+{
+  printf '# Real\n\n'
+  printf '```markdown\n'
+  printf '## Sample Heading\n'
+  printf '```\n\n'
+  printf 'See [a](#sample-heading) and [b](#real).\n'
+} > "${fenced}"
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" "${fenced}" 2>&1 || true)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"link to #sample-heading"*)
+    pass "a heading inside a fence is not harvested as an anchor" ;;
+  *) fail "a heading inside a fence is not harvested as an anchor" "${out}" ;;
+esac
+
+# The other direction: skipping fences must not skip the headings around them.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"#real"*) fail "and a real heading beside the fence still resolves" "${out}" ;;
+  *) pass "and a real heading beside the fence still resolves" ;;
+esac
+
+# Cross-file is the surface that made this matter, so assert it there too.
+printf '[x](fenced.md#sample-heading) [y](fenced.md#real)\n' > "${SANDBOX}/xfile/into-fence.md"
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" "${SANDBOX}/xfile/into-fence.md" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"fenced.md#sample-heading"*)
+    case "${out}" in
+      *"fenced.md#real"*) fail "a fenced heading does not resolve from another file" "${out}" ;;
+      *) pass "a fenced heading does not resolve from another file" ;;
+    esac ;;
+  *) fail "a fenced heading does not resolve from another file" "${out}" ;;
+esac
+
 # --- a link inside backticks is a sample, not a link ------------------------
 # CHANGELOG.md cites the original defect verbatim in the entry recording its
 # fix. Without this, prose correctly describing a fixed bug reports as the bug,

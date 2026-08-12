@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-08-12
+
 ### Changed
 - **The README is now five sections and a Quickstart, down from 965 lines.** It
   had grown into the reference manual as well as the pitch, and the two want
@@ -71,6 +73,25 @@ write release notes, not two to keep in sync by hand.
   hole.
 
 ### Fixed
+- **The README used its own vocabulary before defining it.** "Practice note",
+  "rule" and "vault" all appeared in the first screen, and the sentence naming
+  the load-bearing assumptions ("assumes git plus a markdown vault") landed on
+  terms nothing had introduced. A paragraph now names the two artifacts and the
+  difference between them — long-form note read on demand, short rule charged
+  against a session budget — because that split *is* the design, and it is also
+  the answer to why the rules file stops growing. A second short paragraph says
+  Obsidian is optional: the vault is plain markdown in git, and the skills read
+  the filesystem with no plugin or MCP server in the loop.
+- Three smaller edits in the same pass. The Quickstart's time estimate is gone
+  for the same reason its command count was. `make init YES=1` now names
+  `SBW_EXPECTED_VAULT_ID` in its comment, at the one moment the reader is
+  actually writing it, rather than leaving the commit guard's anchor to be met
+  later in an error message. And "Row 2 is the demo. It is immediate and legible
+  in a screenshot" — a note-to-self about content strategy that a reader has no
+  use for — is now "Start there."
+- The skill count is stated nowhere rather than as an unchecked "five" in two
+  files. Same treatment as the Quickstart's "four commands": a number in prose
+  that nothing verifies is one skill away from being wrong in two places at once.
 - **The Quickstart stopped pinning a release.** The restructure dropped the
   three tag-resolution lines, making a clone of `main` the default path. The
   vault CI templates pin `ENGINE_REF` to a tag, and `upgrade.sh` warns about a
@@ -94,7 +115,16 @@ write release notes, not two to keep in sync by hand.
   not change that", which was accurate at 222 lines and would not have stayed
   so. This is the class `stated_counts.py` polices, one boundary outside what it
   can see — a count in prose rather than over a list.
-- Suite 1035 → 1040 assertions. The first pass of this restructure added none:
+- Three assertions on a behaviour that was correct but unasserted: a heading
+  inside a fenced block is not harvested as an anchor. The README's daily-note
+  example carries `## Built`, `## Follow-ups` and three more, so without the
+  exclusion five anchors would resolve green while pointing at sample data —
+  and cross-file checking makes that reachable from every doc in the tree, not
+  just the file holding the fence. The exclusion is original to the script and
+  a probe confirmed it holds; what was missing was anything that would notice if
+  a refactor dropped it. Asserted in both directions, and across files, since
+  that is the surface that made it matter.
+- Suite 1035 → 1046 assertions. The first pass of this restructure added none:
   the doc-check file lists grew to include `REFERENCE.md`, which is the right
   instinct, but those are single assertions over a list, so coverage did not
   actually rise alongside the largest reader-facing change in the repo's
@@ -2030,7 +2060,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.2...v0.25.3
