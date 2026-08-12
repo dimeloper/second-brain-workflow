@@ -172,8 +172,13 @@ reports every restatement separately.
 
 An item naming a pull request, a branch, or a commit can also be checked against
 that repo's main branch, and is annotated `[landed]`, `[closed]` (a PR closed
-without merging), `[open]`, or `[unchecked]` with the reason. This is **on with
-`--recent` and off here** — the `make audit` invocation above runs neither `gh`
+without merging), `[open]`, or `[unchecked]` with the reason. Only **this repo's**
+items are probed unless `--landed-all` is passed; the skipped ones are counted in
+a footer rather than left looking checked. Nothing is fetched, so a branch or
+commit verdict from a checkout last fetched more than a week ago reports
+`[unchecked] … too stale to judge` instead of a confident "not merged" — a PR
+verdict reads GitHub and never goes stale. This is **on with `--recent` and off
+here** — the `make audit` invocation above runs neither `gh`
 nor git against another checkout, which is what keeps it working on the vault's
 CI runner, where no repo is checked out and `gh` is unauthenticated. `--landed`
 opts in anyway; `--no-landed` opts out of the skill's window.

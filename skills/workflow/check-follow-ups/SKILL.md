@@ -158,6 +158,12 @@ cost nothing and are annotated with nothing.
 | `[open]` | genuinely still open. This is a confirmation, not a nag |
 | `[unchecked]` | could not be established, with the reason on the line |
 
+**Only this repo's items are checked by default.** Items in other repos are
+reported as normal but not probed, and a footer says how many carried a
+checkable ref and were skipped. `--landed-all` widens it — worth doing when the
+question is "has any of this already been done", since work landing in a repo
+you are not standing in is exactly what you would otherwise miss.
+
 `[landed]` and `[closed]` threads are lifted into a **Looks already done** block
 above everything else.
 
@@ -173,7 +179,11 @@ fixable gap into an item that silently never gets checked.
 
 The check never runs `git fetch`, so a branch or commit verdict is only as
 current as that checkout's last fetch — which is why those lines carry a
-`(last fetched 2d ago)` note. A PR verdict is live.
+`(last fetched 2d ago)` note. Past a week it stops asserting altogether and
+reports `[unchecked] … too stale to judge`, because a stale answer is a *false
+negative*: "not merged" about work that landed a fortnight ago, said with the
+same confidence as a true one. Fix it by fetching that repo, then re-running. A
+PR verdict is live and never goes stale.
 
 ### Run the script rather than re-implementing this
 
@@ -188,6 +198,7 @@ a relative `scripts/...` path will not resolve:
 ~/second-brain-workflow/scripts/check-followups.py --recent 8         # look further back
 ~/second-brain-workflow/scripts/check-followups.py --recent --no-threads   # every restatement
 ~/second-brain-workflow/scripts/check-followups.py --recent --no-landed    # skip the repo checks
+~/second-brain-workflow/scripts/check-followups.py --recent --landed-all   # check every repo's refs
 ```
 
 `--recent` already implies both threading and the landed check. Reach for

@@ -47,7 +47,7 @@ from lib.followups import done_followups, flag_for  # noqa: E402
 from lib.followups import group_for_repo  # noqa: E402
 from lib.followups import note_context_repo, open_followups  # noqa: E402
 from lib.followups import repo_file_index, vault_repos  # noqa: E402
-from lib.landed import CLOSED, LANDED, UNCHECKED, evaluate  # noqa: E402
+from lib.landed import CLOSED, LANDED, UNCHECKED, evaluate, refs  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
 DATE_NOTE_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\.md$')
@@ -216,8 +216,14 @@ def lift_done(groups):
 GH_MISSING_SUFFIX = "gh not installed"
 
 
-def check_landed(threads):
+def check_landed(threads, only_repo=None):
     """Stamp each thread with what its repo says about it. -> footer lines.
+
+    `only_repo` limits the probing to one repo's threads; None checks every one.
+    Scoped to this repo by default, because that is where the report is already
+    asking you to act — but the skipped ones are *counted and named* in a footer,
+    since an unprobed item and a probed-and-open one look identical on the line
+    and the difference is the whole point of the check.
 
     Refs are read from *every* member of a thread, not just the newest wording.
     A restatement routinely drops the branch name it opened with once the author
@@ -228,9 +234,20 @@ def check_landed(threads):
     fact about the machine rather than about any item, and printed in place it
     would repeat the same sentence under every pull request in the report.
     """
-    subjects = [(i, " ".join(m["item"] for m in t["members"]), t.get("repo"))
-                for i, t in enumerate(threads)]
-    results = evaluate(subjects)
+    def text_of(thread):
+        return " ".join(m["item"] for m in thread["members"])
+
+    in_scope, skipped = [], 0
+    for i, thread in enumerate(threads):
+        if only_repo is not None and thread.get("repo") != only_repo:
+            # Only worth mentioning if there was something to check — an item
+            # naming no PR, branch or commit was never going to be probed.
+            if thread.get("repo") and refs(text_of(thread)):
+                skipped += 1
+            continue
+        in_scope.append((i, text_of(thread), thread.get("repo")))
+
+    results = evaluate(in_scope)
 
     gh_missing = 0
     for i, thread in enumerate(threads):
@@ -242,10 +259,15 @@ def check_landed(threads):
             kept.append(verdict)
         thread["verdicts"] = kept
 
+    footers = []
     if gh_missing:
-        return ["", f"{gh_missing} item(s) name a pull request, but gh is not "
-                    "installed — their state is unchecked."]
-    return []
+        footers.extend(["", f"{gh_missing} item(s) name a pull request, but gh is "
+                            "not installed — their state is unchecked."])
+    if skipped:
+        footers.extend(["", f"{skipped} item(s) in other repos name a PR, branch or "
+                            "commit and were not checked — only this repo's were. "
+                            "--landed-all checks them too."])
+    return footers
 
 
 def basis_suffix(note):
@@ -434,6 +456,10 @@ def main():
     ap.add_argument("--no-landed", action="store_true",
                     help="never look at another repo, and never call gh. This is "
                          "the default for the --stale-days audit.")
+    ap.add_argument("--landed-all", action="store_true",
+                    help="check every repo's refs, not just this repo's. Slower, "
+                         "and the point of it is spotting work already done "
+                         "somewhere you are not standing.")
     ap.add_argument("--recent", type=int, metavar="N", nargs="?", const=4,
                     help="the check-follow-ups window instead of an age cutoff: "
                          "every open item in the N most recent notes that exist "
@@ -504,7 +530,10 @@ def main():
     # checkouts and no gh auth. An audit that started making network calls would
     # be a different tool than the one those two agreed to run.
     if args.landed or (args.recent is not None and not args.no_landed):
-        footers.extend(check_landed(stale))
+        # Scoped to this repo unless widened — or unless there is no "this repo"
+        # to scope to, where restricting would silently check nothing at all.
+        scope = None if (args.landed_all or not repo) else repo
+        footers.extend(check_landed(stale, scope))
 
     # No repo to compare against means nothing could land in "this repo", and
     # three headings over one populated bucket is worse than no headings at all.

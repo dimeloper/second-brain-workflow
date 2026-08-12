@@ -642,7 +642,7 @@ EOF
 landed() {
   PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
     "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 \
-    --repo landed-repo "$@"
+    --repo landed-repo --landed-all "$@"
 }
 
 out_l="$(landed 2>/dev/null)"
@@ -744,6 +744,96 @@ case "${out_nogh}" in
   *"[landed] \`feature/merged\` is merged into main"*)
     pass "branch and commit verdicts still work with no gh at all" ;;
   *) fail "branch and commit verdicts still work with no gh at all" "${out_nogh}" ;;
+esac
+
+# --- a stale checkout is not evidence -------------------------------------
+#
+# The repos this checks are mostly not the one you are standing in, and nothing
+# here fetches. A branch verdict read from a checkout last fetched a month ago is
+# a *false negative* — "not merged" about work that landed weeks back — asserted
+# with the same confidence as a true one. Past STALE_FETCH_DAYS it refuses to
+# answer instead. Needs a real remote: only a remote-tracking base can be stale,
+# and a repo without one resolves to a local main that is authoritative.
+SREPO="${HOME}/stale-repo"
+SUP="${LSAND}/stale-repo.git"
+git init -q --bare "${SUP}"
+git -C "${SUP}" symbolic-ref HEAD refs/heads/main
+git init -q "${SREPO}"
+git -C "${SREPO}" symbolic-ref HEAD refs/heads/main
+git -C "${SREPO}" config user.email "test@example.com"
+git -C "${SREPO}" config user.name "Test"
+git -C "${SREPO}" commit -q --allow-empty -m "base"
+git -C "${SREPO}" remote add origin "${SUP}"
+git -C "${SREPO}" push -q -u origin main 2>/dev/null
+git -C "${SREPO}" fetch -q origin 2>/dev/null      # so .git/FETCH_HEAD exists
+git -C "${SREPO}" checkout -q -b feature/unmerged
+git -C "${SREPO}" commit -q --allow-empty -m "work that may or may not have landed"
+
+cat > "${LVAULT}/2026-01-03.md" <<'EOF'
+# 2026-01-03
+
+## Follow-ups
+- [ ] Finish the work on `feature/unmerged` #repo/stale-repo
+EOF
+
+stale_run() {
+  PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
+    "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-03 --recent 1 \
+    --repo stale-repo 2>&1
+}
+
+# Freshly fetched: judged normally, so the downgrade below is about age and not
+# about having a remote at all.
+out_fresh="$(stale_run)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_fresh}" in
+  *"[open] \`feature/unmerged\` not merged into origin/main"*)
+    pass "a freshly fetched checkout is judged normally" ;;
+  *) fail "a freshly fetched checkout is judged normally" "${out_fresh}" ;;
+esac
+
+# Backdate the fetch record. -v is BSD, -d is GNU; the runners are both.
+old="$(date -v-30d +%Y%m%d%H%M 2>/dev/null || date -d '30 days ago' +%Y%m%d%H%M)"
+touch -t "${old}" "${SREPO}/.git/FETCH_HEAD"
+out_stale="$(stale_run)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_stale}" in
+  *"[unchecked]"*"too stale to judge"*)
+    pass "a month-old checkout yields unchecked, not a confident \"not merged\"" ;;
+  *) fail "a month-old checkout yields unchecked, not a confident \"not merged\"" "${out_stale}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_stale}" in
+  *"last fetched 30d ago"*) pass "and says how stale, and which repo, so it is fixable" ;;
+  *) fail "and says how stale, and which repo, so it is fixable" "${out_stale}" ;;
+esac
+
+# --- the landed check is scoped to this repo by default ------------------
+scoped() {
+  PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
+    "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 \
+    --repo stale-repo "$@" 2>&1
+}
+out_scoped="$(scoped)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_scoped}" in
+  *"PR #7 merged"*) fail "another repo's refs are not probed by default" "probed" ;;
+  *) pass "another repo's refs are not probed by default" ;;
+esac
+
+# ...but never silently. An unprobed item and a probed-and-open one look
+# identical on the line, so the count of what was skipped has to be stated.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_scoped}" in
+  *"in other repos name a PR, branch or commit and were not checked"*)
+    pass "and the skipped ones are counted, with the flag that widens it" ;;
+  *) fail "and the skipped ones are counted, with the flag that widens it" "${out_scoped}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(scoped --landed-all)" in
+  *"PR #7 merged"*) pass "--landed-all reaches the other repos" ;;
+  *) fail "--landed-all reaches the other repos" "$(scoped --landed-all)" ;;
 esac
 
 finish

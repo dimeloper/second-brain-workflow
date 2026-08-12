@@ -17,6 +17,28 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **The landed check now probes only the repo you are standing in.** It probed
+  every repo with a checkable ref, which cost about a second and — more to the
+  point — went looking in checkouts the reader had not opened in weeks. Items
+  elsewhere are still reported in full; they are simply not probed, and a footer
+  counts the ones that carried a PR, branch or commit so an unprobed item cannot
+  be mistaken for a probed-and-open one. `--landed-all` restores the old scope,
+  which is the right flag when the question is "has any of this already been
+  done somewhere else".
+
+### Fixed
+- **A stale checkout no longer produces a confident wrong answer.** Branch and
+  commit verdicts are read from whatever `origin/*` that checkout last fetched,
+  and nothing here fetches. For your own repo you roughly know how old that is;
+  for one you have not touched in a month you do not, and the failure is a *false
+  negative* — "not merged" about work that landed a fortnight ago, asserted
+  exactly as confidently as a true one. Past seven days it now reports
+  `[unchecked] … origin/main in <repo> was last fetched 34d ago, too stale to
+  judge`. Only remote-tracking bases can go stale, so a repo with no remote —
+  judged against a local `main` that is authoritative by definition — is
+  unaffected, and PR verdicts read GitHub and never were.
+
 ## [0.29.0] - 2026-08-12
 
 ### Fixed

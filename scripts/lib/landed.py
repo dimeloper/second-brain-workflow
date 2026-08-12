@@ -314,6 +314,17 @@ class Resolver:
 
 LANDED, OPEN, CLOSED, UNCHECKED = "landed", "open", "closed", "unchecked"
 
+# How old a checkout's last fetch may be before a branch/commit verdict read from
+# it stops being worth asserting. This module never fetches, so such a verdict is
+# only as current as `origin/*` happened to be — and for the repo you are
+# standing in you roughly know that, while for one you have not opened in a month
+# you do not. A stale `open` is a *false negative*: "not merged" about work that
+# landed weeks ago, stated with the same confidence as a true one. Refusing to
+# answer is the honest outcome, and `unchecked` already carries its reason.
+#
+# PR verdicts are unaffected: `gh` reads GitHub, not the checkout.
+STALE_FETCH_DAYS = 7
+
 
 class Verdict:
     """One ref's answer: a state, the sentence explaining it, and its ref.
@@ -389,6 +400,19 @@ def _freshness(repo):
     return " (last fetched today)" if age < 1 else f" (last fetched {age}d ago)"
 
 
+def _too_stale(repo, base):
+    """Days since last fetch when `base` is too old to judge from, else None.
+
+    Only remote-tracking bases can go stale. A repo with no remote resolves to a
+    *local* `main`, which is authoritative by definition — there is nothing it
+    could be behind — so nothing is downgraded there.
+    """
+    if not base.startswith("origin/"):
+        return None
+    age = fetch_age_days(repo)
+    return age if age is not None and age > STALE_FETCH_DAYS else None
+
+
 def probe_pr(repo, number, repo_name):
     if shutil.which("gh") is None:
         return Verdict(UNCHECKED, f"PR #{number} unchecked — gh not installed",
@@ -427,6 +451,11 @@ def probe_sha(repo, sha, repo_name):
     if base is None:
         return Verdict(UNCHECKED, f"`{sha}` unchecked — no main branch found",
                        ("sha", sha), repo_name)
+    stale = _too_stale(repo, base)
+    if stale is not None:
+        return Verdict(UNCHECKED, f"`{sha}` unchecked — {base} in {repo_name} was "
+                                  f"last fetched {stale}d ago, too stale to judge",
+                       ("sha", sha), repo_name)
     answer = _ancestor(repo, sha, base)
     if answer is None:
         return Verdict(UNCHECKED, f"`{sha}` unchecked — not a commit in this checkout",
@@ -442,6 +471,14 @@ def probe_branch(repo, branch, repo_name):
     base = default_base(repo)
     if base is None:
         return Verdict(UNCHECKED, f"`{branch}` unchecked — no main branch found",
+                       ("branch", branch), repo_name)
+    # Checked before "no such branch": on a stale checkout the branch being
+    # absent is itself a symptom of the staleness, and naming the staleness is
+    # the more accurate diagnosis of the two.
+    stale = _too_stale(repo, base)
+    if stale is not None:
+        return Verdict(UNCHECKED, f"`{branch}` unchecked — {base} in {repo_name} was "
+                                  f"last fetched {stale}d ago, too stale to judge",
                        ("branch", branch), repo_name)
     tip = None
     for candidate in (f"origin/{branch}", branch):
