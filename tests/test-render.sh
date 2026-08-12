@@ -263,4 +263,86 @@ assert_contains "${REPO_AO3}/AGENTS.md" "my own conventions" \
   "a hand-written AGENTS.md is still never overwritten"
 
 
+# --- --local: rendered here, invisible to the remote -------------------------
+# The case this exists for: personal conventions in a repo owned by someone
+# else. Rendering and committing are different decisions, and without this the
+# second one happens by accident.
+LOCAL_REPO="${SANDBOX}/local-repo"
+make_target_repo "${LOCAL_REPO}"
+"${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${LOCAL_REPO}" --local >/dev/null 2>&1
+assert_exit 0 $? "--local renders"
+assert_file "${LOCAL_REPO}/.claude/rules/frontend-angular.md" "and writes the same files"
+assert_file "${LOCAL_REPO}/.git/info/exclude" "and an exclude file exists"
+assert_contains "${LOCAL_REPO}/.git/info/exclude" ".claude/rules/frontend-angular.md" \
+  "naming each rendered file"
+assert_contains "${LOCAL_REPO}/.git/info/exclude" ".sbw-version" \
+  "including the version stamp, which is rendered output too"
+# The claim the mode makes, checked against git rather than against the file we
+# just wrote: an exclude entry that git disagrees with is worth nothing.
+status="$(cd "${LOCAL_REPO}" && git status --porcelain --untracked-files=all)"
+mine="$(printf '%s\n' "${status}" \
+  | grep -c 'frontend-angular\|AGENTS.md\|CLAUDE.md\|sbw-version' || true)"
+assert_str "0" "${mine}" "and git reports none of the files we rendered"
+# The repo's *own* hand-written rule stays visible: --local hides what this
+# engine wrote, never what was already there.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${status}" in
+  *"local-only.mdc"*) pass "a hand-written rule in the repo is still git-visible" ;;
+  *) fail "a hand-written rule in the repo is still git-visible" "${status}" ;;
+esac
+
+# Idempotent: a second run rewrites the block rather than appending a second.
+"${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${LOCAL_REPO}" --local >/dev/null 2>&1
+headers="$(grep -c "second-brain-workflow: rendered locally" "${LOCAL_REPO}/.git/info/exclude" || true)"
+assert_str "1" "${headers}" "a second --local run leaves one block, not two"
+
+# --- --local refuses when it cannot keep its promise -------------------------
+# .git/info/exclude has no effect on a path already in the index: it would show
+# up as an ordinary modification, one `git commit -a` from being shared. A mode
+# that cannot keep its promise must not half-keep it.
+TRACKED_REPO="${SANDBOX}/tracked-repo"
+make_target_repo "${TRACKED_REPO}"
+printf 'the teams own conventions\n' > "${TRACKED_REPO}/AGENTS.md"
+git -C "${TRACKED_REPO}" add AGENTS.md
+git -C "${TRACKED_REPO}" -c user.email=t@example.com -c user.name=T commit -qm "team file"
+out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${TRACKED_REPO}" --local 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "--local refuses when a rendered path is already tracked"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"cannot keep its promise"*"AGENTS.md"*) pass "naming the tracked file and why" ;;
+  *) fail "naming the tracked file and why" "${out}" ;;
+esac
+assert_no_file "${TRACKED_REPO}/.claude/rules/frontend-angular.md" \
+  "and writes nothing at all — the refusal comes before any write"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "$(cat "${TRACKED_REPO}/AGENTS.md")" = "the teams own conventions" ]; then
+  pass "leaving the team's own file untouched"
+else
+  fail "leaving the team's own file untouched" "$(cat "${TRACKED_REPO}/AGENTS.md")"
+fi
+
+# --- a hand-written AGENTS.md is skipped, not dropped from the plan ----------
+# v0.20.1 joined two questions into one flag: whether a source AGENTS.md exists,
+# and whether the target's is ours. Joined, a target with a hand-written
+# AGENTS.md lost both AGENTS.md and CLAUDE.md from the plan entirely and warned
+# that the *engine* had no AGENTS.md — false, and it hid the accurate skip line.
+HANDWRITTEN="${SANDBOX}/handwritten-agents"
+make_target_repo "${HANDWRITTEN}"
+printf 'mine, not yours\n' > "${HANDWRITTEN}/AGENTS.md"
+out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${HANDWRITTEN}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"skip (hand-written, not ours): AGENTS.md"*)
+    pass "a hand-written AGENTS.md is reported as skipped, by name" ;;
+  *) fail "a hand-written AGENTS.md is reported as skipped, by name" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no AGENTS.md in"*) fail "and not reported as the engine having none" "${out}" ;;
+  *) pass "and not reported as the engine having none" ;;
+esac
+assert_file "${HANDWRITTEN}/CLAUDE.md" "CLAUDE.md still renders alongside it"
+
+
 finish

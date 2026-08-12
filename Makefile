@@ -36,6 +36,7 @@ help:
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make render REPO=...     render rules into one repo (also registers it)"
+	@echo "                         LOCAL=1 also excludes them from that repo's git"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make init              explain this engine, detect the machine, preview a config"
 	@echo "                         (make init YES=1 VAULT_ID=... writes it, then runs doctor)"
@@ -100,7 +101,7 @@ explain:
 # not exist until then: every other reference was ./scripts/render.py <repo>.
 render:
 	@if [ -z "$(REPO)" ]; then echo "usage: make render REPO=/path/to/repo" >&2; exit 2; fi
-	@./scripts/render.py "$(REPO)"
+	@./scripts/render.py "$(REPO)" $(if $(LOCAL),--local,)
 
 guard:
 	@./scripts/guard-vault-commit.sh --vault "$(VAULT)"

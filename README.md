@@ -155,6 +155,34 @@ don't slip past as two. And an `--id` that doesn't appear in the repository's
 name **warns** — usually the sign of a Quickstart followed verbatim, keeping
 `vault_id=personal` next to a work remote.
 
+### Rendering into a repo you do not own
+
+Rendering and committing are different decisions, and without saying so the
+second one happens by accident. `--local` renders normally and then adds exactly
+the files it wrote to that repo's `.git/info/exclude`:
+
+```bash
+make render REPO=~/work/their-repo LOCAL=1        # ./scripts/render.py --local
+                                                  # does the same
+```
+
+The rules load in your sessions; the repo's remote never sees them, and nothing
+about the exclusion is committed either — `.git/info/exclude` is local to one
+clone. It prints the list every run, because who sees your conventions is a
+decision worth restating rather than a default worth forgetting.
+
+**It refuses if any of those paths is already tracked.** `.git/info/exclude` has
+no effect on a path in the index — the file would show up as an ordinary
+modification, one `git commit -a` from being shared — so a mode that cannot keep
+its promise does not half-keep it. Nothing is written, the tracked files are
+named, and the two real options are: render without `--local` and decide file by
+file, or agree the rules with whoever owns the repo.
+
+Worth knowing which way to lean. Committing them is often the healthier answer —
+the team sees what landed and objects to what does not fit, and you end up with
+shared conventions rather than private ones. `--local` is for the case where that
+conversation is not yours to start.
+
 `SBW_RULES_DIR` is not in the block above, because a fresh clone renders from its
 own `rules/`. If yours live in a separate repo, clone it and then set the key —
 `make init` and `make doctor` both *report* a rules directory they find and

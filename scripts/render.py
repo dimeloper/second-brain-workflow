@@ -289,6 +289,77 @@ def render_claude_md(sha):
     )
 
 
+EXCLUDE_HEADER = "# second-brain-workflow: rendered locally, not shared"
+EXCLUDE_FOOTER = "# end second-brain-workflow"
+
+
+def git_dir(repo):
+    """The repo's real .git directory, or None if this is not a work tree.
+
+    `git rev-parse` rather than `repo / ".git"`: in a worktree or a submodule
+    that path is a *file* pointing elsewhere, and writing an exclude file beside
+    it would put it where nothing reads.
+    """
+    import subprocess
+    try:
+        out = subprocess.run(["git", "-C", str(repo), "rev-parse", "--absolute-git-dir"],
+                             capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+    return Path(out.stdout.strip()) if out.returncode == 0 and out.stdout.strip() else None
+
+
+def tracked_paths(repo, rels):
+    """Which of `rels` git already tracks here.
+
+    The whole point of --local is that the team never sees these files, and
+    `.git/info/exclude` has no effect on a path already in the index — it would
+    show up as a plain modification, one `git commit -a` from being shared. So
+    this is checked before anything is written, and it refuses rather than
+    warns: a mode that cannot keep its promise should not half-keep it.
+    """
+    import subprocess
+    if not rels:
+        return []
+    out = subprocess.run(["git", "-C", str(repo), "ls-files", "--"] + list(rels),
+                         capture_output=True, text=True, check=False)
+    if out.returncode != 0:
+        return []
+    return sorted(line for line in out.stdout.splitlines() if line.strip())
+
+
+def write_exclude(repo, rels):
+    """Add the rendered paths to .git/info/exclude, inside a marked block.
+
+    Rewritten whole each run rather than appended to, so re-rendering after a
+    rule is added or a target changes cannot leave a stale half-list behind, and
+    a second run is not a second copy.
+    """
+    gd = git_dir(repo)
+    if gd is None:
+        return None
+    info = gd / "info"
+    info.mkdir(parents=True, exist_ok=True)
+    path = info / "exclude"
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+
+    kept, skipping = [], False
+    for line in existing.splitlines():
+        if line.strip() == EXCLUDE_HEADER:
+            skipping = True
+            continue
+        if skipping:
+            if line.strip() == EXCLUDE_FOOTER:
+                skipping = False
+            continue
+        kept.append(line)
+
+    block = [EXCLUDE_HEADER] + sorted(set(rels)) + [EXCLUDE_FOOTER]
+    text = "\n".join([l for l in kept if l.strip() or kept.index(l) < len(kept) - 1] + block) + "\n"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 def agents_is_writable(repo):
     """Will this repo's AGENTS.md actually be written by us?
 
@@ -320,7 +391,15 @@ def plan(rules, targets, sha, warn=None, fold_always_on=True):
     # to append to, *and* the target repo has to be one whose AGENTS.md we
     # actually write — a hand-written one is skipped, and folding into a file
     # that is never written drops the rule from every claude-code consumer.
-    have_agents = AGENTS_SRC.is_file() and fold_always_on
+    # Two different questions, conflated in v0.20.1 and separated here. Whether
+    # there is a source AGENTS.md to render decides if AGENTS.md and CLAUDE.md
+    # are planned at all; whether the *target's* AGENTS.md is ours decides only
+    # whether always-on rules fold into it. Joined, a target with a hand-written
+    # AGENTS.md dropped both files from the plan and warned that the *engine* had
+    # no AGENTS.md — false, and it hid the accurate "skip (hand-written, not
+    # ours)" the writer would otherwise have printed.
+    have_agents = AGENTS_SRC.is_file()
+    fold_here = have_agents and fold_always_on
     if "cursor" in targets:
         # Cursor does not read AGENTS.md, so its always-on rules keep their own
         # files with alwaysApply: true. Nothing to fold, nothing duplicated.
@@ -329,7 +408,7 @@ def plan(rules, targets, sha, warn=None, fold_always_on=True):
             out[p] = c
     if "claude-code" in targets:
         for r in rules:
-            if r["always"] and have_agents:
+            if r["always"] and fold_here:
                 # Reaches Claude Code through CLAUDE.md's @AGENTS.md import.
                 # Emitting it here as well would load the same text twice and
                 # count it twice against the budget.
@@ -338,7 +417,7 @@ def plan(rules, targets, sha, warn=None, fold_always_on=True):
             out[p] = c
     if "agents" in targets or "claude-code" in targets:
         if have_agents:
-            p, c = render_agents(sha, always_on)
+            p, c = render_agents(sha, always_on if fold_here else ())
             out[p] = c
             if "claude-code" in targets:
                 p, c = render_claude_md(sha)
@@ -379,6 +458,9 @@ def main():
     ap.add_argument("--rules-dir", help="override SBW_RULES_DIR for this run")
     ap.add_argument("--check", action="store_true", help="exit 1 on drift, write nothing")
     ap.add_argument("--dry-run", action="store_true", help="print planned actions")
+    ap.add_argument("--local", action="store_true",
+                    help="also exclude the rendered files locally, so the repo's "
+                         "remote never sees them")
     ap.add_argument("--explain", action="store_true", help="print resolution and exit")
     args = ap.parse_args()
 
@@ -446,6 +528,13 @@ def main():
     if not repo.is_dir():
         sys.exit(f"Target repo not found: {repo}")
 
+    if args.local:
+        if args.check or args.dry_run:
+            pass  # reporting modes write nothing, so there is nothing to exclude
+        elif git_dir(repo) is None:
+            sys.exit(f"--local needs a git work tree: {repo} is not one. There is "
+                     "nothing to keep out of a remote here.")
+
     fold = agents_is_writable(repo)
     rendered = plan(rules, targets, content_sha,
                     warn=lambda m: print(f"warning: {m}", file=sys.stderr),
@@ -454,6 +543,20 @@ def main():
         print("note: AGENTS.md here is hand-written, so the always-on rules stay "
               "as their own files under .claude/rules/ rather than being folded "
               "into it.", file=sys.stderr)
+    if args.local:
+        planned = sorted(list(rendered) + list(HEADERLESS_OWNED))
+        already = tracked_paths(repo, planned)
+        if already:
+            sys.exit(
+                "--local cannot keep its promise here: git already tracks\n"
+                + "".join(f"  {p}\n" for p in already)
+                + ".git/info/exclude has no effect on a tracked path — it would show\n"
+                  "up as an ordinary modification, one `git commit -a` from being\n"
+                  "shared. Nothing was written.\n\n"
+                  "Either render without --local and decide file by file, or agree\n"
+                  "the rules with whoever owns this repo."
+            )
+
     mode = "check" if args.check else ("dry-run" if args.dry_run else "write")
     print(f"Engine: {ENGINE} @ {sha} (v{engine_version()})")
     if split:
@@ -548,6 +651,20 @@ def main():
     # nothing left to explain it.
     if mode == "write":
         register_repo(repo, warn=lambda m: print(f"warning: {m}", file=sys.stderr))
+
+    if args.local and mode == "write":
+        rels = sorted(list(rendered) + list(HEADERLESS_OWNED))
+        written = write_exclude(repo, rels)
+        print()
+        print(f"Excluded locally in {written}:")
+        for rel in rels:
+            print(f"  {rel}")
+        # Said every run, not only the first. The whole point of the mode is a
+        # decision about who sees these rules, and a decision that stops being
+        # restated is one that quietly becomes a default.
+        print("These files exist here and this repo's remote will never see them.")
+        print("Nothing about the exclusion is committed either — .git/info/exclude")
+        print("is local to this clone, so a fresh clone elsewhere has neither.")
 
     if mode == "check":
         if drift:

@@ -17,6 +17,50 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-08-12
+
+No **Major** entry: a new opt-in flag, and a fix to a message that had been
+unreachable since v0.20.1. Nothing already rendered changes.
+
+### Added
+- **`render.py --local` / `make render REPO=… LOCAL=1`** — render into a repo you
+  do not own, without the repo's remote ever seeing it. It writes the same files,
+  then adds exactly those paths to that repo's `.git/info/exclude`, inside a
+  marked block rewritten whole on each run so a second render is not a second
+  copy. `.git/info/exclude` rather than `.gitignore` deliberately: a `.gitignore`
+  entry is itself a commit announcing the thing it hides.
+
+  The list is printed **every run**, not only the first. Who sees your
+  conventions is a decision, and a decision that stops being restated becomes a
+  default.
+
+  **It refuses when it cannot keep its promise.** If any path it would write is
+  already tracked, nothing is written at all: `.git/info/exclude` has no effect
+  on a path in the index, so the file would appear as an ordinary modification,
+  one `git commit -a` from being shared. The tracked files are named, and the two
+  real options given — render without `--local` and decide file by file, or agree
+  the rules with whoever owns the repo.
+
+  This is the whole reason it is a flag rather than three lines of `printf`: the
+  file list varies by `RENDER_TARGETS` and drifts as rules change, the engine
+  already computes it, and the tracked-file case is the one a hand-rolled version
+  gets wrong silently.
+
+### Fixed
+- **A hand-written `AGENTS.md` in a target repo dropped `AGENTS.md` *and*
+  `CLAUDE.md` from the plan entirely**, and warned that *the engine* had no
+  `AGENTS.md` — which was false. v0.20.1 joined two different questions into one
+  flag: whether a source `AGENTS.md` exists, and whether the target's is ours.
+  The first decides whether those files are planned at all; the second decides
+  only whether always-on rules fold into them.
+
+  The consequence was that `skip (hand-written, not ours): AGENTS.md` — the
+  accurate line, and the one v0.20.1's own release notes describe — has been
+  unreachable since that release. Found while building `--local`, because the
+  refusal that should have fired on a tracked `AGENTS.md` did not: the file was
+  never in the plan to be refused.
+- Suite 1018 → 1033 assertions.
+
 ## [0.25.3] - 2026-08-12
 
 ### Fixed
@@ -1881,7 +1925,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.3...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.0...v0.25.1
