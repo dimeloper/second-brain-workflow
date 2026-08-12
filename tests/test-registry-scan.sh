@@ -55,7 +55,7 @@ doctor() {
   SBW_SCAN_ROOTS="${roots}" SBW_SCAN_DEPTH="${depth}" \
     "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1
 }
-found() { printf '%s\n' "$1" | grep -qxF "$2"; }
+found() { grep -qxF "$2" <<< "$1"; }
 
 # --- fixtures ---------------------------------------------------------------
 # One directory per way a repo can and cannot announce itself.

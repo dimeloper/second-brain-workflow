@@ -62,7 +62,7 @@ bad_case() {
   TESTS_RUN=$((TESTS_RUN + 1))
   if [ "${rc}" != "2" ]; then
     fail "${name}" "want exit 2, got ${rc}: ${out}"
-  elif ! printf '%s' "${out}" | grep -q -- "${want}"; then
+  elif ! grep -q -- "${want}" <<< "${out}"; then
     fail "${name}" "message did not mention '${want}': ${out}"
   else
     pass "${name}"

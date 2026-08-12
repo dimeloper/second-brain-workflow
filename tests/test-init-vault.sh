@@ -101,7 +101,7 @@ assert_exit 0 $? "re-run with --adopt is safe"
 
 out="$("${INIT}" --path "${V}" --id work --adopt 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
-if echo "${out}" | grep -q "Already complete"; then
+if grep -q "Already complete" <<< "${out}"; then
   pass "second run adds nothing"
 else
   fail "second run adds nothing" "${out}"
@@ -167,7 +167,7 @@ git -C "${HOOKED}" add -A >/dev/null 2>&1
 SBW_EXPECTED_VAULT_ID=hooked git -C "${HOOKED}" -c user.email=t@t -c user.name=t commit -qm "bad" >/dev/null 2>&1
 assert_exit 1 $? "hand-run git commit is blocked by the hook, no agent involved"
 TESTS_RUN=$((TESTS_RUN + 1))
-if git -C "${HOOKED}" log --oneline | grep -q "bad"; then
+if grep -q "bad" <<< "$(git -C "${HOOKED}" log --oneline)"; then
   fail "the blocked commit did not actually land"
 else
   pass "the blocked commit did not actually land"

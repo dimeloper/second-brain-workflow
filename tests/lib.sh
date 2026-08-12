@@ -7,6 +7,22 @@
 
 set -uo pipefail
 
+# `pipefail` is on, so **never write `printf "$big" | grep -q PATTERN`** to test
+# whether something matched. `grep -q` exits at the first match; the producer is
+# then killed by SIGPIPE; pipefail reports the pipeline as 141, and the match
+# reads as a miss. It is timing-dependent — it fires when the producer is still
+# writing as grep leaves, so the *earliest*-matching patterns on the *largest*
+# inputs are the ones that flake, which is the opposite of the intuition that
+# an early match is the safe case.
+#
+# It cost a red release tag: test-init.sh's config-key check failed on exactly
+# the first two keys, only on the loaded CI runners, and passed 40/40 locally.
+# The same shape had also made guard-vault-commit.sh's credential scan fail
+# *open* on a large diff. Use a here-string instead — no pipe, no signal:
+#
+#     grep -qE "PATTERN" <<< "${text}"        # not: printf ... | grep -qE
+#     [ -n "$(find … -print -quit)" ]         # not: find … | grep -q .
+
 ENGINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC2034  # consumed by the sourcing test scripts, not here
 FIXTURES="${ENGINE}/tests/fixtures"

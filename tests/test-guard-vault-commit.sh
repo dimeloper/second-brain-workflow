@@ -126,22 +126,60 @@ git -C "${VAULT}" add -A >/dev/null 2>&1
 assert_exit 0 $? "allows a .github/workflows/*.yml file"
 
 # --- size caps --------------------------------------------------------------
-GUARD_MAX_LINES=2 "${GUARD}" --vault "${VAULT}" >/dev/null 2>&1
+# Every invocation from here down passes --expect-id. Without it the guard exits
+# 1 at the identity check, several steps before any of these rules run — so each
+# `assert_exit 1` below was satisfied by the wrong refusal, and the size caps,
+# the credential scan, the conflict-marker scan and the enforced-note rule were
+# all untested. That is how a credential scan that failed open survived: nothing
+# here ever reached it.
+ID=(--expect-id work)
+
+GUARD_MAX_LINES=2 "${GUARD}" --vault "${VAULT}" "${ID[@]}" >/dev/null 2>&1
 assert_exit 1 $? "blocks an oversized diff by line count"
-GUARD_MAX_FILES=1 "${GUARD}" --vault "${VAULT}" >/dev/null 2>&1
+GUARD_MAX_FILES=1 "${GUARD}" --vault "${VAULT}" "${ID[@]}" >/dev/null 2>&1
 assert_exit 1 $? "blocks an oversized diff by file count"
 
 # --- credentials and conflict markers ---------------------------------------
 git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "notes" >/dev/null 2>&1
 printf 'token: ghp_%s\n' "0123456789abcdefghij0123456789abcdef" >> "${VAULT}/2026-08-02.md"
 git -C "${VAULT}" add -A >/dev/null 2>&1
-"${GUARD}" --vault "${VAULT}" >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" "${ID[@]}" >/dev/null 2>&1
 assert_exit 1 $? "blocks a staged credential"
 git -C "${VAULT}" checkout -- "2026-08-02.md" 2>/dev/null || git -C "${VAULT}" reset -q --hard HEAD
 
+# The same credential, but *early* in a *large* diff — the case that failed
+# open. `printf "$body" | grep -q` exits grep on the first match, SIGPIPEs the
+# printf still writing the rest, and `pipefail` turns that into 141: a match
+# reported as a miss, so the commit was allowed. The test above never caught it
+# because appending one line to a small file puts the match at the very end,
+# where the producer has already finished. Caps are raised for this one call so
+# the guard is exercised on the credential check rather than blocking earlier on
+# size, which would pass this assertion for the wrong reason.
+{
+  printf 'token: ghp_%s\n' "0123456789abcdefghij0123456789abcdef"
+  i=0
+  while [ "${i}" -lt 60000 ]; do
+    printf 'filler line %s to push the diff well past any pipe buffer\n' "${i}"
+    i=$((i + 1))
+  done
+} >> "${VAULT}/2026-08-02.md"
+git -C "${VAULT}" add -A >/dev/null 2>&1
+big_out="$(GUARD_MAX_LINES=100000 GUARD_MAX_FILES=50 "${GUARD}" --vault "${VAULT}" "${ID[@]}" 2>&1)"
+big_rc=$?
+assert_exit 1 "${big_rc}" "blocks a credential early in a large diff — the fail-open case"
+# On the message, not just the exit code: a size cap or any other rule would
+# also exit 1, and an assertion that cannot tell those apart would have passed
+# against the buggy guard too. It did, which is how this line came to exist.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${big_out}" in
+  *credential*) pass "and blocks it *as* a credential, not for some other reason" ;;
+  *) fail "and blocks it *as* a credential, not for some other reason" "${big_out}" ;;
+esac
+git -C "${VAULT}" reset -q --hard HEAD
+
 printf '<<<<<<< HEAD\nmine\n=======\ntheirs\n>>>>>>> other\n' >> "${VAULT}/2026-08-02.md"
 git -C "${VAULT}" add -A >/dev/null 2>&1
-"${GUARD}" --vault "${VAULT}" >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" "${ID[@]}" >/dev/null 2>&1
 assert_exit 1 $? "blocks conflict markers"
 git -C "${VAULT}" reset -q --hard HEAD
 
@@ -176,7 +214,7 @@ out="$("${GUARD}" --vault "${VAULT}" 2>&1)"
 rc=$?
 assert_exit 0 "${rc}" "missing vault.json does not block"
 TESTS_RUN=$((TESTS_RUN + 1))
-if echo "${out}" | grep -q "identity unchecked"; then
+if grep -q "identity unchecked" <<< "${out}"; then
   pass "missing vault.json is reported"
 else
   fail "missing vault.json is reported" "${out}"

@@ -160,7 +160,11 @@ detect_rules_dir() {
     [ -d "${candidate}" ] || continue
     resolved="$(cd "${candidate}" && pwd)"
     [ "${resolved}" != "${STANDARDS_DIR}/rules" ] || continue
-    find "${resolved}" -maxdepth 1 -name '*.md' -type f 2>/dev/null | grep -q . || continue
+    # `-print -quit` rather than `find ... | grep -q .`: grep exits on the first
+    # line, SIGPIPEs a find that is still walking, and pipefail then reports 141
+    # — so a directory that *does* hold rules read as empty and was skipped. The
+    # bigger the directory, the likelier the wrong answer.
+    [ -n "$(find "${resolved}" -maxdepth 1 -name '*.md' -type f -print -quit 2>/dev/null)" ] || continue
     echo "${resolved}"
     return 0
   done

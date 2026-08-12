@@ -251,7 +251,10 @@ n_lines="$(diff_numstat | awk '{a+=$1; d+=$2} END {print a+d+0}')"
 deleted="$(diff_paths --diff-filter=D -- 'practices/*')"
 while IFS= read -r f; do
   [ -n "${f}" ] || continue
-  if git -C "${VAULT}" show "${PRE_REF}:${f}" 2>/dev/null | grep -q '^maturity: enforced'; then
+  # Here-string for the same reason as the secret scan below: a match on the
+  # note's first lines would SIGPIPE `git show` and, under pipefail, report the
+  # pipeline as failed — reading as "not enforced" and allowing the deletion.
+  if grep -q '^maturity: enforced' <<< "$(git -C "${VAULT}" show "${PRE_REF}:${f}" 2>/dev/null)"; then
     fail "deleting an enforced practice note: ${f}
        Demote it to trialing with a recorded counterexample instead."
   fi
@@ -260,11 +263,18 @@ ${deleted}
 EOF
 
 # --- 6. conflict markers and secrets ----------------------------------------
+#
+# Here-strings, not `printf ... | grep -q`. That pipeline failed *open*: `grep
+# -q` exits the moment it matches, `printf` is then killed by SIGPIPE, and
+# `pipefail` reports the pipeline as 141 — so `if` took the else branch and the
+# commit was allowed. The earlier the credential appeared in the diff and the
+# larger the diff, the more reliably it was missed, which is precisely backwards
+# for a check whose whole job is to catch one.
 body="$(diff_body)"
-if printf '%s' "${body}" | grep -qE '^\+(<<<<<<< |>>>>>>> |=======$)'; then
+if grep -qE '^\+(<<<<<<< |>>>>>>> |=======$)' <<< "${body}"; then
   fail "conflict markers in the diff"
 fi
-if printf '%s' "${body}" | grep -qE '^\+.*(ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY)'; then
+if grep -qE '^\+.*(ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY)' <<< "${body}"; then
   fail "the diff looks like it contains a credential"
 fi
 

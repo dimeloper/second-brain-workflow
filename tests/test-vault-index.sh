@@ -35,13 +35,13 @@ out="$("${INDEX}" --vault "${VAULT}" 2>&1 >/dev/null)"
 rc=$?
 assert_exit 0 "${rc}" "warnings do not fail the run"
 TESTS_RUN=$((TESTS_RUN + 1))
-if echo "${out}" | grep -q "broken-frontmatter"; then
+if grep -q "broken-frontmatter" <<< "${out}"; then
   pass "reports the malformed note"
 else
   fail "reports the malformed note" "${out}"
 fi
 TESTS_RUN=$((TESTS_RUN + 1))
-if echo "${out}" | grep -q "unknown maturity: bogus"; then
+if grep -q "unknown maturity: bogus" <<< "${out}"; then
   pass "names the specific problem"
 else
   fail "names the specific problem" "${out}"
@@ -82,7 +82,7 @@ out="$("${INDEX}" --vault "${SANDBOX}/nope" 2>&1)"
 rc=$?
 assert_exit 1 "${rc}" "missing vault exits 1"
 TESTS_RUN=$((TESTS_RUN + 1))
-if echo "${out}" | grep -qi "traceback"; then
+if grep -qi "traceback" <<< "${out}"; then
   fail "missing vault reports cleanly" "${out}"
 else
   pass "missing vault reports cleanly"

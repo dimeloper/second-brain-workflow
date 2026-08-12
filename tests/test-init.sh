@@ -54,7 +54,12 @@ done
 # reads.
 missing=""
 for key in ${SBW_CONFIG_KEYS}; do
-  printf '%s\n' "${out}" | grep -qE "^  ${key} +[a-z]" || missing="${missing}${key} "
+  # Here-string, not `printf | grep -q`. That pipeline is a coin flip under the
+  # `pipefail` set in lib.sh: grep exits at the first match, printf is killed by
+  # SIGPIPE, and the pipeline reports 141 even though the line was found. It
+  # struck the *earliest*-matching keys — SBW_VAULT and RENDER_TARGETS, the
+  # first two — which is why the failure always named those and never the rest.
+  grep -qE "^  ${key} +[a-z]" <<< "${out}" || missing="${missing}${key} "
 done
 assert_str "" "${missing}" "every config key carries a description, not just a name"
 

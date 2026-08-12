@@ -522,7 +522,10 @@ check_rules() {
 ${found}" in *"
         ${resolved}
 "*) continue ;; esac
-    find "${resolved}" -maxdepth 1 -name '*.md' -type f 2>/dev/null | grep -q . || continue
+    # `-print -quit`, not `| grep -q .` — see scripts/init.sh's copy of this
+    # line: the pipeline SIGPIPEs find and pipefail reports it as failed, so a
+    # populated directory reads as empty.
+    [ -n "$(find "${resolved}" -maxdepth 1 -name '*.md' -type f -print -quit 2>/dev/null)" ] || continue
     found="${found}        ${resolved}
 "
   done
