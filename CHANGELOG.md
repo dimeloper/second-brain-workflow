@@ -17,6 +17,34 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-08-12
+
+### Fixed
+- **`docs/vault-ci/audit.yml` pasted the audit report into JavaScript source.**
+  The tracking-issue step built its body as
+  `` const body = `${{ steps.audit.outputs.report }}…` ``, and `${{ }}` inside an
+  `actions/github-script` `script:` block is textual substitution *before* node
+  parses the file — so the report was code, not data. It survived twenty-six
+  releases because every report it had ever seen happened to contain no
+  JavaScript punctuation. The first one that did failed the job outright with
+  `SyntaxError: Unexpected identifier 'repos'`: `check-lineage.py` writes
+  `` `repos:` `` in backticks, and a backtick closes the template literal.
+
+  The syntax error was the harmless half. The same substitution means a
+  `${...}` in any note title or rule body that reaches the report is
+  **evaluated**, in a job holding `issues: write`. The report is now passed as
+  an environment variable and read with `process.env`, where nothing in it can
+  be code.
+
+  New `tests/test-vault-ci.sh` scans both templates for `${{ }}` inside a
+  `script:` block and fails on it, and is itself shown catching the exact line
+  that broke — the templates run in someone else's repository with someone
+  else's token, and no local run executes them, so this class had nothing
+  watching it at all. Interpolation in `run:` steps is untouched.
+
+  **Re-copy `docs/vault-ci/audit.yml` into your vault** if you took it from
+  v0.28.0 or earlier; the audit's tracking issue does not update until you do.
+
 ## [0.28.0] - 2026-08-12
 
 ### Added
@@ -2157,7 +2185,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.1...HEAD
+[0.28.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.0...v0.26.1

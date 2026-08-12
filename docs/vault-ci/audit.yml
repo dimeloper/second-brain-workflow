@@ -19,7 +19,7 @@ env:
   # Versioning section) — bump this deliberately, don't track a moving
   # branch here.
   ENGINE_REPO: dimeloper/second-brain-workflow
-  ENGINE_REF: v0.28.0
+  ENGINE_REF: v0.28.1
 
 jobs:
   audit:
@@ -134,10 +134,21 @@ jobs:
       - name: Open or update the tracking issue
         if: always()
         uses: actions/github-script@v7
+        # The report reaches the script as an environment variable, never as
+        # `${{ }}` inside `script:`. That form is textual substitution into
+        # JavaScript source *before* node sees it, so the report's own
+        # punctuation is parsed as code: a backtick closes the template literal
+        # — which is exactly how this broke, check-lineage.py writes `repos:`
+        # in backticks — and a `${...}` anywhere in a note title or rule body
+        # would be evaluated, in a job that holds `issues: write`. Reading
+        # process.env passes the same text as a value, where nothing in it can
+        # be code.
+        env:
+          REPORT: ${{ steps.audit.outputs.report }}
         with:
           script: |
             const title = "second-brain-workflow audit";
-            const body = `${{ steps.audit.outputs.report }}\n\n_Last run: ${new Date().toISOString()} — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}_`;
+            const body = `${process.env.REPORT}\n\n_Last run: ${new Date().toISOString()} — ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}_`;
 
             // The REST API 404s on issues.create if the label doesn't exist
             // yet — it does not auto-create labels the way it auto-creates,
