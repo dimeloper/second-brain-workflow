@@ -17,6 +17,51 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-08-12
+
+### Added
+- **`check-followups.py` reports a carried-forward item once, aged from when it
+  was first raised.** There is no automatic carry-forward, so a still-open item
+  is rewritten into a later note by hand — and reworded, because by then the
+  writer knows more. One `calorie-counter-ai` task was three lines across three
+  notes, and the report counted it three times *and* led with "1 day open",
+  which was the newest rewrite's age. The task had been sitting for four days.
+  That age is the entire reason to read the list.
+
+  Exact matching cannot collapse these; here even the version number moved
+  (`1.1.0+24` → `+25`). New `scripts/lib/followup_threads.py` matches on a
+  shared hard reference (both name PR #28), on identical text once versions are
+  collapsed, on token similarity or containment with a shared opening word, or
+  on an identical leading clause — under two hard preconditions: same repo, and
+  **two different notes**. That second one is what keeps two `Device retest: …`
+  items written side by side on one day apart, which no amount of text
+  similarity could. Across the whole vault this collapses 62 items into 58 with
+  no false merge; `--no-threads` reports every restatement separately.
+
+  A thread ticked off in a newer note, while an older note still shows it
+  unchecked, is now closed rather than reported open forever — the only thing
+  this removes, and a footer line says how many.
+- **Items naming a PR, branch, or commit are checked against that repo's main
+  branch**, and marked `[landed]`, `[closed]` (a PR closed without merging),
+  `[open]`, or `[unchecked]` with the reason. New `scripts/lib/landed.py`: `gh`
+  for live PR state, `git merge-base --is-ancestor` for branches and commits.
+  Finished-looking threads are lifted into a `Looks already done` block, which
+  is a **question** — nothing is ticked without the user confirming, because the
+  evidence is about the ref and the item usually says more than the ref does
+  ("merge PR #28 *and ship a build*" is half done when the PR merges).
+
+  Only items carrying such a reference are probed, so most cost nothing. Repos
+  are located through the render registry, then one bounded walk of
+  `SBW_SCAN_ROOTS`, cached in
+  `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repo-paths`. It never runs
+  `git fetch`, and says how stale a checkout's `origin/main` was instead.
+
+  **On with `--recent`, off with `--stale-days`** — so `make audit` and
+  `docs/vault-ci/audit.yml` are untouched and stay offline, which is what lets
+  them keep working on a runner with no checkouts and no `gh` auth. `--landed`
+  and `--no-landed` override in either direction, and a test asserts the audit
+  path never invokes `gh`.
+
 ### Fixed
 - **CI could not run the release-tag check it had just been given.** v0.27.0
   taught `test-release-consistency.sh` to fail when `VERSION` and both
@@ -2112,7 +2157,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.3...v0.26.0
