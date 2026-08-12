@@ -15,6 +15,14 @@ Two kinds are checked:
   and a heading renamed there would break the pitch silently. Manual
   repointing is not a check.
 
+Fenced blocks are skipped, and so are **inline code spans**: a link inside
+backticks is a sample of a link, not one. That distinction is load-bearing for
+`CHANGELOG.md`, which cites the original defect verbatim as
+``[rules/](#the-rules-live-somewhere-else)`` in the entry recording its fix.
+Without the exclusion, prose correctly describing a fixed bug reports as the
+bug — and the file could not be checked at all, leaving the one cross-file
+link outside the docs tree unwatched.
+
 What this deliberately does NOT cover, so its green is not read as broader
 than it is:
 
@@ -35,6 +43,9 @@ import re, sys, pathlib
 SAME_FILE = re.compile(r'\]\(#([A-Za-z0-9_-]+)\)')
 CROSS_FILE = re.compile(r'\]\(([^)\s#]+)#([A-Za-z0-9_-]+)\)')
 EXTERNAL = ("http://", "https://", "mailto:", "//")
+# A run of N backticks, the shortest thing it can close over, then the same
+# run — so ``a ` b`` is one span rather than two halves of nothing.
+INLINE_CODE = re.compile(r'(`+)(.+?)\1')
 
 
 def slug(text):
@@ -80,6 +91,10 @@ for arg in sys.argv[1:]:
             continue
         if fence:
             continue
+        # A link inside backticks is a sample of a link, not one. Stripping the
+        # span leaves a real link whose *text* is code — `[`make doctor`](x#y)`
+        # — still matchable, since only the bracketed text is removed.
+        line = INLINE_CODE.sub('', line)
         for target in SAME_FILE.findall(line):
             if target not in own:
                 bad.append("%s:%d: link to #%s, which is not a heading here"

@@ -202,9 +202,13 @@ esac
 # exist, in the paragraph explaining why the engine ships no rules of its own. A
 # link that silently does nothing is the same class as a heading that states a
 # count its list does not have.
+# CHANGELOG.md is in this list for the cross-file link the restructure created
+# outside the docs tree — the one link the checker was extended for that would
+# otherwise sit outside it. It can only be here because inline code spans are
+# skipped; see the code-span assertions below.
 out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" \
   "${ENGINE}/README.md" "${ENGINE}/docs/REFERENCE.md" "${ENGINE}/docs/NEW-MACHINE.md" \
-  "${ENGINE}/docs/GUARD.md" "${ENGINE}/docs/AUDIT.md" 2>&1 || true)"
+  "${ENGINE}/docs/GUARD.md" "${ENGINE}/docs/AUDIT.md" "${ENGINE}/CHANGELOG.md" 2>&1 || true)"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${out}" = "clean" ]; then
   pass "every in-document anchor link resolves to a heading"
@@ -260,6 +264,41 @@ if [ "${out}" = "clean" ]; then
 else
   fail "an external link and an unresolvable path are both left alone" "${out}"
 fi
+
+# --- a link inside backticks is a sample, not a link ------------------------
+# CHANGELOG.md cites the original defect verbatim in the entry recording its
+# fix. Without this, prose correctly describing a fixed bug reports as the bug,
+# and the file cannot be checked at all — which would leave the one cross-file
+# link outside the docs tree unwatched, the exact gap this checker exists for.
+spans="${SANDBOX}/xfile/spans.md"
+# shellcheck disable=SC2016  # the backticks are markdown code spans, which is
+# the whole fixture — they must reach the file unexpanded.
+printf '# Heading\n\nCited: `[r](#long-gone)`; real: [y](#also-gone); text-is-code: [`x`](#heading).\n' \
+  > "${spans}"
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" "${spans}" 2>&1 || true)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"#long-gone"*) fail "a link inside a code span is not treated as a link" "${out}" ;;
+  *) pass "a link inside a code span is not treated as a link" ;;
+esac
+
+# Stripping spans must not blind it to real links on the same line, which is
+# how an exclusion turns into a hole.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"link to #also-gone"*)
+    pass "and a real broken link beside one is still caught" ;;
+  *) fail "and a real broken link beside one is still caught" "${out}" ;;
+esac
+
+# Only the bracketed text is removed, so a link whose label is code still
+# resolves — `[`make doctor`](GUARD.md#make-doctor)` appears throughout the docs.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"#heading"*) fail "and a link whose label is code still resolves" "${out}" ;;
+  *) pass "and a link whose label is code still resolves" ;;
+esac
 
 # --- a command a Major changelog entry tells the reader to run --------------
 # upgrade.sh prints ### Major sections verbatim, so a command named there is

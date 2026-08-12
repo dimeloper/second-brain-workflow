@@ -58,6 +58,18 @@ write release notes, not two to keep in sync by hand.
   still does not cover, stated so its green is not read as broader than it is:
   external links, and a cross-file path that does not resolve at all.
 
+  **Inline code spans are skipped too**, and that is what lets `CHANGELOG.md`
+  join the checked set. This file cites the original defect verbatim — as
+  inline code, in the entry recording its fix — so without the exclusion, prose
+  correctly describing a fixed bug reports as the bug, and the file could not be
+  checked at all. That would have left the one cross-file link the restructure
+  created outside the docs tree unwatched: precisely the gap the checker was
+  extended for. Only the bracketed text is stripped, so a link whose *label* is
+  code — `` [`make doctor`](GUARD.md#make-doctor) ``, which appears throughout —
+  still resolves, and a real broken link beside a cited one is still caught.
+  Both directions are asserted, because an exclusion is how a check becomes a
+  hole.
+
 ### Fixed
 - **The Quickstart stopped pinning a release.** The restructure dropped the
   three tag-resolution lines, making a clone of `main` the default path. The
