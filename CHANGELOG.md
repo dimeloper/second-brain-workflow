@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-08-12
+
 ### Changed
 - **The landed check now probes only the repo you are standing in.** It probed
   every repo with a checkable ref, which cost about a second and — more to the
@@ -2270,7 +2272,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.27.0...v0.28.0
