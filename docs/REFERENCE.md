@@ -746,17 +746,40 @@ tagged `v<VERSION>`. Bump policy:
 **Cutting a release:** move [`CHANGELOG.md`](../CHANGELOG.md)'s `[Unreleased]`
 entries under a new `## [X.Y.Z] - YYYY-MM-DD` heading (add the two comparison
 links at the file's bottom), bump `VERSION` to match, bump `ENGINE_REF` in
-**both** `docs/vault-ci/*.yml` templates to the new tag, tag `v<VERSION>`, and
-point the GitHub Release's notes at that changelog section rather than writing
+**both** `docs/vault-ci/*.yml` templates to the new tag, commit, push the branch,
+and then tag through the gate:
+
+```bash
+git push origin main            # the release commit, on its own — no tag here
+make release-check WAIT=1       # blocks until the run for THIS commit reports
+make release-check YES=1        # tags and pushes, only if that run was green
+```
+
+Point the GitHub Release's notes at that changelog section rather than writing
 them by hand — one place to describe what changed, not two that can say different
-things. A **Major** entry in the changelog always names the specific action
+things.
+
+`make release-check` refuses on a red run, a pending run, a run that does not
+exist, a dirty tree, an unpushed `HEAD`, and a tag that already exists. It never
+re-runs a failed job: a red that is really a flake is a judgement made with the
+log open, and a gate that retried until green could not refuse. On a red it
+prints `gh run view --log-failed` and `gh run rerun --failed` for you to run
+deliberately.
+
+The separate `WAIT=1` and `YES=1` steps are the point rather than an
+inconvenience. `git push origin main && git push origin v0.9.0` reads as one
+atomic publish, and that chained `&&` is exactly how the practice was lost after
+eight cuts held it by hand — the pause had no representation in the command. Now
+it does. A **Major** entry in the changelog always names the specific action
 required, since that's the part a commit log can't supply on its own.
 `tests/test-release-consistency.sh` enforces the `VERSION`/changelog/`ENGINE_REF`
 half of that list, because a template pinned several releases back gives an
 adopter a workflow that quietly runs fewer checks than they think.
 
-**Then open the CI run for the tag.** A green `make check` locally is not
-evidence the pipeline passed: a linter's verdict is specific to its version, and
+**Then open the CI run for the tag.** The gate above reads the run for the
+*branch* commit; a tag builds separately, and this repo has already seen a tag
+run go red on a commit whose branch run was green. A green `make check` locally
+is not evidence the pipeline passed either: a linter's verdict is specific to its version, and
 v0.23.0 and v0.24.0 were both tagged with a failing lint that no local run could
 have shown. CI's shellcheck is now pinned to the same version this repo develops
 against, which removes that particular disagreement — it does not remove the

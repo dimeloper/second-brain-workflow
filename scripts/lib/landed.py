@@ -61,6 +61,12 @@ PR_REF_RE = re.compile(
 # every item in this vault that names a commit backticks it. Hex alone is not
 # enough: `3017620422003` is a barcode and `deadbeef` is a word, so a real SHA
 # has to have both a digit and a hex letter in it.
+#
+# The stated cost: an all-digit short SHA is missed, and about one in
+# twenty-five is. That is the deliberate side of the trade — the alternative is
+# an "unchecked" line under every item quoting a barcode or an order number,
+# and the item that prompted this feature quotes one. A missed check reads
+# exactly like today's report; a wrong "landed" would not.
 SHA_REF_RE = re.compile(r'`([0-9a-f]{7,40})`')
 
 # A branch, backticked, and only with a conventional prefix. Matching any

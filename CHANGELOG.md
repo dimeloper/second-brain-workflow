@@ -17,6 +17,34 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`make release-check` — the gate that refuses to tag on a red or pending CI
+  run.** Until now this was a practice held by hand, and it was held through
+  eight cuts and lost on the ninth. The way it was lost is the whole design
+  input: `git push origin main && git push origin v0.9.0` reads as one atomic
+  publish step, so the pause the practice consists of had nothing to skip and
+  nothing to notice skipping. Before that, `v0.4.0` and `v0.5.0` were both
+  tagged red — and `v0.5.0`'s break surfaced a day later in an adopting vault's
+  CI, from a template pinning the broken tag.
+
+  `scripts/release-check.sh` refuses on: a red run, a pending run, no run at all
+  for `HEAD`, a dirty tree, a `HEAD` that origin's default branch does not point
+  at, and a tag that already exists. Preview by default, `YES=1` to tag and
+  push, `WAIT=1` to block while the run finishes — the same shape as `upgrade`
+  and `uninstall`, and the separate steps are the point: pushing the branch and
+  pushing the tag can no longer be one command.
+
+  It never re-runs a failed job. A red that is really a flake is a call someone
+  makes with the log in front of them, and a gate that retried until green would
+  be a gate that always passes — so it prints `gh run view --log-failed` and
+  `gh run rerun --failed` to run deliberately. That distinction is not
+  hypothetical: cutting v0.28.1 hit a genuinely flaky `test-init.sh` assertion
+  that failed on the tag run, passed on the branch run for the same commit, and
+  passed on re-run.
+
+  Deliberately not part of `make check` — it reads the network and asks about
+  one specific commit, and it runs once per cut rather than on every edit.
+
 ## [0.28.1] - 2026-08-12
 
 ### Fixed

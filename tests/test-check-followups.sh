@@ -582,15 +582,24 @@ git -C "${LREPO}" init -q
 git -C "${LREPO}" symbolic-ref HEAD refs/heads/main
 git -C "${LREPO}" config user.email "test@example.com"
 git -C "${LREPO}" config user.name "Test"
+# Fixed identity *and* fixed timestamps, so every commit below hashes to the
+# same SHA on every run. Without this the fixture's SHAs are random hex, and
+# `landed.py` deliberately does not treat an all-digit token as a commit — that
+# is what stops a backticked barcode from being probed — so roughly one run in
+# twenty-five drew an all-digit short SHA and failed. A test whose fixture is
+# random is a test that fails for reasons unrelated to what it asserts, which is
+# the exact thing this suite is meant to be able to distinguish.
+export GIT_AUTHOR_DATE="2026-01-02T00:00:00+00:00"
+export GIT_COMMITTER_DATE="2026-01-02T00:00:00+00:00"
 gitc() { git -C "${LREPO}" "$@" >/dev/null 2>&1; }
 gitc commit -q --allow-empty -m "base"
 gitc checkout -q -b feature/merged
-gitc commit -q --allow-empty -m "landed work"
+gitc commit -q --allow-empty -m "the landed commit"
 sha_landed="$(git -C "${LREPO}" rev-parse --short HEAD)"
 gitc checkout -q main
 gitc merge -q --no-ff -m "merge feature/merged" feature/merged
 gitc checkout -q -b feature/open
-gitc commit -q --allow-empty -m "unlanded work"
+gitc commit -q --allow-empty -m "the unlanded commit"
 sha_open="$(git -C "${LREPO}" rev-parse --short HEAD)"
 gitc checkout -q main
 
@@ -626,6 +635,7 @@ cat > "${LVAULT}/2026-01-02.md" <<EOF
 - [ ] Revisit PR #8, which someone may have abandoned #repo/landed-repo
 - [ ] Wait for PR #9 to be reviewed #repo/landed-repo
 - [ ] Write the release note, which names nothing checkable #repo/landed-repo
+- [ ] Device retest against the Nutella barcode \`3017620422003\` #repo/landed-repo
 - [ ] Merge PR #7 in a repo nobody has cloned #repo/absent-repo
 EOF
 
@@ -665,6 +675,15 @@ case "${out_l}" in
     pass "finished-looking threads are lifted out as a question, not an action" ;;
   *) fail "finished-looking threads are lifted out as a question, not an action" "${out_l}" ;;
 esac
+
+# A backticked all-digit token is a barcode, an order number, an id — not a
+# commit — and is never probed. The cost of that rule, stated here so it is a
+# decision rather than a surprise: a short SHA that happens to be all digits is
+# missed too, and roughly one in twenty-five is. Reporting "unchecked" under
+# every item that quotes a number would be the worse trade, and a *wrong*
+# landed verdict would be worse still.
+probed="$(printf '%s\n' "${out_l}" | grep -c '^ *\[[a-z]*\].*3017620422003' || true)"
+assert_str "0" "${probed}" "an all-digit token is read as data, not a commit"
 
 # An item with nothing checkable in it costs nothing and is annotated with
 # nothing — no "unchecked" noise on the majority of a real report.

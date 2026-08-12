@@ -1,7 +1,7 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
         vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain render guard doctor audit \
         init \
-        verify-claude check
+        verify-claude check release-check
 
 # Resolved by the same code the scripts use, never re-derived in make syntax:
 # make cannot read the config file, so a fallback written here would ignore it
@@ -18,7 +18,7 @@ endif
 SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault.sh scripts/init.sh \
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
-                 scripts/lib/registry.sh scripts/upgrade.sh \
+                 scripts/lib/registry.sh scripts/upgrade.sh scripts/release-check.sh \
                  scripts/lib/resolve-vault.sh scripts/uninstall.sh \
                  scripts/fetch-skill-sources.sh scripts/lib/skill-links.sh \
                  tests/lib.sh $(wildcard tests/test-*.sh)
@@ -167,6 +167,16 @@ skills-for:
 practices-for:
 	@if [ -z "$(REPO)" ]; then echo "usage: make practices-for REPO=/path/to/repo" >&2; exit 2; fi
 	@./scripts/practices-for.py --repo "$(REPO)" --vault "$(VAULT)"
+
+# The gate the release practice was missing. Deliberately NOT part of `make
+# check`: this one reads the network and asks about a specific commit, and it is
+# run once per cut rather than on every edit. Preview unless YES=1, the same
+# shape as uninstall and upgrade — so the tag is something you opt into, and the
+# wait between pushing main and pushing the tag is a command rather than a thing
+# to remember not to chain with &&.
+release-check:
+	@./scripts/release-check.sh $(if $(YES),--yes,) $(if $(WAIT),--wait,) \
+	  $(if $(RELEASE_VERSION),--version $(RELEASE_VERSION),)
 
 # Preview by default; --yes is the script's own gate, so `make uninstall` can
 # never remove anything on its own.
