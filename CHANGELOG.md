@@ -17,6 +17,29 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **CI could not run the release-tag check it had just been given.** v0.27.0
+  taught `test-release-consistency.sh` to fail when `VERSION` and both
+  templates name a release nobody tagged. Reading the tag's own CI run — the
+  step this file's release instructions insist on, for exactly this class —
+  showed it reporting `?? undetermined: no HEAD~1` in both jobs: `actions/checkout`
+  clones at depth 1 with no tags, so both scope guards fired and the check
+  asserted nothing.
+
+  Locally it worked, and it did catch the real window: with v0.27.0 merged and
+  untagged, `make check` was red on `main` until the tag was pushed. But the
+  tier that would notice a tag forgotten *days* later, on a repo nobody is
+  watching, was the one that could not see. The undetermined line made that
+  visible instead of green, which is the difference between this and the
+  tautology it replaced — but visible is not caught. `fetch-depth: 0` on both
+  jobs.
+
+  Not cut as its own release. A version bump stamps every rendered file and
+  `.sbw-version` in every onboarded repo, so `make upgrade` would report the
+  whole registry as needing a re-render — real churn for adopters, over a
+  change to this repo's own CI that alters nothing they can observe. It rides
+  with the next release that has something in it for them.
+
 ## [0.27.0] - 2026-08-12
 
 ### Changed
