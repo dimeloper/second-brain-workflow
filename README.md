@@ -64,10 +64,12 @@ write — changing nothing until you add `YES=1`.
 ```bash
 git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
+# omit the next three lines to track main instead of the newest release
 latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
 echo "latest = $latest"                       # empty means no release yet
-[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
-git submodule update --init --recursive       # a tag checkout does not move the pin
+[ -z "$latest" ] || git checkout "$latest"
+git submodule update --init --recursive       # not optional: a tag checkout
+                                              # does not move the submodule pin
 
 make init                                     # read this; it writes nothing
 ```
