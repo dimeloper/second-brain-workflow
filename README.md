@@ -171,12 +171,17 @@ about the exclusion is committed either — `.git/info/exclude` is local to one
 clone. It prints the list every run, because who sees your conventions is a
 decision worth restating rather than a default worth forgetting.
 
-**It refuses if any of those paths is already tracked.** `.git/info/exclude` has
+**It refuses if a path it would *write* is already tracked.** `.git/info/exclude` has
 no effect on a path in the index — the file would show up as an ordinary
 modification, one `git commit -a` from being shared — so a mode that cannot keep
 its promise does not half-keep it. Nothing is written, the tracked files are
 named, and the two real options are: render without `--local` and decide file by
 file, or agree the rules with whoever owns the repo.
+
+A tracked file the render **skips** — the team's own `CLAUDE.md`, say — is not a
+refusal. The writer never touches it, so there is nothing to hide; it is named in
+the output and left out of the exclude block, because an exclude entry for a
+tracked file does nothing and would imply otherwise.
 
 Worth knowing which way to lean. Committing them is often the healthier answer —
 the team sees what landed and objects to what does not fit, and you end up with

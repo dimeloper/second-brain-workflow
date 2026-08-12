@@ -360,6 +360,25 @@ def write_exclude(repo, rels):
     return path
 
 
+def would_write(repo, rel):
+    """Would a render actually write this path, or does it skip it?
+
+    The tracked-path refusal must ask this, not merely "is it tracked". A
+    hand-written file already in the repo is *skipped* by the writer — the team's
+    own CLAUDE.md is never modified — so refusing over it would refuse over a
+    file at no risk of being shared, which is the check being wrong in the
+    direction that blocks correct work.
+    """
+    dest = repo / rel
+    if rel in HEADERLESS_OWNED:
+        return True                     # overwritten unconditionally
+    if dest.is_symlink():
+        return True                     # legacy link, always replaced
+    if dest.exists() and not is_generated(dest):
+        return False                    # hand-written: the writer skips it
+    return True
+
+
 def agents_is_writable(repo):
     """Will this repo's AGENTS.md actually be written by us?
 
@@ -545,7 +564,15 @@ def main():
               "into it.", file=sys.stderr)
     if args.local:
         planned = sorted(list(rendered) + list(HEADERLESS_OWNED))
-        already = tracked_paths(repo, planned)
+        tracked = tracked_paths(repo, planned)
+        already = [p for p in tracked if would_write(repo, p)]
+        skipped = [p for p in tracked if p not in already]
+        if skipped:
+            # Named, not refused over: these stay exactly as the repo has them.
+            print("note: git tracks these and the render leaves them alone, so "
+                  "--local has nothing to hide:", file=sys.stderr)
+            for rel in skipped:
+                print(f"        {rel}", file=sys.stderr)
         if already:
             sys.exit(
                 "--local cannot keep its promise here: git already tracks\n"
@@ -653,7 +680,11 @@ def main():
         register_repo(repo, warn=lambda m: print(f"warning: {m}", file=sys.stderr))
 
     if args.local and mode == "write":
-        rels = sorted(list(rendered) + list(HEADERLESS_OWNED))
+        # Only what this render owns. A hand-written file the writer skipped is
+        # the repo's, and listing it here would be a no-op entry implying we are
+        # hiding something we never wrote.
+        rels = sorted(p for p in list(rendered) + list(HEADERLESS_OWNED)
+                      if would_write(repo, p))
         written = write_exclude(repo, rels)
         print()
         print(f"Excluded locally in {written}:")

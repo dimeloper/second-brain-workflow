@@ -296,31 +296,53 @@ esac
 headers="$(grep -c "second-brain-workflow: rendered locally" "${LOCAL_REPO}/.git/info/exclude" || true)"
 assert_str "1" "${headers}" "a second --local run leaves one block, not two"
 
-# --- --local refuses when it cannot keep its promise -------------------------
-# .git/info/exclude has no effect on a path already in the index: it would show
-# up as an ordinary modification, one `git commit -a` from being shared. A mode
-# that cannot keep its promise must not half-keep it.
-TRACKED_REPO="${SANDBOX}/tracked-repo"
-make_target_repo "${TRACKED_REPO}"
-printf 'the teams own conventions\n' > "${TRACKED_REPO}/AGENTS.md"
-git -C "${TRACKED_REPO}" add AGENTS.md
-git -C "${TRACKED_REPO}" -c user.email=t@example.com -c user.name=T commit -qm "team file"
-out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${TRACKED_REPO}" --local 2>&1)"
+# --- a tracked file the render SKIPS is not worth refusing over --------------
+# Reported from a work machine: --local refused because the repo tracked its own
+# CLAUDE.md. But the writer skips a hand-written file, so it was never at risk of
+# being shared — the check was asking "is it tracked" when the question is "would
+# we write it". Refusing there blocks correct work over a file nothing touches.
+TEAM_REPO="${SANDBOX}/team-owned"
+make_target_repo "${TEAM_REPO}"
+printf 'the teams own CLAUDE.md\n' > "${TEAM_REPO}/CLAUDE.md"
+git -C "${TEAM_REPO}" add CLAUDE.md
+git -C "${TEAM_REPO}" -c user.email=t@example.com -c user.name=T commit -qm "team file"
+out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${TEAM_REPO}" --local 2>&1)"
 rc=$?
-assert_exit 1 "${rc}" "--local refuses when a rendered path is already tracked"
+assert_exit 0 "${rc}" "--local proceeds when the tracked file is one the render skips"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"cannot keep its promise"*"AGENTS.md"*) pass "naming the tracked file and why" ;;
-  *) fail "naming the tracked file and why" "${out}" ;;
+  *"--local has nothing to hide"*"CLAUDE.md"*)
+    pass "and names it as tracked-and-left-alone rather than refusing" ;;
+  *) fail "and names it as tracked-and-left-alone rather than refusing" "${out}" ;;
 esac
-assert_no_file "${TRACKED_REPO}/.claude/rules/frontend-angular.md" \
-  "and writes nothing at all — the refusal comes before any write"
 TESTS_RUN=$((TESTS_RUN + 1))
-if [ "$(cat "${TRACKED_REPO}/AGENTS.md")" = "the teams own conventions" ]; then
-  pass "leaving the team's own file untouched"
+if grep -q '^CLAUDE.md$' "${TEAM_REPO}/.git/info/exclude"; then
+  fail "a skipped file is not added to the exclude block" "CLAUDE.md was excluded"
 else
-  fail "leaving the team's own file untouched" "$(cat "${TRACKED_REPO}/AGENTS.md")"
+  pass "a skipped file is not added to the exclude block"
 fi
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "$(cat "${TEAM_REPO}/CLAUDE.md")" = "the teams own CLAUDE.md" ]; then
+  pass "and the team's file is byte-identical afterwards"
+else
+  fail "and the team's file is byte-identical afterwards" "$(cat "${TEAM_REPO}/CLAUDE.md")"
+fi
+
+# ...but a tracked file the render *would* overwrite still refuses: that one is
+# ours, already shared, and excluding it locally would hide a real modification.
+OURS_REPO="${SANDBOX}/ours-tracked"
+make_target_repo "${OURS_REPO}"
+"${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${OURS_REPO}" >/dev/null 2>&1
+git -C "${OURS_REPO}" add AGENTS.md
+git -C "${OURS_REPO}" -c user.email=t@example.com -c user.name=T commit -qm "committed ours"
+out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${OURS_REPO}" --local 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "a tracked file the render owns still refuses"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"cannot keep its promise"*"AGENTS.md"*) pass "naming it" ;;
+  *) fail "naming it" "${out}" ;;
+esac
 
 # --- a hand-written AGENTS.md is skipped, not dropped from the plan ----------
 # v0.20.1 joined two questions into one flag: whether a source AGENTS.md exists,

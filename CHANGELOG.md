@@ -17,6 +17,28 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-08-12
+
+### Fixed
+- **`--local` refused over files the render never touches.** Reported from a work
+  machine on its first real use: a company repo tracking its own `CLAUDE.md` was
+  refused, even though the writer *skips* a hand-written file and would never
+  have modified it. The check asked "is this path tracked" when the question is
+  "would we write it" — refusing over a file at no risk of being shared, which is
+  the check being wrong in the direction that blocks correct work.
+
+  It now refuses only for a tracked path the render would actually write: one
+  that does not exist yet, one carrying our provenance marker, or the version
+  stamp. A tracked file the render skips is **named in the output and left out of
+  the exclude block** — an exclude entry for a tracked path does nothing, and
+  listing it would imply we were hiding something we never wrote.
+
+  The refusal still fires where it matters: a previously-rendered `AGENTS.md`
+  that someone committed *is* ours, and excluding it locally would hide a real
+  modification to a shared file.
+- Suite 1033 → 1035 assertions, and one earlier assertion removed rather than
+  updated: it encoded the behaviour this release corrects.
+
 ## [0.26.0] - 2026-08-12
 
 No **Major** entry: a new opt-in flag, and a fix to a message that had been
@@ -1925,7 +1947,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.1...HEAD
+[0.26.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.1...v0.25.2
