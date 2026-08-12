@@ -11,6 +11,19 @@ convention a maturity gradient instead: it starts as an `idea`, becomes
 a few repos. Then you distill it into one short rule, and one source renders to
 Cursor, Claude Code, and `AGENTS.md`.
 
+Two artifacts, and the difference between them is the design. A **practice
+note** is long-form: one convention, its evidence, and the repos it has held in,
+as an ordinary markdown file in a git repo — the *vault*. It is read on demand,
+so length is cheap. A **rule** is the distilled version: a few imperative lines,
+rendered into every repo you onboard and loaded on relevant turns, so every line
+is charged against a session budget. Notes accumulate; rules stay short. That
+split is why the rules file stops growing. See
+[Hot path and cold path](docs/REFERENCE.md#hot-path-and-cold-path).
+
+The vault is plain markdown in git. Obsidian is a pleasant way to browse it —
+graph view, dataview queries — but nothing here requires it: the skills read the
+filesystem, with no plugin or MCP server in the loop.
+
 **Two load-bearing choices, before you read further.** It assumes git plus a
 markdown vault. And **the promotion gate is manual by design** — nothing
 promotes a note on your behalf, because a counter that promoted itself would
@@ -50,12 +63,12 @@ is the honest schedule:
 | **Month 1** | A note reaches `enforced`. You distill it into one rule; `render.py` emits it for every agent you use, with drift-checking in CI. |
 | **Month 3** | `make audit` tells you which rules are orphaned, which claims went stale, and which always-on rules are over budget. |
 
-Row 2 is the demo. It is immediate and legible in a screenshot.
+Start there.
 
 ## Quickstart
 
-An afternoon, and two placeholders to substitute — `VAULT_ID` and
-`YOUR_ACCOUNT`. The rest is paste-and-run.
+Two placeholders to substitute — `VAULT_ID` and `YOUR_ACCOUNT`. The rest is
+paste-and-run.
 
 `make init` explains what the engine does, prints every configuration key with
 its current value and where that value came from, and shows the config it would
@@ -109,7 +122,9 @@ Then finish the machine:
 
 ```bash
 ./scripts/sync-skills.sh
-make init YES=1 VAULT_ID="$vault_id"          # appends what is missing, runs doctor
+make init YES=1 VAULT_ID="$vault_id"          # appends what is missing — including
+                                              # SBW_EXPECTED_VAULT_ID, the commit
+                                              # guard's anchor — then runs doctor
 ```
 
 Getting that branch wrong is the one mistake worth naming here: running **A**
@@ -211,8 +226,8 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   load in your sessions and the remote never sees them. It refuses if a path it
   would write is already tracked, rather than half-keeping the promise. See
   [Rendering into a repo you do not own](docs/REFERENCE.md#rendering-into-a-repo-you-do-not-own).
-- **Bring your own skills.** The engine ships five of its own and no roster of
-  other people's. Declare the ones you want in a `skills.json`, pinned by sha
+- **Bring your own skills.** The engine ships a handful of its own and no roster
+  of other people's. Declare the ones you want in a `skills.json`, pinned by sha
   and allowlisted per source, so two machines reading the same manifest install
   the same thing. See
   [Bringing your own skills](docs/REFERENCE.md#bringing-your-own-skills).
