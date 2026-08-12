@@ -17,6 +17,41 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-08-12
+
+### Fixed
+- **`guard-vault-commit.sh` failed open on a credential early in a large diff.**
+  The scan was `printf '%s' "${body}" | grep -qE '<secret patterns>'`. `grep -q`
+  exits at the first match, the `printf` still writing the rest is killed by
+  SIGPIPE, and `set -o pipefail` reports the pipeline as 141 — so `if` took the
+  else branch and the commit was allowed. The earlier the credential and the
+  larger the diff, the more reliably it was missed, which is exactly backwards
+  for a check that exists to catch one. Same for the conflict-marker scan beside
+  it and the enforced-note-deletion check above it.
+
+  **The guard's tests could not have caught this**, and that is the more
+  important half. Every invocation in `test-guard-vault-commit.sh` from the size
+  caps down omitted `--expect-id`, so the guard exited 1 at the identity check
+  several steps earlier — each `assert_exit 1` was satisfied by the wrong
+  refusal, and the size caps, the credential scan, the conflict-marker scan and
+  the enforced-note rule were all effectively untested. They now pass the
+  expected id, and the new fail-open case asserts on the *message* rather than
+  the exit code, because an exit code alone cannot tell "blocked as a
+  credential" from "blocked for any other reason" — the first version of that
+  test passed against the buggy guard for precisely that reason.
+
+- **The same pipeline shape was a flaky test and two silent wrong answers.**
+  `tests/test-init.sh` failed only on loaded CI runners, only on the first two
+  config keys, and passed 40/40 locally — early matches are the ones whose
+  producer is still writing when `grep -q` leaves. It reddened the v0.28.1 tag
+  run. `init.sh` and `doctor.sh` both used `find … | grep -q .` to decide
+  whether a directory holds rules, where a SIGPIPEd `find` reads as "empty" and
+  the directory is skipped.
+
+  Every `cmd | grep -q` in the repo is now a here-string, `find … | grep -q .`
+  is `find … -print -quit`, and `tests/lib.sh` documents the hazard where
+  `pipefail` is set.
+
 ### Added
 - **`make release-check` — the gate that refuses to tag on a red or pending CI
   run.** Until now this was a practice held by hand, and it was held through
@@ -2213,7 +2248,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.26.1...v0.27.0
