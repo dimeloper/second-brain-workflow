@@ -15,8 +15,8 @@ Cursor, Claude Code, and `AGENTS.md`.
 markdown vault. And **the promotion gate is manual by design** — nothing
 promotes a note on your behalf, because a counter that promoted itself would
 measure writing, not re-application. Both are decisions, not missing features.
-If you wanted automation, this is the wrong tool and the next 200 lines will not
-change that.
+If you wanted automation, this is the wrong tool and nothing further down
+changes that.
 
 ![Knowledge graph showing practice notes growing sparse-to-dense across three phases — Session 1, a few sessions later, and months in — as they mature from idea to trialing to enforced, Obsidian graph-view style.](docs/impact.svg)
 
@@ -54,8 +54,8 @@ Row 2 is the demo. It is immediate and legible in a screenshot.
 
 ## Quickstart
 
-Four commands and an afternoon. Substitute two placeholders — `VAULT_ID` and
-`YOUR_ACCOUNT` — and the rest is paste-and-run.
+An afternoon, and two placeholders to substitute — `VAULT_ID` and
+`YOUR_ACCOUNT`. The rest is paste-and-run.
 
 `make init` explains what the engine does, prints every configuration key with
 its current value and where that value came from, and shows the config it would
@@ -64,8 +64,22 @@ write — changing nothing until you add `YES=1`.
 ```bash
 git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
+latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+echo "latest = $latest"                       # empty means no release yet
+[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
+git submodule update --init --recursive       # a tag checkout does not move the pin
+
 make init                                     # read this; it writes nothing
 ```
+
+**Pin the release; don't track `main`.** The vault CI templates pin
+`ENGINE_REF` to a tag, and `make upgrade` warns about a vault workflow that
+pins nothing on the grounds that its checks then run against whatever `main`
+is. An unpinned local checkout is the same hazard from the other side: the
+pre-commit hook and the CI backstop stop enforcing the same code, and CI exists
+precisely to catch what `--no-verify` skips. The `git submodule update` line is
+not optional either — a tag checkout after `--recurse-submodules` leaves
+`vendor/obsidian-skills` at whatever `main` pinned.
 
 **The vault comes before the config**, because `init-vault.sh` writes the vault
 path and its id *together*, and that pairing is what stops them disagreeing.

@@ -37,11 +37,56 @@ write release notes, not two to keep in sync by hand.
   who wanted automation and keeps the ones who would actually use this.
 - Every cross-file link into a moved section was repointed rather than left to
   resolve to nothing: `GUARD.md`, `NEW-MACHINE.md`, `CHANGELOG.md`,
-  `docs/vault-ci/README.md`, and one message `upgrade.sh` prints. `doc_links.py`
-  only checks same-document anchors, so a stale `../README.md#…` would have gone
-  unreported — which is why `docs/REFERENCE.md` was added to every doc check in
-  `test-doc-snippets.sh` at the same time, rather than shipping a reader-facing
-  document with less checking than the one it was carved out of.
+  `docs/vault-ci/README.md`, and one message `upgrade.sh` prints.
+  `docs/REFERENCE.md` was added to every doc check in `test-doc-snippets.sh` at
+  the same time, rather than shipping a reader-facing document with less
+  checking than the one it was carved out of.
+
+### Added
+- **`doc_links.py` now checks cross-file anchors, not just same-document ones.**
+  Moving the README's deep links into `REFERENCE.md` put the entire "why this
+  doesn't rot" section — the part carrying the trust argument — behind links the
+  checker could not see, where a heading renamed in the target would break the
+  pitch silently. Careful manual repointing is not a check, and this is the
+  shape this codebase keeps catching itself on: something the tooling cannot
+  determine falls through to green.
+
+  A link of the form `path#anchor` now resolves `path` relative to the file
+  holding it and checks the anchor against that file's headings. All seven of
+  the README's deep links pass today, so it lands green; renaming a heading in
+  `REFERENCE.md` turns `make check` red and names every caller. Two things it
+  still does not cover, stated so its green is not read as broader than it is:
+  external links, and a cross-file path that does not resolve at all.
+
+### Fixed
+- **The Quickstart stopped pinning a release.** The restructure dropped the
+  three tag-resolution lines, making a clone of `main` the default path. The
+  vault CI templates pin `ENGINE_REF` to a tag, and `upgrade.sh` warns about a
+  vault workflow that pins nothing on the grounds that its checks then run
+  against whatever `main` is — so the README was recommending, for the local
+  hook, precisely what the tooling warns about for CI. That pair has to agree:
+  CI exists to catch what `--no-verify` skips, and if the pre-commit hook runs
+  several unreleased commits ahead of the ref CI checks out, the two tiers
+  enforce different code. On a repo that shipped four same-day patches in one
+  week, that divergence has a half-life of hours.
+
+  Restored, along with the `git submodule update --init --recursive` line that
+  is not optional beside it — a tag checkout after `--recurse-submodules` leaves
+  `vendor/obsidian-skills` at whatever `main` pinned, which the rollback section
+  already knew. Two assertions now hold both lines in place. Demoting the pin to
+  `NEW-MACHINE.md` would have been fine as documentation; making unpinned the
+  default path was not.
+- A prose count the document contradicted: the Quickstart said "four commands"
+  over five (six on the adopt branch). It now states no number, which is the
+  only version that cannot drift. Same treatment for "the next 200 lines will
+  not change that", which was accurate at 222 lines and would not have stayed
+  so. This is the class `stated_counts.py` polices, one boundary outside what it
+  can see — a count in prose rather than over a list.
+- Suite 1035 → 1040 assertions. The first pass of this restructure added none:
+  the doc-check file lists grew to include `REFERENCE.md`, which is the right
+  instinct, but those are single assertions over a list, so coverage did not
+  actually rise alongside the largest reader-facing change in the repo's
+  history.
 
 ## [0.26.1] - 2026-08-12
 
