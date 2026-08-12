@@ -41,10 +41,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
-from lib.followups import current_repo, display, flag_for  # noqa: E402
+from lib.followup_threads import as_threads, build  # noqa: E402
+from lib.followups import annotate, current_repo, display  # noqa: E402
+from lib.followups import done_followups, flag_for  # noqa: E402
 from lib.followups import group_for_repo  # noqa: E402
 from lib.followups import note_context_repo, open_followups  # noqa: E402
 from lib.followups import repo_file_index, vault_repos  # noqa: E402
+from lib.landed import CLOSED, LANDED, UNCHECKED, evaluate  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
 DATE_NOTE_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\.md$')
@@ -82,16 +85,26 @@ RECENT_SEARCH_CAP_DAYS = 90
 
 
 def collect(notes, as_of, known_repos):
-    out = []
+    """(open items, ticked items) across `notes`, both as records.
+
+    The ticked ones are never reported. They are collected because an item
+    ticked off in a later note closes the same task still sitting unchecked in an
+    older one — see lib/followup_threads.build.
+    """
+    out, done = [], []
     for note_date, path in notes:
         text = path.read_text(encoding="utf-8")
         # Resolved once per note, not once per item — every item in a note
         # shares it.
         context = note_context_repo(text, known_repos) if known_repos else None
-        for item in open_followups(text):
-            out.append({"date": note_date, "age": (as_of - note_date).days,
-                        "item": item, "context": context, "flag": flag_for(item)})
-    return out
+
+        def record(item, note_date=note_date, context=context):
+            return {"date": note_date, "age": (as_of - note_date).days,
+                    "item": item, "context": context, "flag": flag_for(item)}
+
+        out.extend(record(item) for item in open_followups(text))
+        done.extend(record(item) for item in done_followups(text))
+    return out, done
 
 
 def audit(vault, stale_days, as_of, known_repos=frozenset()):
@@ -111,7 +124,7 @@ def recent(vault, count, as_of, known_repos=frozenset()):
     been sitting — but it never decides membership, which is the whole difference
     from audit() above.
 
-    Returns (items, notes_used). Search stops at RECENT_SEARCH_CAP_DAYS so a vault
+    Returns (items, ticked, notes_used). Search stops at RECENT_SEARCH_CAP_DAYS so a vault
     whose notes thin out reports what it found instead of walking its whole
     history; the caller says so rather than implying the window was full.
     """
@@ -119,7 +132,8 @@ def recent(vault, count, as_of, known_repos=frozenset()):
               if 0 <= (as_of - d).days <= RECENT_SEARCH_CAP_DAYS]
     picked = sorted(within, key=lambda pair: pair[0], reverse=True)[:count]
     picked.sort(key=lambda pair: pair[0])
-    return collect(picked, as_of, known_repos), [d for d, _ in picked]
+    stale, done = collect(picked, as_of, known_repos)
+    return stale, done, [d for d, _ in picked]
 
 
 def line_for(s):
@@ -128,6 +142,110 @@ def line_for(s):
     # first" section that then re-lists them under their repo breaks it.
     mark = f"[{s['flag']}] " if s.get("flag") else ""
     return f"  - {s['date'].isoformat()} ({s['age']} days open): {mark}{display(s['item'])}"
+
+
+def lines_for(s, note=None, show_repo=False):
+    """Every line one thread occupies: the item, then what is known about it.
+
+    The date is the thread's *first* mention and the age is measured from it,
+    while the text is the *newest* wording — so the continuation line has to say
+    which dates the restatements were, or a reader comparing the report against
+    their notes finds text on 08-11 dated 08-08 and has no way to reconcile it.
+
+    Both continuation lines are conditional, so an item mentioned once with
+    nothing checkable in it renders exactly as it always did.
+    """
+    out = [line_for(s) + basis_suffix(note)]
+    if s.get("restated"):
+        trail = ", ".join(d.strftime("%m-%d") for d in s["dates"][1:])
+        out.append(f"      restated {trail} — newest wording shown")
+    for verdict in s.get("verdicts", ()):
+        # The repo is named only where the line has no heading telling you it —
+        # under "This repo" it would repeat identically all the way down, which
+        # is what basis_suffix already refuses to do for the same reason.
+        where = f" · {verdict.repo}" if show_repo and verdict.repo else ""
+        out.append(f"      [{verdict.state}] {verdict.detail}{where}")
+    return out
+
+
+def already_done(thread):
+    """Does the repo say this is finished? Merged, or a PR closed unmerged.
+
+    Both belong in the same block and neither ticks anything off: a merged PR is
+    almost certainly done and a closed one almost certainly isn't, and the report
+    is not in a position to tell which of the two the item's other half — "and
+    ship a TestFlight build" — is in. So it asks.
+    """
+    return any(v.state in (LANDED, CLOSED) for v in thread.get("verdicts", ()))
+
+
+def counted(bucket):
+    """"(3)" when nothing collapsed, "(3 threads, 6 items)" when it did.
+
+    The item count never disappears. Collapsing restatements is the one thing
+    here that makes a number go down, so the number it went down from stays on
+    the line — an unexplained 3 where the notes plainly show 6 is exactly the
+    kind of quiet arithmetic that makes a report untrustworthy.
+    """
+    items = sum(len(t["dates"]) for t, _ in bucket)
+    if items == len(bucket):
+        return f"{len(bucket)}"
+    return f"{len(bucket)} threads, {items} items"
+
+
+def lift_done(groups):
+    """Pull the finished-looking threads out into a bucket of their own.
+
+    A fourth bucket rather than a marker in place, because these are the only
+    ones with an action attached — confirm and tick — and because they are worth
+    reading whatever repo they belong to, the same reasoning that promotes a
+    blocker or a live credential. Every thread still appears exactly once.
+    """
+    done, rest = [], []
+    for bucket in groups:
+        kept = []
+        for thread, note in bucket:
+            (done if already_done(thread) else kept).append((thread, note))
+        rest.append(kept)
+    # Stable across buckets: mine, elsewhere, unknown — then oldest first, which
+    # is how everything else in this report is ordered.
+    done.sort(key=lambda pair: pair[0]["date"])
+    return done, tuple(rest)
+
+
+GH_MISSING_SUFFIX = "gh not installed"
+
+
+def check_landed(threads):
+    """Stamp each thread with what its repo says about it. -> footer lines.
+
+    Refs are read from *every* member of a thread, not just the newest wording.
+    A restatement routinely drops the branch name it opened with once the author
+    stops needing the reminder, and the reference is still the best evidence
+    available about the same task.
+
+    The one reason hoisted out of the per-item lines is a missing `gh`: it is a
+    fact about the machine rather than about any item, and printed in place it
+    would repeat the same sentence under every pull request in the report.
+    """
+    subjects = [(i, " ".join(m["item"] for m in t["members"]), t.get("repo"))
+                for i, t in enumerate(threads)]
+    results = evaluate(subjects)
+
+    gh_missing = 0
+    for i, thread in enumerate(threads):
+        kept = []
+        for verdict in results.get(i, ()):
+            if verdict.state == UNCHECKED and verdict.detail.endswith(GH_MISSING_SUFFIX):
+                gh_missing += 1
+                continue
+            kept.append(verdict)
+        thread["verdicts"] = kept
+
+    if gh_missing:
+        return ["", f"{gh_missing} item(s) name a pull request, but gh is not "
+                    "installed — their state is unchecked."]
+    return []
 
 
 def basis_suffix(note):
@@ -167,7 +285,23 @@ def elsewhere_tally(elsewhere, unknown):
     return tally
 
 
-def brief_report(stale, vault, header, repo, basis, groups):
+def done_block(done):
+    """The "confirm and tick" section, or nothing at all.
+
+    Printed above everything else because it is the only part of the report with
+    a cheap action attached, and because it is the part most likely to be wrong
+    in the reader's favour — an item they have been carrying for four days that
+    the repo says landed on Tuesday.
+    """
+    if not done:
+        return []
+    lines = ["", f"Looks already done ({counted(done)}) — confirm before ticking"]
+    for thread, note in done:
+        lines.extend(lines_for(thread, note, show_repo=True))
+    return lines
+
+
+def brief_report(stale, vault, header, repo, basis, groups, done=(), footers=()):
     """This repo in full; every other repo as a count. Nothing dropped.
 
     The asymmetry is the point: run from a repo, the items you can act on now are
@@ -176,22 +310,25 @@ def brief_report(stale, vault, header, repo, basis, groups):
     place. What survives collapsing is anything flagged — a blocker or a live
     credential — because that urgency is not about which repo you are in, and
     hiding it behind a count would be the one genuinely harmful omission here.
+    Something the repo says has already landed survives it for the same reason.
     """
     mine, elsewhere, unknown = groups
     lines = [f"second-brain-workflow follow-ups audit — vault: {vault}", "", header]
     lines.append(f"Brief: `{repo}` (from {basis}) in full, other repos as counts. "
                  "Nothing is filtered — run without --brief for every item.")
 
+    lines.extend(done_block(done))
+
     promoted = [(s, note) for s, note in (elsewhere + unknown) if s.get("flag")]
     if promoted:
         lines.extend(["", f"Whatever repo it is in ({len(promoted)})"])
         for s, note in promoted:
-            lines.append(line_for(s) + basis_suffix(note))
+            lines.extend(lines_for(s, note, show_repo=True))
 
-    lines.extend(["", f"This repo — {repo} ({len(mine)})"])
+    lines.extend(["", f"This repo — {repo} ({counted(mine)})"])
     if mine:
         for s, note in mine:
-            lines.append(line_for(s) + basis_suffix(note))
+            lines.extend(lines_for(s, note))
     else:
         lines.append("  (nothing open for this repo)")
 
@@ -199,14 +336,29 @@ def brief_report(stale, vault, header, repo, basis, groups):
     if rest:
         note = (f" — {len(promoted)} of them listed above"
                 if promoted else "")
-        lines.extend(["", f"Elsewhere ({rest}){note}"])
+        lines.extend(["", f"Elsewhere ({counted(elsewhere + unknown)}){note}"])
         lines.append("  " + " · ".join(f"{name} {n}" for name, n in
                                        elsewhere_tally(elsewhere, unknown)))
+    lines.extend(footers)
     return "\n".join(lines)
 
 
+def total_phrase(threads):
+    """The count on the summary line: items, and threads when they differ.
+
+    Items first and always, because that is the number that matches what the
+    reader can count in their own notes. The thread count is what the rest of the
+    report is organised by, so both have to be on the line or one of them looks
+    like an error.
+    """
+    items = sum(len(t["dates"]) for t in threads)
+    if items == len(threads):
+        return str(items)
+    return f"{items} in {len(threads)} threads"
+
+
 def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
-           window=None, brief=False):
+           window=None, brief=False, done=(), footers=()):
     """The audit as text. Oldest first, and grouped by repo when we know one.
 
     The count line comes before any grouping and counts everything, so the
@@ -225,31 +377,36 @@ def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
             short = "" if len(dates) == asked else \
                 f" — only {len(dates)} exist within {RECENT_SEARCH_CAP_DAYS} days"
             lines.append(f"Open follow-ups in the last {len(dates)} notes "
-                         f"({span}): {len(stale)}{short}")
+                         f"({span}): {total_phrase(stale)}{short}")
     else:
-        lines.append(f"Open follow-ups older than {stale_days} days: {len(stale)}")
+        lines.append(f"Open follow-ups older than {stale_days} days: "
+                     f"{total_phrase(stale)}")
 
     if not stale or groups is None:
         for s in stale:
-            lines.append(line_for(s))
+            lines.extend(lines_for(s, show_repo=True))
+        lines.extend(footers)
         return "\n".join(lines)
 
     if brief:
-        return brief_report(stale, vault, lines[-1], repo, basis, groups)
+        return brief_report(stale, vault, lines[-1], repo, basis, groups, done,
+                            footers)
 
     mine, elsewhere, unknown = groups
     lines.append(f"Grouped by repo. This repo is `{repo}` (from {basis}); "
                  "every item above is listed below exactly once.")
-    for title, bucket in (
-        (f"This repo — {repo} ({len(mine)})", mine),
-        (f"Other repos ({len(elsewhere)})", elsewhere),
-        (f"No repo identified ({len(unknown)})", unknown),
+    lines.extend(done_block(done))
+    for title, bucket, show_repo in (
+        (f"This repo — {repo} ({counted(mine)})", mine, False),
+        (f"Other repos ({counted(elsewhere)})", elsewhere, True),
+        (f"No repo identified ({counted(unknown)})", unknown, True),
     ):
         if not bucket:
             continue
         lines.extend(["", title])
         for s, note in bucket:
-            lines.append(line_for(s) + basis_suffix(note))
+            lines.extend(lines_for(s, note, show_repo))
+    lines.extend(footers)
     return "\n".join(lines)
 
 
@@ -267,6 +424,16 @@ def main():
                     help="this repo's items in full, every other repo as a count. "
                          "Anything flagged blocked or credential is still shown in "
                          "full whatever repo it is in. Nothing is filtered.")
+    ap.add_argument("--no-threads", action="store_true",
+                    help="report every restatement of a carried-forward item "
+                         "separately, instead of collapsing them into one thread "
+                         "aged from when it was first raised")
+    ap.add_argument("--landed", action="store_true",
+                    help="check items naming a PR, branch or commit against that "
+                         "repo's main branch. On by default with --recent.")
+    ap.add_argument("--no-landed", action="store_true",
+                    help="never look at another repo, and never call gh. This is "
+                         "the default for the --stale-days audit.")
     ap.add_argument("--recent", type=int, metavar="N", nargs="?", const=4,
                     help="the check-follow-ups window instead of an age cutoff: "
                          "every open item in the N most recent notes that exist "
@@ -283,6 +450,8 @@ def main():
     # list under a heading promising brevity.
     if args.brief and args.no_repo_grouping:
         ap.error("--brief and --no-repo-grouping are opposites; pick one")
+    if args.landed and args.no_landed:
+        ap.error("--landed and --no-landed are opposites; pick one")
 
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
     vault = resolve_vault(args.vault, cfg)
@@ -308,18 +477,44 @@ def main():
 
     window = None
     if args.recent is not None:
-        stale, dates = recent(vault, args.recent, as_of, known)
+        items, ticked, dates = recent(vault, args.recent, as_of, known)
         window = (args.recent, dates)
     else:
-        stale = audit(vault, args.stale_days, as_of, known)
+        items, ticked = audit(vault, args.stale_days, as_of, known)
+
+    # Attribution happens here rather than inside the grouping, because
+    # threading needs each item's repo before there is anything to group.
+    repo_files = repo_file_index(Path.cwd()) if repo else None
+    for records in (items, ticked):
+        annotate(records, known, repo, repo_files,
+                 text=lambda s: s["item"], context=lambda s: s["context"])
+
+    footers = []
+    if args.no_threads:
+        stale = as_threads(items)
+    else:
+        stale, closed_later = build(items, as_of, ticked)
+        if closed_later:
+            footers.extend(["", f"{len(closed_later)} thread(s) left unchecked in an "
+                                "older note are ticked off in a newer one, and are "
+                                "not listed. --no-threads shows them."])
+
+    # Default on for the skill's window, off for the long-range audit — which is
+    # what `make audit` and the vault's CI job run, on a machine with no repo
+    # checkouts and no gh auth. An audit that started making network calls would
+    # be a different tool than the one those two agreed to run.
+    if args.landed or (args.recent is not None and not args.no_landed):
+        footers.extend(check_landed(stale))
 
     # No repo to compare against means nothing could land in "this repo", and
     # three headings over one populated bucket is worse than no headings at all.
     # Fall back to the flat list and say why.
+    done = ()
     if repo:
-        groups = group_for_repo(stale, repo, known, repo_file_index(Path.cwd()),
+        groups = group_for_repo(stale, repo, known, repo_files,
                                 text=lambda s: s["item"],
                                 context=lambda s: s["context"])
+        done, groups = lift_done(groups)
     elif stale and not args.no_repo_grouping:
         print(f"note: not grouping by repo — {basis}.", file=sys.stderr)
         if args.brief:
@@ -327,7 +522,8 @@ def main():
                   "showing every item.", file=sys.stderr)
 
     print(report(stale, vault, args.stale_days, repo, basis, groups, window,
-                 brief=args.brief and groups is not None))
+                 brief=args.brief and groups is not None, done=done,
+                 footers=footers))
     return 0
 
 

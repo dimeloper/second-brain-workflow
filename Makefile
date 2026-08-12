@@ -85,6 +85,7 @@ lint-python:
 	  scripts/check-followups.py scripts/check-rules.py scripts/rule-budget.py scripts/lib/config.py \
 	  scripts/lib/frontmatter.py scripts/lib/registry.py scripts/lib/skill_manifest.py \
 	  scripts/lib/repo_match.py scripts/lib/promotion.py scripts/practices-for.py \
+	  scripts/lib/followups.py scripts/lib/followup_threads.py scripts/lib/landed.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real

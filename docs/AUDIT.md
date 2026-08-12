@@ -161,6 +161,34 @@ current repo, then the note's `## Built` context.
 ./scripts/check-followups.py --recent --brief             # this repo in full, others tallied
 ```
 
+An item carried forward by hand — rewritten into a later note because it is
+still open, and reworded on the way — is reported once, as a **thread**: dated
+and aged from its first mention, shown in its newest wording, with a
+`restated 08-10, 08-11` line naming the notes in between. A heading reading
+`(3 threads, 6 items)` means three tasks written across six lines. Matching
+requires the same repo and two different notes, so two items written side by side
+in one day's section are never collapsed however alike they read. `--no-threads`
+reports every restatement separately.
+
+An item naming a pull request, a branch, or a commit can also be checked against
+that repo's main branch, and is annotated `[landed]`, `[closed]` (a PR closed
+without merging), `[open]`, or `[unchecked]` with the reason. This is **on with
+`--recent` and off here** — the `make audit` invocation above runs neither `gh`
+nor git against another checkout, which is what keeps it working on the vault's
+CI runner, where no repo is checked out and `gh` is unauthenticated. `--landed`
+opts in anyway; `--no-landed` opts out of the skill's window.
+
+```bash
+./scripts/check-followups.py --recent --no-threads   # every restatement separately
+./scripts/check-followups.py --landed                # check refs during the audit too
+```
+
+Repos are located by name through the render registry first, then a walk of
+`SBW_SCAN_ROOTS` bounded by `SBW_SCAN_DEPTH`, with hits cached in
+`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repo-paths`. A repo whose
+directory name differs from its origin is not found by the walk; add a
+`name<TAB>path` line to that file and it is.
+
 `--recent [N]` swaps the age cutoff for the `check-follow-ups` skill's window —
 the N most recent notes that exist (default 4), today included, chosen by note
 count and never by age, so a vacation-length gap costs nothing. It is the same

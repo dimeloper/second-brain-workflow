@@ -7,9 +7,16 @@
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 setup_sandbox
 
+# The landed check reads the render registry and writes a repo-path cache, both
+# under ${XDG_CONFIG_HOME:-~/.config}. isolate_home covers the second half of
+# that default; this covers the first, so a developer who exports the variable
+# cannot have their real config read or written by this suite.
+export XDG_CONFIG_HOME="${SANDBOX}/config-home"
+
 CHECK="${ENGINE}/scripts/check-followups.py"
 FVAULT="${FIXTURES}/followups/vault"
 RVAULT="${FIXTURES}/followups/repos-vault"
+TVAULT="${FIXTURES}/followups/threads-vault"
 AS_OF="2026-08-03"
 
 # --no-repo-grouping for the window/staleness assertions below: without it the
@@ -468,5 +475,256 @@ esac
 "${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 --brief \
   --no-repo-grouping >/dev/null 2>&1
 assert_exit 2 "$?" "--brief and --no-repo-grouping are refused together"
+
+# --- carried forward by hand is one thread, not three --------------------
+#
+# The reported defect: with no automatic carry-forward, a still-open item gets
+# rewritten into today's note and reworded, so one task was counted once per
+# rewrite *and* aged from the newest one — a four-day-old task reading as one
+# day old. --no-landed throughout: whether two items are the same task is a
+# question about text, and testing it must not need a network or another repo.
+threads() {
+  "${CHECK}" --vault "${TVAULT}" --as-of 2026-01-06 --recent 3 --no-landed "$@"
+}
+
+out_t="$(threads --repo alpha-service 2>/dev/null)"
+assert_exit 0 "$?" "a vault full of restatements is still never a build break"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_t}" in
+  *"11 in 7 threads"*) pass "restatements collapse, and both counts stay on the line" ;;
+  *) fail "restatements collapse, and both counts stay on the line" "${out_t}" ;;
+esac
+
+# The whole point: the age is the first mention's, the wording is the newest.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_t}" in
+  *"2026-01-02 (4 days open): Merge barcode PR #28 and ship a TestFlight build"*)
+    pass "a thread is aged from its first mention and shown in its newest wording" ;;
+  *) fail "a thread is aged from its first mention and shown in its newest wording" "${out_t}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_t}" in
+  *"restated 01-04, 01-06 — newest wording shown"*)
+    pass "the restatement dates are named, so the report reconciles with the notes" ;;
+  *) fail "the restatement dates are named, so the report reconciles with the notes" "${out_t}" ;;
+esac
+
+# Two items sharing a leading clause *in the same note* are two tasks. This is
+# the guard that makes the leading-clause signal safe to have at all.
+smoke="$(printf '%s\n' "${out_t}" | grep -c 'Smoke check:' || true)"
+assert_str "2" "${smoke}" "two same-clause items in one note stay two threads"
+
+# ...and the same clause across two notes, with a wholly rewritten body, is one.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_t}" in
+  *"Device retest: known barcode plus the miss path"*)
+    fail "a rewritten body still threads on its leading clause" "the older wording is still listed" ;;
+  *"Device retest: real hit plus a Greek miss"*)
+    pass "a rewritten body still threads on its leading clause" ;;
+  *) fail "a rewritten body still threads on its leading clause" "${out_t}" ;;
+esac
+
+# Restated *shorter* — the shape Jaccard alone scores below the floor, because
+# it punishes the longer version for carrying an explanation the other dropped.
+console="$(printf '%s\n' "${out_t}" | grep -c 'Create the app record' || true)"
+assert_str "1" "${console}" "a restatement that drops detail is still the same thread"
+
+# Same sentence, different repo: never one task. An item's repo is the one
+# precondition that is never traded off against how similar the words are.
+barcode="$(printf '%s\n' "${out_t}" | grep -c 'Merge barcode PR #28' || true)"
+assert_str "2" "${barcode}" "an identical item under another repo is never merged in"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_t}" in
+  *"No repo identified (1)"*) pass "an unattributed item never merges into an attributed one" ;;
+  *) fail "an unattributed item never merges into an attributed one" "${out_t}" ;;
+esac
+
+# Ticked off in a newer note while an older note still shows it unchecked. The
+# one thing threading removes, so it is counted rather than silently dropped.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_t}" in
+  *"1 thread(s) left unchecked in an older note"*)
+    pass "an item ticked off later closes the thread, and the report says so" ;;
+  *) fail "an item ticked off later closes the thread, and the report says so" "${out_t}" ;;
+esac
+
+out_raw="$(threads --repo alpha-service --no-threads 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_raw}" in
+  *"2026-01-02..2026-01-06): 12"*) pass "--no-threads restores every restatement, including the ticked-off one" ;;
+  *) fail "--no-threads restores every restatement, including the ticked-off one" "${out_raw}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_raw}" in
+  *restated*) fail "--no-threads says nothing about restatements" "${out_raw}" ;;
+  *) pass "--no-threads says nothing about restatements" ;;
+esac
+
+# --- has it already landed? ----------------------------------------------
+#
+# Built here rather than checked in as a fixture, because the assertions are
+# about real commit ancestry and a fixture cannot carry a SHA that will still be
+# a SHA after the next clone. Everything is inside the sandbox: the repo lives
+# under the sandbox HOME so the default scan root finds it, and `gh` is a stub on
+# PATH, so no assertion below depends on a network or on a real GitHub account.
+LSAND="${SANDBOX}/landed"
+LVAULT="${LSAND}/vault"
+LREPO="${HOME}/landed-repo"
+GH_SENTINEL="${LSAND}/gh-was-called"
+mkdir -p "${LVAULT}" "${LSAND}/bin" "${LREPO}"
+export GH_SENTINEL
+
+git -C "${LREPO}" init -q
+git -C "${LREPO}" symbolic-ref HEAD refs/heads/main
+git -C "${LREPO}" config user.email "test@example.com"
+git -C "${LREPO}" config user.name "Test"
+gitc() { git -C "${LREPO}" "$@" >/dev/null 2>&1; }
+gitc commit -q --allow-empty -m "base"
+gitc checkout -q -b feature/merged
+gitc commit -q --allow-empty -m "landed work"
+sha_landed="$(git -C "${LREPO}" rev-parse --short HEAD)"
+gitc checkout -q main
+gitc merge -q --no-ff -m "merge feature/merged" feature/merged
+gitc checkout -q -b feature/open
+gitc commit -q --allow-empty -m "unlanded work"
+sha_open="$(git -C "${LREPO}" rev-parse --short HEAD)"
+gitc checkout -q main
+
+cat > "${LSAND}/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+# Stands in for `gh pr view N --json ...`. Records that it ran, so a test can
+# assert the audit path never reaches the network.
+printf 'called\n' >> "${GH_SENTINEL}"
+for arg in "$@"; do
+  case "${arg}" in
+    7) printf '{"number":7,"state":"MERGED","mergedAt":"2026-01-01T09:00:00Z"}\n'; exit 0 ;;
+    8) printf '{"number":8,"state":"CLOSED","mergedAt":null}\n'; exit 0 ;;
+    9) printf '{"number":9,"state":"OPEN","mergedAt":null}\n'; exit 0 ;;
+  esac
+done
+printf 'no pull requests found\n' >&2
+exit 1
+STUB
+chmod +x "${LSAND}/bin/gh"
+
+cat > "${LVAULT}/2026-01-02.md" <<EOF
+# 2026-01-02
+
+## Built
+- \`landed-repo\`: several things, some of which have since shipped.
+
+## Follow-ups
+- [ ] Merge the branch \`feature/merged\` and cut a build #repo/landed-repo
+- [ ] Finish the work on \`feature/open\` #repo/landed-repo
+- [ ] Confirm the fix in \`${sha_landed}\` reached production #repo/landed-repo
+- [ ] Review the change in \`${sha_open}\` with the team #repo/landed-repo
+- [ ] Merge PR #7 once review is done #repo/landed-repo
+- [ ] Revisit PR #8, which someone may have abandoned #repo/landed-repo
+- [ ] Wait for PR #9 to be reviewed #repo/landed-repo
+- [ ] Write the release note, which names nothing checkable #repo/landed-repo
+- [ ] Merge PR #7 in a repo nobody has cloned #repo/absent-repo
+EOF
+
+landed() {
+  PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
+    "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 \
+    --repo landed-repo "$@"
+}
+
+out_l="$(landed 2>/dev/null)"
+assert_exit 0 "$?" "a landed check is still never a build break"
+
+for probe in \
+  "[landed] \`feature/merged\` is merged into main|a branch merged into main reads as landed" \
+  "[open] \`feature/open\` not merged into main|a branch that never landed reads as open" \
+  "[landed] \`${sha_landed}\` is on main|a commit on main reads as landed" \
+  "[open] \`${sha_open}\` not on main|a commit only on a side branch reads as open" \
+  "[landed] PR #7 merged 2026-01-01|a merged pull request reads as landed, with its date" \
+  "[closed] PR #8 closed without merging|a pull request closed unmerged is neither done nor open" \
+  "[open] PR #9 open, not merged|an open pull request is reported as open, not guessed at" \
+  "no checkout of \`absent-repo\` found|a repo that is not on this machine says so instead of failing" \
+; do
+  want="${probe%%|*}"
+  name="${probe##*|}"
+  TESTS_RUN=$((TESTS_RUN + 1))
+  case "${out_l}" in
+    *"${want}"*) pass "${name}" ;;
+    *) fail "${name}" "${out_l}" ;;
+  esac
+done
+
+# Merged and closed-unmerged are the two states with an action attached, so all
+# four land in one block — and nothing is ticked on the reader's behalf.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_l}" in
+  *"Looks already done (4) — confirm before ticking"*)
+    pass "finished-looking threads are lifted out as a question, not an action" ;;
+  *) fail "finished-looking threads are lifted out as a question, not an action" "${out_l}" ;;
+esac
+
+# An item with nothing checkable in it costs nothing and is annotated with
+# nothing — no "unchecked" noise on the majority of a real report.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_l}" in
+  *"Write the release note, which names nothing checkable"[!$'\n']*"[")
+    fail "an item naming nothing checkable is left alone" "${out_l}" ;;
+  *) pass "an item naming nothing checkable is left alone" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(landed --no-landed 2>/dev/null)" in
+  *"[landed]"*|*"[open]"*) fail "--no-landed asks the repo nothing" "still probed" ;;
+  *) pass "--no-landed asks the repo nothing" ;;
+esac
+
+# The audit path — `make audit` and the vault's CI job — runs with no --recent,
+# on a machine with no repo checkouts and no gh auth. It must stay offline
+# without anyone having to remember a flag.
+rm -f "${GH_SENTINEL}"
+PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" \
+  "${CHECK}" --vault "${LVAULT}" --as-of 2026-06-01 --stale-days 30 \
+  --repo landed-repo >/dev/null 2>&1
+assert_no_file "${GH_SENTINEL}" "the --stale-days audit never calls gh"
+
+# ...and passing --landed explicitly opts it back in, so the default is a
+# default rather than a restriction.
+PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" \
+  "${CHECK}" --vault "${LVAULT}" --as-of 2026-06-01 --stale-days 30 \
+  --repo landed-repo --landed >/dev/null 2>&1
+assert_file "${GH_SENTINEL}" "--landed opts the audit back in"
+
+"${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 --landed \
+  --no-landed >/dev/null 2>&1
+assert_exit 2 "$?" "--landed and --no-landed are refused together"
+
+# gh absent is a fact about the machine, so it is stated once rather than
+# repeated under every pull request — and it degrades, it does not crash.
+NOGH="${LSAND}/nogh"
+mkdir -p "${NOGH}"
+ln -sf "$(command -v git)" "${NOGH}/git"
+ln -sf "$(command -v python3)" "${NOGH}/python3"
+out_nogh="$(PATH="${NOGH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
+  "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 \
+  --repo landed-repo 2>/dev/null)"
+rc=$?
+assert_exit 0 "${rc}" "a machine with no gh still gets a report"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nogh}" in
+  *"but gh is not installed"*) pass "a missing gh is stated once, not under every pull request" ;;
+  *) fail "a missing gh is stated once, not under every pull request" "${out_nogh}" ;;
+esac
+
+# The git-only verdicts do not need gh and must survive its absence.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nogh}" in
+  *"[landed] \`feature/merged\` is merged into main"*)
+    pass "branch and commit verdicts still work with no gh at all" ;;
+  *) fail "branch and commit verdicts still work with no gh at all" "${out_nogh}" ;;
+esac
 
 finish

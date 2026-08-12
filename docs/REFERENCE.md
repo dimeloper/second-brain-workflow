@@ -709,6 +709,28 @@ only what it says: no configured root could be read, so there was no second
 source to compare against at all. `make uninstall` leaves the registry file
 alone.
 
+### The repo-path cache
+
+`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repo-paths` — `name<TAB>path`
+per line, same blank-line and `#` comment handling, same atomic write. Written by
+[`check-followups.py`'s landed check](AUDIT.md#stale-follow-ups), which has to
+answer a different question than the registry does: not "which repos did this
+machine render into" but "where is the repo this follow-up is *about*". Those
+sets barely overlap — an item can name a repo that was never onboarded, and
+usually does.
+
+So it resolves through the registry first, then one walk of `SBW_SCAN_ROOTS`
+bounded by `SBW_SCAN_DEPTH` — the same two keys and the same boundary the
+onboarding scan above uses — and caches what it finds so only the first run pays
+for the walk. Entries are revalidated on read (the path still exists, is still a
+checkout, still has that origin), and a name that resolves to nothing is *not*
+cached: "not on this machine today" is a fact about today, and remembering it
+would outlive the `git clone` that fixes it.
+
+The walk matches on directory name, so a checkout whose directory differs from
+its origin is not found. Adding the `name<TAB>path` line by hand is the fix, and
+is why the format is the hand-editable one.
+
 ## Versioning
 
 `VERSION` at the repo root —

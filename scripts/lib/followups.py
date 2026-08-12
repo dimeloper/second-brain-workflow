@@ -100,12 +100,11 @@ def flag_for(item):
 FILE_REF_RE = re.compile(r'`([^`\s]*[\w-]+\.[A-Za-z0-9]{1,6}|[^`\s]*/[^`\s]+)`')
 
 
-def open_followups(text):
-    """Text of every `- [ ]` item under `## Follow-ups`, in order, unwrapped.
+def _collect(text, want):
+    """Text of every item under `## Follow-ups` matching `want`, in order.
 
-    A `- [x]` item is done and never reported. A note with no `## Follow-ups`
-    heading yields nothing rather than erroring — notes written before the
-    section existed are still perfectly good notes.
+    A note with no `## Follow-ups` heading yields nothing rather than erroring —
+    notes written before the section existed are still perfectly good notes.
 
     **Wrapped lines are joined into the item they belong to.** These items are
     prose and routinely run to three or four lines; reading only the first was
@@ -132,17 +131,33 @@ def open_followups(text):
         if not in_section:
             continue
 
-        if FOLLOWUP_ITEM_RE.match(line):
+        if want.match(line):
             flush()
-            current = [FOLLOWUP_ITEM_RE.match(line).group(1).strip()]
-        elif FOLLOWUP_DONE_RE.match(line) or line[:1] == "-":
-            flush()  # a done item, or any other top-level bullet: ends this one
+            current = [want.match(line).group(1).strip()]
+        elif line[:1] == "-":
+            flush()  # any other top-level bullet, ticked or not: ends this one
         elif current is not None and line[:1].isspace() and line.strip():
             current.append(line.strip())
         elif not line.strip():
             flush()  # a blank line closes the item; wrapped lines never contain one
     flush()
     return items
+
+
+def open_followups(text):
+    """Every `- [ ]` item under `## Follow-ups` — the things still to do."""
+    return _collect(text, FOLLOWUP_ITEM_RE)
+
+
+def done_followups(text):
+    """Every `- [x]` item under `## Follow-ups` — the things already ticked.
+
+    Not a report of its own: nobody wants a list of what they finished. It is
+    read so that an item ticked off in *today's* note can close the same task
+    left unchecked in an older one, which is otherwise reported as open forever
+    — the older wording is never gone back and edited, and shouldn't have to be.
+    """
+    return _collect(text, FOLLOWUP_DONE_RE)
 
 
 REPO_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
@@ -335,6 +350,25 @@ def repo_file_index(root, limit=20000):
     return paths
 
 
+def annotate(records, known_repos, current=None, repo_files=None, text=None,
+             context=None):
+    """Stamp each record with `repo` and `basis`, in place. -> the same list.
+
+    Attribution used to happen as a side effect of grouping, which was fine while
+    grouping was the only thing that needed it. Threading needs it *earlier* —
+    two items can only be the same task if they belong to the same repo — and
+    doing it twice would mean two answers to one question. So it is a step of its
+    own now, and group_for_repo below reads what this wrote.
+    """
+    get = text or (lambda i: i)
+    ctx = context or (lambda i: None)
+    for record in records:
+        found, basis = attribute(get(record), known_repos, current, repo_files,
+                                 ctx(record))
+        record["repo"], record["basis"] = found, basis
+    return records
+
+
 def group_for_repo(items, repo, known_repos, repo_files=None, text=None, context=None):
     """Split items into (mine, elsewhere, unknown), preserving input order.
 
@@ -353,7 +387,14 @@ def group_for_repo(items, repo, known_repos, repo_files=None, text=None, context
     ctx = context or (lambda i: None)
     mine, elsewhere, unknown = [], [], []
     for item in items:
-        found, basis = attribute(get(item), known_repos, repo, repo_files, ctx(item))
+        # Pre-stamped by annotate() when the caller ran it — grouping must reach
+        # the same verdict as threading did, and the way to guarantee that is to
+        # reuse the answer rather than to recompute it identically.
+        if isinstance(item, dict) and "repo" in item:
+            found, basis = item["repo"], item["basis"]
+        else:
+            found, basis = attribute(get(item), known_repos, repo, repo_files,
+                                     ctx(item))
         if found is None:
             unknown.append((item, None))
         elif repo and found == repo:

@@ -46,6 +46,41 @@ Skip, without erroring, any note found before this section existed (no
 
 Widen the note count on request ("check my tasks going back further").
 
+## Threads
+
+There is no automatic carry-forward, so a still-open item is rewritten into
+today's note by hand — and reworded, because the writer knows more than they did
+yesterday. One task therefore appears once per day it survived:
+
+```
+2026-08-08  Merge Flutter barcode PR #28 and ship TestFlight/store build
+2026-08-10  Merge Flutter barcode PR #28 and ship TestFlight IPA (`1.1.0+24` on `feature/…`)
+2026-08-11  Merge Flutter barcode PR #28 and ship TestFlight IPA (`1.1.0+25`)
+```
+
+Those are **one thread**, and the script reports them as one line:
+
+```
+  - 2026-08-08 (4 days open): Merge Flutter barcode PR #28 and ship TestFlight IPA (`1.1.0+25`)
+      restated 08-10, 08-11 — newest wording shown
+```
+
+Read the two halves correctly when you summarise:
+
+- **the date and the age are the first mention's** — that is the number worth
+  acting on, and reporting the newest restatement's age said "1 day" about a
+  task that had been sitting for four
+- **the text is the newest wording** — it is what the task is *now*
+
+A heading reading `(3 threads, 6 items)` means six lines in the notes, three
+tasks. Say the thread count; the item count is on the line so nothing looks
+quietly dropped.
+
+If a thread was ticked off in a newer note while an older note still shows it
+unchecked, it is closed and not listed, and a footer line says how many. **Read
+that line out** — it is the only thing the report removes. `--no-threads` shows
+every restatement separately.
+
 ## Repo
 
 One day's follow-ups routinely span several repos — a backend, an ingestion
@@ -109,6 +144,37 @@ Attribute each item by, strongest signal first:
 None of those hit? It goes under **No repo identified** — that is a real answer,
 not a failure.
 
+## Landed evidence
+
+An item naming a pull request, a branch, or a commit is checkable, and the
+script checks it against that repo's main branch — `gh` for a PR's real state,
+local `origin/main` ancestry for a branch or a SHA. Items naming none of those
+cost nothing and are annotated with nothing.
+
+| Marker | Means |
+|---|---|
+| `[landed]` | merged — the work is on main |
+| `[closed]` | the PR was closed **without** merging, so the task is still real and the thing you remember doing about it was thrown away |
+| `[open]` | genuinely still open. This is a confirmation, not a nag |
+| `[unchecked]` | could not be established, with the reason on the line |
+
+`[landed]` and `[closed]` threads are lifted into a **Looks already done** block
+above everything else.
+
+**That block is a question, never an action.** Never tick an item because the
+report says it landed. The evidence is about the *ref*, and the item usually
+says more than the ref does — "Merge PR #28 **and ship a TestFlight build**" is
+half done when the PR merges. Read the block out, say what the evidence is, and
+tick only what the user confirms, via step 6 below.
+
+Never hide an `[unchecked]`. "No checkout of `foo` found under SBW_SCAN_ROOTS"
+is a fact about this machine the user can fix in one line; swallowing it turns a
+fixable gap into an item that silently never gets checked.
+
+The check never runs `git fetch`, so a branch or commit verdict is only as
+current as that checkout's last fetch — which is why those lines carry a
+`(last fetched 2d ago)` note. A PR verdict is live.
+
 ### Run the script rather than re-implementing this
 
 All of the above is already implemented. **This skill directory contains only
@@ -120,7 +186,14 @@ a relative `scripts/...` path will not resolve:
 ~/second-brain-workflow/scripts/check-followups.py --recent           # expand everything
 ~/second-brain-workflow/scripts/check-followups.py --recent --repo NAME
 ~/second-brain-workflow/scripts/check-followups.py --recent 8         # look further back
+~/second-brain-workflow/scripts/check-followups.py --recent --no-threads   # every restatement
+~/second-brain-workflow/scripts/check-followups.py --recent --no-landed    # skip the repo checks
 ```
+
+`--recent` already implies both threading and the landed check. Reach for
+`--no-threads` when the user disputes a collapse and wants the raw items, and
+for `--no-landed` when they want the answer immediately and the repo checks are
+costing seconds they don't want to spend.
 
 **Run it with `--brief` first.** It computes exactly the shape described above —
 this repo in full, others tallied, flagged items lifted out — so the collapsing is
@@ -181,7 +254,12 @@ There is no automatic carry-forward. An item unchecked in a note outside the
 window (older than the 3 found, or beyond the 90-day search cap) silently
 drops out of the report. If something is still open, rewrite it into today's
 `## Follow-ups` so it stays inside the window — don't rely on widening the
-lookback indefinitely.
+lookback indefinitely. **Rewrite it freely**: the rewrite is recognised as the
+same thread and keeps its original age, so there is no reason to preserve
+yesterday's wording for a task you now understand better.
+
+**It never ticks anything off by itself**, whatever the repo says. A merged PR
+is evidence, and step 6 is still the only write — after the user confirms.
 
 **It never filters by repo, and never hides an item it couldn't attribute.**
 Attribution is best-effort and "No repo identified" is a normal, populated
