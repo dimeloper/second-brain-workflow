@@ -96,7 +96,20 @@ norun()   { : > "${RUNS}"; }
 GH_UNAUTHED=1 run >/dev/null 2>&1
 assert_exit 2 "$?" "an unauthenticated gh is refused, not treated as no findings"
 
-out="$(PATH="/usr/bin:/bin" "${CHECK}" 2>&1)"
+# A PATH of /usr/bin:/bin does NOT remove gh — the Ubuntu runners ship it in
+# /usr/bin, so that spelling tested "gh present but unauthenticated" there while
+# testing "gh absent" here, and the two produce different messages. A directory
+# holding symlinks to exactly the commands the script needs, and nothing named
+# gh, is absent-everywhere by construction.
+NOGH="${SANDBOX}/nogh"
+mkdir -p "${NOGH}"
+# bash included deliberately: the shebang is `/usr/bin/env bash`, and env
+# resolves bash through PATH — leave it out and the script exits 127 before it
+# can refuse anything, which is a pass for the wrong reason.
+for tool in bash git dirname tr sed awk cut date sleep grep; do
+  ln -sf "$(command -v "${tool}")" "${NOGH}/${tool}"
+done
+out="$(PATH="${NOGH}" "${CHECK}" 2>&1)"
 rc=$?
 assert_exit 2 "${rc}" "no gh at all is refused — there is no local substitute"
 TESTS_RUN=$((TESTS_RUN + 1))
