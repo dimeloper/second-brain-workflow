@@ -421,8 +421,7 @@ VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-ski
 
 ### Bringing your own skills
 
-The engine ships a handful of skills of its own and tracks one pinned upstream
-set. It
+The engine ships five skills of its own and tracks one pinned upstream set. It
 does **not** ship a roster of other people's skills, for the same reason
 [`rules/`](#one-rule-set-every-agent) ships empty: a curated selection of someone
 else's craft skills is an opinion, and the engine's job is the mechanism.

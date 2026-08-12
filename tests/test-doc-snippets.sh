@@ -170,6 +170,29 @@ case "${QS}" in
   *) fail "and vault_path is derived from it, so the two cannot disagree" "${QS}" ;;
 esac
 
+# --- the skill count the docs state matches the skills that exist ------------
+# "five" sat in two files with nothing checking it — the same class as the
+# Quickstart's "four commands", one skill away from being wrong in two places at
+# once. Stating no number was the other way out, and vaguer prose is the option
+# that never drifts; the count is worth something to a reader deciding whether
+# to adopt, so it stays and becomes checkable instead.
+skill_count="$(find "${ENGINE}/skills" -name SKILL.md | wc -l | tr -d ' ')"
+case "${skill_count}" in
+  1) skill_word=one ;;   2) skill_word=two ;;   3) skill_word=three ;;
+  4) skill_word=four ;;  5) skill_word=five ;;  6) skill_word=six ;;
+  7) skill_word=seven ;; 8) skill_word=eight ;; 9) skill_word=nine ;;
+  *) skill_word="${skill_count}" ;;
+esac
+for doc in README.md docs/REFERENCE.md; do
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if grep -q "ships ${skill_word} " "${ENGINE}/${doc}"; then
+    pass "${doc} says the engine ships ${skill_word}, which is how many exist"
+  else
+    fail "${doc} says the engine ships ${skill_word}, which is how many exist" \
+      "no 'ships ${skill_word}' in ${doc}, but ${skill_count} skill(s) carry a SKILL.md"
+  fi
+done
+
 # --- a heading that states a count over a list of another length -------------
 # "Three rules worth knowing:" over five bullets. Prose and list drift because
 # one grows and the other is a sentence nobody re-reads — four instances across
