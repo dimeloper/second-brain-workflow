@@ -367,7 +367,13 @@ EOF
 
   # Registry ∪ scan. A path in both is one path; sort -u decides that, not the
   # order they arrive in.
-  targets="$(printf '%s\n%s\n' "${entries}" "${scan}" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u)"
+  # `|| true`: with no registry entries and no scan hits, `grep -v` matches
+  # nothing and exits 1, and under `set -o pipefail` that fails the whole
+  # substitution — aborting the run under `set -e` after the heading had already
+  # printed. A machine with no onboarded repos is the state every fresh install
+  # is in, so `make upgrade` died on exactly the machines most likely to run it.
+  targets="$(printf '%s\n%s\n' "${entries}" "${scan}" \
+    | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u || true)"
 
   while IFS= read -r repo; do
     [ -n "${repo}" ] || continue

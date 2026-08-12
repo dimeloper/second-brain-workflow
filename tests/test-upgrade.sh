@@ -334,6 +334,30 @@ out_lacks "undetermined" "and is not called undetermined"
 out_lacks "0 repo" "still never a count of zero repos"
 out_lacks "0 of" "and never zero-of-anything either"
 out_has "scanned scope: roots=${EMPTY_SCAN}" "with the boundary that result holds within"
+# Every assertion above matches text from the *doctor* block, which upgrade
+# prints before its own Onboarded-repos section — so all of them passed while
+# that section aborted mid-print. Under `set -o pipefail`, `grep -v` matching
+# nothing exits 1 and failed the substitution that unions registry and scan,
+# which is the state every machine with no onboarded repos is in. These two
+# assert the section finishes.
+# Counted, not matched: upgrade's own verdict for this state is the *same
+# sentence* doctor prints, and doctor's copy is embedded above — so a presence
+# check cannot tell "both sections finished" from "doctor printed it and the
+# next one died". Two occurrences can.
+verdicts="$(grep -c "no repos carry rendered output here, and the registry names none" "${OUT}" || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${verdicts}" = "2" ]; then
+  pass "the onboarded-repos section reaches its own verdict, not just doctor's"
+else
+  fail "the onboarded-repos section reaches its own verdict, not just doctor's" \
+    "expected 2 occurrences, found ${verdicts}"
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${rc}" -eq 0 ] || [ "${rc}" -eq 1 ]; then
+  pass "an empty registry does not abort the run"
+else
+  fail "an empty registry does not abort the run" "exit ${rc}: $(tail -3 "${OUT}")"
+fi
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${rc}" -ne 3 ]; then
   pass "and it does not exit 3, which now means something narrower"

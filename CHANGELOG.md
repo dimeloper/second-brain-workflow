@@ -17,6 +17,32 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-08-12
+
+### Fixed
+- **`make upgrade` aborted on a machine with no onboarded repos** — the state
+  every fresh install is in, and therefore the machines most likely to run it.
+  The *Onboarded repos* section printed its heading and then nothing, and `make`
+  reported `Error 1` with no finding named.
+
+  Under `set -o pipefail`, the `grep -v` that strips blank lines from the union
+  of registry and scan matches nothing when both are empty and exits 1, failing
+  the whole command substitution and aborting the run under `set -e`. Third
+  instance of that shape in this repo, after `sync-skills.sh` and `doctor.sh`,
+  and it is a practice note in the vault.
+
+  Reported from a real work machine mid-upgrade, not found by the suite.
+
+- **The test covering that exact state passed while the run died.** Every one of
+  its assertions matched text from the **doctor** block, which `upgrade` prints
+  verbatim *before* its own section — so the section could abort immediately
+  afterwards with nothing failing. Worse, `upgrade`'s own verdict for this state
+  is the *same sentence* doctor prints, so a presence check cannot distinguish
+  "both sections finished" from "doctor printed it and the next one died". The
+  assertion now **counts** occurrences, and it was confirmed to fail against the
+  unfixed script before being kept.
+- Suite 1015 → 1017 assertions.
+
 ## [0.25.1] - 2026-08-12
 
 ### Fixed
@@ -1834,7 +1860,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.2...HEAD
+[0.25.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.0...v0.24.1
