@@ -109,8 +109,8 @@ echo "latest = $latest"                       # empty means no release yet
 git submodule update --init --recursive
 ```
 
-That pins the newest tagged release — the stable option. See the README's
-[Versioning](../README.md#versioning) section for the bump policy and how to
+That pins the newest tagged release — the stable option. See the reference's
+[Versioning](REFERENCE.md#versioning) section for the bump policy and how to
 roll back to an older one.
 
 No SSH key set up yet (or a work machine you don't want to add one to)?
@@ -194,7 +194,7 @@ To undo it — including starting this setup over — `make uninstall` previews 
 `make uninstall YES=1` acts. It removes only links it can account for, handles
 links left dangling by a checkout you already deleted, and leaves your vault,
 your config file and any onboarded repo's rendered rules alone. See the
-README's [Removing them again](../README.md#removing-them-again).
+reference's [Removing them again](REFERENCE.md#removing-them-again).
 
 **Check.** The count on the last line per directory is the assertion — it should
 be the number of skills you expect, in *every* configured directory:
@@ -470,7 +470,8 @@ repo and no skills directory, and needs nothing beyond `git`, `python3` and
 rule loads on a matching file and not otherwise. Skip it only if you have no
 rules yet — it needs at least one glob-scoped rule to test.
 
-For Cursor, see the canary method in the README. There is no automated
+For Cursor, see the canary method in
+[REFERENCE.md](REFERENCE.md#confirming-a-rule-actually-loads). There is no automated
 equivalent.
 
 ### 7. Make the first commit
@@ -520,7 +521,7 @@ it in that repo's CI, not just here.
 The render also records this repo in
 `${XDG_CONFIG_HOME:-$HOME/.config}/second-brain-workflow/repos`, so that later
 "re-render everything" is a list rather than a glob you have to guess — see the
-README's [repo registry](../README.md#the-repo-registry). `--check` and
+reference's [repo registry](REFERENCE.md#the-repo-registry). `--check` and
 `--dry-run` don't write it. On a machine that onboarded repos before this
 existed, `make doctor` scans for them and names each one it finds that the
 registry does not — re-rendering registers it.
@@ -614,8 +615,8 @@ when it happens.
 
 Both carry a provenance comment naming the exact commit and engine version
 the content came from — edit `rules/frontend-angular.md` and re-render,
-never a generated file. See the README's [One rule set, every
-agent](../README.md#one-rule-set-every-agent) section for why Claude Code's
+never a generated file. See the reference's [One rule set, every
+agent](REFERENCE.md#one-rule-set-every-agent) section for why Claude Code's
 shape is canonical and Cursor's `globs` is derived, plus the full targets
 table and CI/verification commands.
 

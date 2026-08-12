@@ -30,7 +30,7 @@ that quietly stops getting run, which is exactly the problem the capture side
 
 2. Set `ENGINE_REF` in the copied file to the tag you want this workflow
    pinned to — same discipline as any other rollback (see the main
-   [README's Versioning section](../../README.md#versioning)). Bump it
+   [Versioning section](../REFERENCE.md#versioning)). Bump it
    deliberately when you want the audit running newer checks, not
    automatically.
 

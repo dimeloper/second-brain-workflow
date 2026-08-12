@@ -1,86 +1,74 @@
 # second-brain-workflow
 
-**Second brain workflow for developers.**
+**Your agent forgets everything at session end. This remembers only the parts
+that turned out to be true.**
 
-Turn your coding sessions into a growing, queryable knowledge base — instead
-of insights evaporating at the end of a chat, or piling up in one rules file
-no one re-reads.
+Everyone now has a `CLAUDE.md` or an `AGENTS.md`. Nobody has a lifecycle. Every
+convention in a rules file was written once, at equal weight, and never
+re-examined — so the file grows, gets skimmed, then ignored. This engine gives a
+convention a maturity gradient instead: it starts as an `idea`, becomes
+`trialing`, and only reaches `enforced` once you have actually re-applied it in
+a few repos. Then you distill it into one short rule, and one source renders to
+Cursor, Claude Code, and `AGENTS.md`.
+
+**Two load-bearing choices, before you read further.** It assumes git plus a
+markdown vault. And **the promotion gate is manual by design** — nothing
+promotes a note on your behalf, because a counter that promoted itself would
+measure writing, not re-application. Both are decisions, not missing features.
+If you wanted automation, this is the wrong tool and the next 200 lines will not
+change that.
 
 ![Knowledge graph showing practice notes growing sparse-to-dense across three phases — Session 1, a few sessions later, and months in — as they mature from idea to trialing to enforced, Obsidian graph-view style.](docs/impact.svg)
 
-*Illustrative, not the actual interface. The agent never browses a graph —
-it reads the generated `practices/INDEX.md`, one row per note. Graph-view
-browsing like this is for you, in Obsidian, over the same vault.*
+*Illustrative, not the actual interface. The agent never browses a graph — it
+reads the generated `practices/INDEX.md`, one row per note. Graph-view browsing
+like this is for you, in Obsidian, over the same vault.*
 
-Say **"update second brain"** at the end of a session and an agent skill
-mines what happened — a bug fixed, a design decision made, a pattern that
-worked — into individual, versioned practice notes in an Obsidian vault.
-Notes start as `idea`s and only mature to `enforced` once you've actually
-re-applied them across a few repos, so the knowledge base tracks what's
-proven, not just what was written once.
+## Who this is for
 
-This repo is the generic **engine** that runs that loop: the agent skills,
-rule rendering, and vault tooling, versioned here rather than trapped in an
-editor's account sync. It ships with none of your own content — `rules/` is
-empty and there's no vault bundled — your actual conventions and vault are
-expected to live in your own repo(s), private if you like, that this engine
-points at.
+A developer who uses an agent daily, works across more than one repo, and has
+already written a big rules file and watched it stop mattering. That last clause
+is the qualifier. Someone who has not hit that wall will not feel the problem,
+and the setup cost will read as unjustified — because for them it is.
 
-## What you get
+This repo is the generic **engine** that runs the loop: the agent skills, rule
+rendering, and vault tooling, versioned here rather than trapped in an editor's
+account sync. It ships with none of your own content — `rules/` is empty and no
+vault is bundled. Your conventions and your vault live in your own repo(s),
+private if you like, that this engine points at.
 
-- **Capture what you learn** — `update-second-brain` is the only write path
-  for practice and daily-note content: captures a session into a daily note, proposes new practice
-  notes, promotes existing ones by evidence, then commits and pushes. See
-  [Cold path](#cold-path-obsidian-vault).
-- **Apply what you already know** — `obsidian-knowledge-base` finds and
-  scores notes against the work at hand, read-only, so the agent applies what
-  you've already learned instead of re-deriving it every session.
-- **Never lose a follow-up** — `check-follow-ups` scans recent daily notes'
-  `Follow-ups` sections and reports what's still open, walking back to the
-  last notes that actually exist rather than a fixed number of calendar days
-  — so it survives a weekend, a holiday, or a vacation gap the same way. Items
-  for the repo you're in come first; the rest are grouped below rather than
-  filtered out, because a task with no repo to infer is usually the one that's
-  been open longest. Anything still open *outside* that window is `make audit`'s
-  job. See [Review loop](#review-loop).
-- **One rule set, every agent** — write short imperative rules once
-  (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
-  `CLAUDE.md`, and a portable `AGENTS.md` from the same source, with
-  drift-checking for CI. See [One rule set, every agent](#one-rule-set-every-agent).
-- **A vault per machine, safely isolated** — a per-commit guard blocks a
-  practice learned on employer work from ever landing in a personal or
-  public repo. See [A vault per machine](#a-vault-per-machine).
-- **`make doctor` says what this machine cannot do** — including whether it has
-  any rules to render at all, and whether an empty rules directory is a decision
-  or an unfinished setup. It names an unreferenced rules directory it finds
-  rather than leaving you to guess, which is the first thing a second machine
-  hits.
+## What you get, and when
+
+The value is deferred, and pretending otherwise loses people at week one. Here
+is the honest schedule:
+
+| When | What you get |
+|------|--------------|
+| **Session 1** | Say **update second brain**. The session lands as a daily note, plus two or three proposed practice notes drawn from work you already did. Costs one sentence. |
+| **Next morning** | Say **check my tasks**. The follow-ups from that session, this repo's first. The cheapest concrete win, and the one to try before believing anything about maturity gradients. |
+| **Week 2** | `obsidian-knowledge-base` starts finding notes that apply to the work at hand, so the agent stops re-deriving decisions you already made. |
+| **Month 1** | A note reaches `enforced`. You distill it into one rule; `render.py` emits it for every agent you use, with drift-checking in CI. |
+| **Month 3** | `make audit` tells you which rules are orphaned, which claims went stale, and which always-on rules are over budget. |
+
+Row 2 is the demo. It is immediate and legible in a screenshot.
 
 ## Quickstart
 
-The whole setup is below. `make init` explains what the engine does, prints
-every configuration key with its current value and where that value came from,
-and shows the config it would write — changing nothing until you add `YES=1`.
+Four commands and an afternoon. Substitute two placeholders — `VAULT_ID` and
+`YOUR_ACCOUNT` — and the rest is paste-and-run.
+
+`make init` explains what the engine does, prints every configuration key with
+its current value and where that value came from, and shows the config it would
+write — changing nothing until you add `YES=1`.
 
 ```bash
 git clone --recurse-submodules "https://github.com/dimeloper/second-brain-workflow.git"
 cd second-brain-workflow
-latest=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
-echo "latest = $latest"                       # empty means no release yet
-[ -z "$latest" ] || git checkout "$latest"    # omit these three lines to track main
-git submodule update --init --recursive
-
 make init                                     # read this; it writes nothing
 ```
 
 **The vault comes before the config**, because `init-vault.sh` writes the vault
-path and its id *together* and that pairing is what stops them disagreeing. It
-also leaves an existing config file untouched, so a config written first would
-not be corrected afterwards — and `make init` refuses to record `SBW_VAULT` for
-a vault that does not exist yet rather than writing a default that points
-nowhere.
-
-`VAULT_ID` is a placeholder, like `YOUR_ACCOUNT` below:
+path and its id *together*, and that pairing is what stops them disagreeing.
 
 ```bash
 vault_id=VAULT_ID                             # personal | work | …
@@ -108,153 +96,34 @@ Then finish the machine:
 make init YES=1 VAULT_ID="$vault_id"          # appends what is missing, runs doctor
 ```
 
-`make init` never overwrites a value already in your config — it appends only
-the keys that are absent, so it is safe on a machine set up months ago. It will
-not choose `SBW_EXPECTED_VAULT_ID` for you: that key is what makes the commit
-guard's identity check non-circular, and reading it from the vault's own
-`vault.json` would answer the question the check exists to ask.
+Getting that branch wrong is the one mistake worth naming here: running **A**
+against a vault that already exists on a remote creates a *second* vault
+claiming the first one's remote, which is how one vault's notes get pushed over
+another's. `init-vault.sh` refuses that outright, and refuses an unedited
+`VAULT_ID`, rather than leaving either to be noticed later.
 
-Substitute `VAULT_ID` and `YOUR_ACCOUNT`; the rest is paste-and-run. Getting
-the branch wrong is not cosmetic: running **A** against a vault that already
-exists on a remote creates a *second* vault claiming the first one's remote,
-which is how one vault's notes get pushed over another's. `init-vault.sh`
-refuses that outright, and refuses an unedited `VAULT_ID`, rather than leaving
-either to be noticed later.
+Two vaults means two runs of this, one per machine role — `personal` on a
+personal machine, `work` on a work one.
 
-Two vaults, so two runs of this, one per machine role — `personal` on a
-personal machine, `work` on a work one. Following it verbatim on the second
-machine is the mistake it is built to survive: an unreplaced placeholder now
-stops the run instead of quietly producing a vault whose id is wrong.
+[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) is the long way: every step with a
+**Check.** after it, pinning to a release instead of tracking `main`, pointing
+at a separate private rules repo, giving the machine the right git identity, and
+a troubleshooting table built from real first-setup failures. Every refusal this
+tooling can produce is explained there.
 
-**`vault_id` must match this machine's `SBW_EXPECTED_VAULT_ID`.** Those two
-disagreeing is the single most common way to end up with a setup that fails on
-its first commit, so `init-vault.sh` writes both together when no config file
-exists yet, and prints what it wrote:
+## Your first session
 
-```
-Wrote /Users/you/.config/second-brain-workflow/config:
-    # Written by init-vault.sh. See config.example for every key.
-    SBW_VAULT=/Users/you/vaults/personal-brain
-    SBW_EXPECTED_VAULT_ID=personal
-```
+The first useful moment is the end of the *next* session, not the end of setup.
+Work normally, then say:
 
-If a config file already exists it is never touched — you get told which line
-to add instead. `--no-config` skips this entirely. See
-[`config.example`](config.example) for every key and
-[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) for writing it by hand.
+> **update second brain**
 
-See [Versioning](#versioning) for the bump policy and how to pin or roll back
-to a specific tag instead of the newest. `--remote` is only recorded, not
-pushed to — create that repo yourself, private, first.
+An agent skill mines what happened — a bug fixed, a design decision made, a
+pattern that worked — into a daily note, and proposes practice notes for the
+parts that look durable. You approve them; nothing is written otherwise. Then it
+commits and pushes the vault.
 
-Two checks run on it at creation. A `--remote` already recorded by the vault
-this machine's config points at is **refused**, because two vaults sharing a
-remote is how one vault's notes get pushed over another's; the check compares
-host, owner and repo, so `.git` and `ssh`/`https` spellings of one repository
-don't slip past as two. And an `--id` that doesn't appear in the repository's
-name **warns** — usually the sign of a Quickstart followed verbatim, keeping
-`vault_id=personal` next to a work remote.
-
-### Rendering into a repo you do not own
-
-Rendering and committing are different decisions, and without saying so the
-second one happens by accident. `--local` renders normally and then adds exactly
-the files it wrote to that repo's `.git/info/exclude`:
-
-```bash
-make render REPO=~/work/their-repo LOCAL=1        # ./scripts/render.py --local
-                                                  # does the same
-```
-
-The rules load in your sessions; the repo's remote never sees them, and nothing
-about the exclusion is committed either — `.git/info/exclude` is local to one
-clone. It prints the list every run, because who sees your conventions is a
-decision worth restating rather than a default worth forgetting.
-
-**It refuses if a path it would *write* is already tracked.** `.git/info/exclude` has
-no effect on a path in the index — the file would show up as an ordinary
-modification, one `git commit -a` from being shared — so a mode that cannot keep
-its promise does not half-keep it. Nothing is written, the tracked files are
-named, and the two real options are: render without `--local` and decide file by
-file, or agree the rules with whoever owns the repo.
-
-A tracked file the render **skips** — the team's own `CLAUDE.md`, say — is not a
-refusal. The writer never touches it, so there is nothing to hide; it is named in
-the output and left out of the exclude block, because an exclude entry for a
-tracked file does nothing and would imply otherwise.
-
-Worth knowing which way to lean. Committing them is often the healthier answer —
-the team sees what landed and objects to what does not fit, and you end up with
-shared conventions rather than private ones. `--local` is for the case where that
-conversation is not yours to start.
-
-`SBW_RULES_DIR` is not in the block above, because a fresh clone renders from its
-own `rules/`. If yours live in a separate repo, clone it and then set the key —
-`make init` and `make doctor` both *report* a rules directory they find and
-name `SBW_RULES_DIR`, but neither adopts one: which rules a machine renders is a
-decision, not something a script should make quietly.
-
-Then just work. Say **"onboard repo"** in a project to wire up rules, and
-**"update second brain"** at the end of a session to capture it. See
-[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) for the full walkthrough,
-including how to point at a separate private rules repo.
-
-## Hot path
-
-Short, imperative rules (`rules/*.md`) and a portable `AGENTS.md`. The agent
-loads these on relevant turns.
-
-By default the engine looks for both as a sibling of its own checkout
-(`<engine>/rules`, `<engine>/AGENTS.md`) — fine for a self-contained clone with
-its own conventions committed alongside the tooling. To keep rules in a
-separate repo instead (the common case if you want the engine itself public
-while your conventions stay private), point at it:
-
-```bash
-SBW_RULES_DIR=~/dev-conventions/rules ./scripts/render.py --explain
-```
-
-or set it once in `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/config` (see
-`config.example`). `AGENTS.md` is expected as `SBW_RULES_DIR`'s
-sibling — i.e. the rules repo's root, not inside `rules/` itself. Precedence:
-`--rules-dir` flag > `SBW_RULES_DIR` env > config file > the
-engine-relative default.
-
-This is about *where* rules live. For exactly how one rule file becomes
-Cursor's, Claude Code's, and `AGENTS.md`'s native formats, see [One rule set,
-every agent](#one-rule-set-every-agent).
-
-## Cold path (Obsidian vault)
-
-Long-form practice notes live in your vault (`practices/**`) — `~/vaults/second-brain`
-by default, overridable via `SBW_VAULT`.
-
-Agents start from the generated index `practices/INDEX.md` — one file listing
-every note with its maturity, repo count, tags and a one-line rule — and open
-individual notes only when a row looks relevant. Regenerate it with:
-
-```bash
-make vault-index          # or: ./scripts/build-vault-index.py [--vault PATH]
-make vault-index-check    # fails if the index is stale
-```
-
-Three skills own the vault, and the read/write split is deliberate:
-
-| Skill | Role |
-|-------|------|
-| `obsidian-knowledge-base` | **read only** — find applicable notes, score work against them |
-| `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
-| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first |
-
-Say **update second brain** at the end of a session to capture and publish it,
-or **check my tasks** any morning to see what's still open. "Recent" is
-deliberately narrow — a commitment that fell out of that window is
-`make audit`'s job instead (via `check-followups.py`), part of the
-[Review loop](#review-loop), not a skill.
-
-### Worked example
-
-A daily note (`2026-08-03.md`) and a practice note it might produce, in full:
+The daily note it writes:
 
 ```markdown
 # 2026-08-03
@@ -276,689 +145,79 @@ A daily note (`2026-08-03.md`) and a practice note it might produce, in full:
 - Bounding outbound calls with a timeout, seen twice now
 ```
 
-````markdown
----
-domain: backend
-applies-to: ""
-maturity: idea
-last-reviewed: 2026-08-03
-repos: ["payments-service"]
-tags: [resilience, http]
----
-
-# Bound every outbound call with a timeout
-
-**Rule:** Every HTTP client call to another service gets an explicit timeout;
-never rely on the library's default (often "none").
-
-**Why:** An unbounded call turns one slow dependency into an outage for every
-request stacked up behind it.
-
-**Example:**
-
-```python
-requests.post(url, json=payload, timeout=5)
-```
-
-**Observed in:** `payments-service`, 2026-08-03 — added after a provider
-outage held requests open for minutes.
-
-## Related
-- [[probe-health-with-a-route-that-does-no-work]]
-````
-
-`check-follow-ups` would report the one open item above — under **this repo**
-when run from `payments-service`, under **other repos** anywhere else, and never
-hidden either way. The `#repo/` tag is written by `update-second-brain`, which
-knows the repo because it runs inside it; omit it for an item that belongs to no
-repo (an email to send, a key to revoke in a console) rather than guessing.
-`update-second-brain` is also what writes the practice note once a pattern like
-this repeats.
-
-### A vault per machine
-
-One vault per machine, each with its own `vault.json` (`id`, `remote`):
-
-```bash
-./scripts/init-vault.sh --path ~/vaults/work-brain --id work \
-  --remote "git@github.com:YOUR_ACCOUNT/work-brain.git"
-```
-
-This also installs `guard-vault-commit.sh` as the vault's `pre-commit` hook
-(`--no-hook` opts out), so a hand-run `git commit` here is guarded even with
-no agent involved.
-
-**The vault is the isolation boundary, not the rule set.** Rules flow outward
-freely: applying your own conventions to an employer's code is fine. The
-direction that must never happen is a practice learned on employer work landing
-in a personal or public repo — and that is a vault write. So every commit is
-checked against the machine's expected vault identity:
-
-```bash
-./scripts/guard-vault-commit.sh --expect-id work
-```
-
-enforced three ways — a fast path built into `update-second-brain`, the
-pre-commit hook above, and a CI backstop that's the only one of the three
-that still catches `git commit --no-verify`. The expected id comes from the
-machine's own config, never from the vault being checked, so a repointed or
-freshly cloned vault can't vouch for itself. This is why there is no layer
-system: the thing that needed isolating was the vault, and a per-commit
-identity check does that directly, not a second rule tier. See
-[docs/GUARD.md](docs/GUARD.md) for the full mechanics, the trust model
-behind the identity check, and what `make doctor` verifies about a machine's
-setup.
-
-### Review loop
-
-Practice notes are the source: when one reaches `maturity: enforced`, a human
-distills it into a rule, and `source:` in the rule's frontmatter records the
-lineage. `make audit` is the review side of that — orphaned rules, stale
-claims, thin evidence, rule frontmatter that doesn't say what its author
-thought, an over-budget always-on rule set, and a follow-up
-commitment still open past the recent window `check-follow-ups` already
-covers — all read-only, none blocking except an orphaned rule. See
-[docs/AUDIT.md](docs/AUDIT.md) for what each check does and the CI template
-that runs it weekly.
-
-## Skills
-
-Local skills live under `skills/` (categorized). Upstream skills are
-vendored as a pinned submodule and installed by allowlist:
-
-```bash
-git submodule update --init
-./scripts/sync-skills.sh         # or: make sync-skills
-```
-
-Already done by the Quickstart; re-run after a checkout that moves the
-submodule's pin.
-
-| Source | Contents |
-|--------|----------|
-| `skills/workflow/` | Onboard, vault read/write, follow-up review, per-project MCP |
-| `vendor/obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (MIT) — `obsidian-bases`, `obsidian-markdown` |
-
-Skills published by a vendor are installed from that vendor, not copied here —
-see `skills/README.md`.
-
-**Manual step, per machine.** Railway's installer writes `use-railway` into
-`~/.claude/skills/` only. To reach it from Cursor as well:
-
-```bash
-ln -s ~/.claude/skills/use-railway ~/.cursor/skills/use-railway
-```
-
-`sync-skills.sh` leaves that link alone — it points outside this repo, so it is
-never repointed or pruned. Re-run the command after a fresh Railway install,
-or run [`make doctor`](docs/GUARD.md#make-doctor), which detects exactly this — a skill
-present in one configured skills directory but missing from another, ours or
-not — and prints the exact `ln -s` to fix it. Detection only; it never links
-anything itself.
-
-Skills install into **every** directory in `SKILLS_DIRS`, defaulting to
-`~/.cursor/skills` and `~/.claude/skills`, so Cursor and Claude Code resolve the
-same skills from one source. A local skill shadows a vendored one of the same
-name. The sync never overwrites a real directory or a symlink owned by another
-tool — it reports the conflict and exits non-zero.
-
-Adjust what gets installed:
-
-```bash
-SKILLS_DIRS=~/.claude/skills ./scripts/sync-skills.sh
-VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-skills.sh
-```
-
-### Bringing your own skills
-
-The engine ships five skills of its own and tracks one pinned upstream set. It
-does **not** ship a roster of other people's skills, for the same reason
-[`rules/`](#one-rule-set-every-agent) ships empty: a curated selection of
-someone else's craft skills is an opinion, and the engine's job is the mechanism.
-
-Declare the ones you want in a `skills.json` next to your own `rules/`, and point
-the machine config at it:
-
-```
-# ~/.config/second-brain-workflow/config
-SBW_SKILLS_MANIFEST=~/dev-conventions/skills.json
-```
-
-```json
-{
-  "sources": [
-    {
-      "name": "motion",
-      "repo": "https://github.com/someone/skills",
-      "ref": "0dd13f5be1c4a2f7e9b8d6c5a4930817264f5abc",
-      "allow": ["animate", "review-animations"]
-    }
-  ]
-}
-```
-
-See [`skills.json.example`](skills.json.example) for every field. Then:
-
-```bash
-make fetch-skills          # preview; YES=1 clones each source at its pin
-make sync-skills           # link the allowed skills in
-make doctor                # reports unfetched, wrong-sha, or undeclared links
-```
-
-Worth knowing before you write one:
-
-- **`ref` is required, and should be a full sha.** An unpinned source means two
-  machines reading the same manifest install different skills on different days,
-  which is the whole failure the manifest exists to prevent. An abbreviated ref
-  is accepted with a warning; the placeholder from the example is refused.
-- **`allow` is required and per-source.** There is no "install everything" —
-  every adopted skill is charged against the same session budget as your own.
-  An entry is a bare skill name, or an object with `name` plus its own
-  `applies_to` and `license`:
-
-  ```json
-  "allow": ["a11y-audit",
-            {"name": "next-scaffold", "applies_to": ["**/next.config.*"]}]
-  ```
-
-  `ref`, `applies_to` and `license` attach to a **source**; what you adopt and
-  reason about is a **skill**. Where a source's skills do not share one answer —
-  a twelve-skill repo of which three are Next-specific — a source-level scope can
-  only state something untrue in one direction or the other. An entry's value
-  **replaces** the source's rather than merging: the case it exists for is
-  *narrowing*, and a merge can only widen, which omitting the key already does.
-  `make skills-for` says whether a resolved scope came from the entry or the
-  source, since the two have different fixes.
-- **Record the `license`.** Omitting it warns on every run. What you are allowed
-  to do with someone else's content gets asked once at adoption and then never
-  again, which is exactly the kind of question that wants a mechanical prompt —
-  an unlicensed repo is all-rights-reserved by default. Free text, so "there
-  isn't one" can be recorded as the finding it is. The warning is **per source**,
-  not per skill: a twelve-skill source recording no licence is one unanswered
-  question, not twelve. An entry that records its own does not contribute, and
-  the line says how many are left — `9 of the 12 skills allowed here have no
-  license of their own` — always, including at twelve of twelve, because a count
-  that shows up only when it is partial is one nobody learns to read.
-- **A skill of yours wins.** A same-named local skill shadows the adopted one,
-  and the sync says so rather than silently preferring one. Two *manifest*
-  sources allowing one name is refused instead: the install directory has one
-  slot for it, so one of the two declarations could not be honoured under any
-  layout, and the drift checks would report clean while the last source linked
-  quietly won.
-- **One skill can be held at its own sha** by declaring the repo twice, with
-  disjoint `allow` lists and a `pinned_apart` reason:
-
-  ```json
-  {
-    "sources": [
-      {
-        "name": "agent-skills",
-        "repo": "https://github.com/someone/agent-skills",
-        "ref": "0dd13f5be1c4a2f7e9b8d6c5a4930817264f5abc",
-        "license": "MIT",
-        "allow": ["a11y-audit", "design-linter"]
-      },
-      {
-        "name": "agent-skills-screenshot",
-        "repo": "https://github.com/someone/agent-skills",
-        "ref": "9e2c1a70b4f3d85a6c07e1b29d4f8a3061c5d2e4",
-        "license": "MIT",
-        "pinned_apart": "screenshot needs the pre-2.0 skills/ layout; the rest track current",
-        "allow": ["screenshot"]
-      }
-    ]
-  }
-  ```
-
-  Nothing about the engine changes shape — one checkout per source name, one
-  declared ref per checkout, the leftover report still keyed on names. The cost
-  is the repo cloned twice, which is cheaper than a layout that made every path
-  in the system move. `pinned_apart` is what tells `doctor` the duplication is
-  deliberate rather than a source added twice with one ref then edited; without
-  it the pair warns. It is **prose, never `true`** — a boolean records that
-  someone once had a reason and nothing about what it was.
-
-Sources are cloned into `vendor/external/`, which is **gitignored**. That is
-deliberately not a submodule: a submodule records its pin in `.gitmodules`, and
-this repo is public, so your roster would ship with the engine.
-
-A skill that ships **its own installer** does not belong in a manifest — install
-it the vendor's way and let it be a real directory. `sync-skills.sh` refuses to
-touch one, which is what keeps `use-railway` working.
-
-#### Which skills apply to a repo
-
-```bash
-make skills-for REPO=/path/to/repo
-```
-
-Two lists, both from your own `skills.json`:
-
-```
-skills relevant to /path/to/repo  (412 file(s) considered)
-roster: /Users/me/dev-conventions/skills.json (from SBW_SKILLS_MANIFEST in …/config)
-
-Adopted and scoped to this repo: 2
-  - animate  (matched App.tsx, app/(onboarding)/_layout.tsx, …; scope inherited from source 'motion')
-  - app-store-screenshots  (matched app.json, eas.json; scope from this entry)
-
-Not adopted, worth considering here: 1
-  - impeccable — design-heavy frontend wanting a visual-polish pass. Invasive:
-    writes PRODUCT.md/DESIGN.md and registers an edit-time hook. Project scope only.
-      install: npx impeccable install --scope=project
-```
-
-The second list is the point, and it is the one thing an agent host cannot do for
-itself: it routes to the skills that are **installed** and can say nothing about
-one that exists and is not. Add `applies_to` globs to a source to scope it, and a
-top-level `candidates` array for skills you have deliberately *not* adopted —
-`name`, `repo` and `when` required, `install`, `license` and `applies_to`
-optional. Write
-`when` about the **cost** as well as the benefit; the reason to read the list is
-to decide.
-
-A skill with no `applies_to` is reported as applying everywhere rather than as a
-miss — it was never claimed to be repo-specific, so calling it irrelevant would
-assert something nobody said.
-
-A candidate carries an optional `status`: `suggested` (default), `adopted` or
-`declined`. Only `suggested` gets pitched — the other two are decisions already
-made, listed one line each under *Already decided, not pitched*. They stay in the
-list rather than being deleted, because **the value of a rejected option is the
-reason it was rejected**; delete the entry and the next session re-evaluates from
-scratch and may reach a different answer for no new reason. `adopted` also covers
-a skill installed the vendor's own way, which is genuinely adopted while
-appearing in no source's `allow` list.
-
-The `onboard-repo` skill runs this at step 2b and **reports without installing**:
-adopting a skill is a standing choice about every future session, and several
-write into the project.
-
-### Which practices a repo has never had
-
-```bash
-make practices-for REPO=/path/to/repo
-```
-
-Only `enforced` notes become rules, and only rules reach a repo — so on a large
-vault the notes at `idea` and `trialing` are invisible to a repo you just
-onboarded. This reports them, filtered to the ones this repo is **not** already
-in the `repos:` of, in two tiers:
-
-- **Governs files here** — the note's own `applies-to` glob matches real files,
-  named with the file that matched. These carry a **promotion delta**:
-  `-> applying here clears ENFORCED`.
-- **Same domain, judgement required** — matched on the repo's inferred stack
-  alone. **No promotion claim**, because a guess that said "clears ENFORCED"
-  would invite adding a `repos:` entry for a note that does not govern this repo.
-
-The delta is the point: promotion runs on `length(repos)`, so one deliberate
-application is often the single act that clears a rung — and knowing which note
-is one repo short used to depend on remembering. The bars are read from the
-vault's own `00-maps/promotion-candidates.md`; an unreadable one is a **hard
-error**, never a default, because a report computed against a guessed bar names
-specific notes as ready when they are not.
-
-It **reports and never applies**, and neither does `onboard-repo`'s step 2c. The
-vault's rule is that `trialing` is *earned by deliberate re-application, not just
-counted*, so applying a dozen notes in one pass would manufacture exactly the
-evidence the bar exists to measure. Apply one, then record it through
-`update-second-brain`.
-
-Cross-cutting notes without a matching glob are excluded and the count is
-printed — they apply everywhere, so listing a hundred of them would bury the
-repo-specific ones.
-
-
-**Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
-runs `sync-skills.sh` before a machine config exists, so the default applies and
-both directories get the links; a config written afterwards naming only one
-leaves the other install in place. `make doctor` reports links of ours found
-outside `SKILLS_DIRS`, and `make uninstall` looks there too — marking them, so
-what `YES=1` widens to reach is visible before it acts.
-
-### Removing them again
-
-```bash
-make uninstall            # print what would go, change nothing
-make uninstall YES=1      # actually remove
-```
-
-Previewing is the default and `--yes` is the only thing that acts, because the
-alternative is symlink archaeology: `sync-skills.sh` installs by name into
-directories that also hold other tools' installs, so "delete the ones that look
-like ours" is a guess. Each link is instead resolved to an absolute path and
-compared against this checkout — never matched on the text
-`second-brain-workflow`, which a relative link like
-`../../.agents/skills/find-skills` doesn't contain at all.
-
-It also removes links left **dangling** by a deleted checkout, which is the one
-state nothing else can clean up: the path they name is gone, so the only
-evidence is a target that no longer resolves plus this engine's skills layout.
-Run it from any checkout — it does not need to be the one the links point into.
-
-Never touched: a real directory (a hand-maintained skill), a link resolving
-anywhere outside this checkout (another tool's install, such as Railway's
-`use-railway`), the skills directories themselves, and a broken link that isn't
-ours. **It also does not remove your vault, your machine config, or the
-rendered rules in repos you onboarded** — delete `.cursor/rules`,
-`.claude/rules`, `AGENTS.md`, `CLAUDE.md` and `.sbw-version` per repo if you
-want those gone. The [repo registry](#the-repo-registry) stays too, so a
-reinstall still knows where this machine has rendered.
-
-## Onboard a repo
-
-Say **onboard repo**. The agent follows `onboard-repo`: syncs rules, adds a thin
-project onboarding rule, points at vault practices, and wires project-scoped MCP.
-
-Or manually:
-
-```bash
-./scripts/sync-rules.sh /path/to/target-repo
-./scripts/sync-skills.sh   # once per machine, or after pulling skill changes
-```
-
-### The repo registry
-
-A successful render appends the target's real path to
-`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repos` — one absolute path
-per line, deduped and sorted, blank lines and `#` comments ignored on read. It
-is the only record of *where* this machine has rendered, and the reason
-"re-render every onboarded repo" is a list rather than a guess: `render.py`
-writes `.sbw-version` into the target and nothing on the machine, so before
-this the only way to find onboarded repos was a directory glob — and a glob
-that matches nothing is indistinguishable from a machine that has genuinely
-onboarded nothing.
-
-`--check` and `--dry-run` never write it, the same contract `.sbw-version` has.
-A registry that can't be written (read-only home, unwritable config directory)
-warns on stderr and the render still succeeds — rendering is the job — but it
-does warn, because an unrecorded render is how the set becomes undetermined
-later with nothing left to explain it.
-
-### Both directions, from two sources
-
-The registry alone cannot answer "which repos on this machine are onboarded" —
-it holds what renders recorded, so one render on a machine with a dozen
-pre-registry repos looks exactly like complete coverage. So
-[`make doctor`](docs/GUARD.md#make-doctor) also **scans** for repos carrying
-rendered output (a `.sbw-version`, or the provenance marker in `AGENTS.md` /
-`CLAUDE.md` — the same rule every other registry check uses) and compares the
-two sets:
-
-- **Registered, but gone or no longer rendered** — named, never pruned. A repo
-  on an unmounted volume is not a deleted repo.
-- **Rendered, but not registered** — named, with `./scripts/render.py <repo>`
-  to register it, or leave it if that repo is abandoned. Nothing adopts it for
-  you.
-
-A scan cannot claim completeness: a repo on another volume, or nested deeper
-than the depth limit, is outside it. So **every report states its scope** —
-`roots=… depth=…` — on clean runs too, and a root that could not be read is
-named rather than dropped. Set `SBW_SCAN_ROOTS` (colon-separated, default
-`$HOME`) and `SBW_SCAN_DEPTH` (default `5`) in the config file to widen it; see
-`config.example`.
-
-Finding nothing within a stated boundary is a result. **Undetermined** is now
-only what it says: no configured root could be read, so there was no second
-source to compare against at all. `make uninstall` leaves the registry file
-alone.
-
-## One rule set, every agent
-
-`rules/*.md` (wherever `SBW_RULES_DIR` resolves to) is the canonical
-source. `scripts/render.py` emits each agent's native format —
-`sync-rules.sh` is a thin wrapper around it:
-
-```yaml
----
-paths:
-  - "**/*.component.ts"
-description: Angular component and reactivity conventions
----
-```
-
-| Target | Output | Always-on | Scoped |
-|--------|--------|-----------|--------|
-| `cursor` | `.cursor/rules/*.mdc` | `alwaysApply: true` | derived `globs` string |
-| `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | via `AGENTS.md` — see below | `paths:` passed through |
-| `agents` | `AGENTS.md` | its own body **plus every always-on rule** | — |
-
-**Where an always-on rule lands depends on the other targets.** `AGENTS.md` is
-the portable output — the one an editor this engine renders no native format for
-still reads — so a rule with no `paths:` is appended to it, and the generated
-`CLAUDE.md` reaches it through `@AGENTS.md`. That import is the **sole delivery
-path** for always-on rules to Claude Code, not a convenience to avoid
-duplication, which is why no `.claude/rules/<name>.md` is written for one.
-
-Two cases where it falls back to a per-rule file instead, because there is
-nothing to fold into:
-
-- `RENDER_TARGETS=claude-code` **without** `agents`. The same rules directory
-  therefore produces a different file set than `claude-code,agents` does.
-- A target repo whose `AGENTS.md` is hand-written, which the writer never
-  overwrites. The run says so when it happens.
-
-`rule-budget.py` mirrors this exactly, and its *undeliverable* report is scoped
-to `agents` alone for the same reason: `claude-code` always has a fallback and
-`agents` has no carrier but `AGENTS.md`.
-
-For a full worked example — one source file next to the exact `.mdc` and
-`.claude/rules/*.md` it produces — see
-[docs/NEW-MACHINE.md](docs/NEW-MACHINE.md#what-rendering-actually-produces).
-
-The source format is Claude Code's native shape, so that emitter is a
-near-identity and Cursor's comma-separated `globs` is the derived one. That
-direction is deliberate: a comma-separated string cannot carry a brace group
-like `{ts,tsx}`, so making it canonical would forbid braces everywhere instead
-of only where they can't be represented.
-
-A rule with `paths` is scoped; a rule without is always-on. There is no
-`alwaysApply` field, so "scoped *and* always-on" is unrepresentable rather than
-something a check has to catch.
-
-Claude Code reads `CLAUDE.md`, not `AGENTS.md`, so the generated `CLAUDE.md`
-imports `@AGENTS.md` — which, since v0.20.0, is how always-on rules reach it at
-all. See the table above.
-
-```bash
-./scripts/render.py /path/to/repo                      # all configured targets
-./scripts/render.py /path/to/repo --targets cursor     # one target
-./scripts/render.py /path/to/repo --check              # exit 1 on drift; for CI
-./scripts/render.py --explain                          # resolution per target
-```
-
-`RENDER_TARGETS` sets the default per machine. Every output is a real file with
-a provenance header naming the source SHA (the rules repo's own commit when it
-differs from the engine's) and source path. Never edit a rendered file in the
-target — edit it at its source and re-render. Files without the header are
-treated as hand-written and are never overwritten or pruned; each target prunes
-only its own outputs.
-
-Rendering rejects globs that would silently match nothing. An unbalanced `[`
-is always an error. A brace group containing a comma is an error only when
-`cursor` is a target, since Cursor's single `globs` string cannot carry it —
-Claude Code expands braces natively, so `--targets claude-code` accepts them.
-
-### Confirming a rule actually loads
-
-The checks above prove the *files* are right, not that an agent read them.
-
-**Claude Code — automated:**
-
-```bash
-make verify-claude
-```
-
-Renders into a throwaway repo and runs three headless sessions with an
-`InstructionsLoaded` hook attached. Reading a file that matches a rule's globs
-must load the rule, and reading one that matches nothing must not. The second
-case is the one that matters — without it, "the rule loaded" is equally
-consistent with every rule always loading, which would make scoping decorative.
-
-```
-    session_start    CLAUDE.md
-    include          AGENTS.md          <- the @AGENTS.md import resolves
-    path_glob_match  frontend-angular.md
-```
-
-and, for a non-matching file, the first two only.
-
-The third session covers the path the other two cannot reach. An always-on rule
-is **not a file** in a Claude Code render — it rides inside `AGENTS.md` — so no
-`load_reason` line can attest to it, and the `include AGENTS.md` above proves the
-import resolves, not that a rule inside it is in context. The probe puts a
-codeword in a temporary always-on rule and asks for it while reading the
-*non-matching* file, so a codeword coming back cannot be explained by glob
-scoping. Same technique as the Cursor canary below, for the same reason.
-
-Verified 2026-08-11 on macOS against Claude Code 2.1.220. Re-run and re-date it
-after anything that changes what reaches a session — v0.20.0 changed exactly
-that, and a date older than the change vouches for the previous shape. Run it on
-any new machine before trusting the toolchain there.
-
-**Cursor — manual.** Cursor has no headless agent and its logs record nothing
-about rule attachment, so this one needs eyes. Do not test it by asking the
-agent about project conventions: it will read `.cursor/rules/` as ordinary files
-and answer convincingly whether or not the glob matched. That produces a false
-pass.
-
-Use a canary the model cannot know and has no reason to look up. Append to one
-scoped rule in a throwaway repo:
-
-```
-- The project codeword is QUOKKA-4417. If asked for the project codeword, reply
-  with exactly that.
-```
-
-Then in two fresh chats ask `What is the project codeword?` — once with a
-matching file as the active tab, once with a non-matching one. Answering
-instantly means the rule was in context; searching the repo first means it was
-not.
-
-**Not covered: Cursor's always-on path.** This canary tests a *scoped* rule, on
-a matching file and a non-matching one. An always-on rule reaches Cursor by a
-different mechanism — `alwaysApply: true` in the `.mdc`, not the `AGENTS.md`
-import Claude Code uses — and nothing has ever exercised it. v0.23.0 closed
-exactly this gap on the Claude Code side, where the two scoping probes could not
-attest that an always-on rule arrives; the same gap is open here, and Cursor
-having no headless agent is why it stays manual rather than why it stays
-unasserted. To check it by hand, put a second canary in a rule with no `paths:`
-and ask for it while editing a file that matches no glob.
-
-Verified 2026-08-02 on Cursor 3.14.7: known immediately on `*.component.ts`, and
-on a `.txt` file the agent had to grep for it. **Scoping** is confirmed on both
-agents; **always-on delivery** is confirmed on Claude Code only (v0.23.0's third
-probe) and remains unverified on Cursor, per the note above.
-
-## Versioning
-
-`VERSION` at the repo root — [releases](https://github.com/dimeloper/second-brain-workflow/releases)
-are tagged `v<VERSION>`. Bump policy:
-
-- **Patch** — docs, wording, anything that doesn't change behavior.
-- **Minor** — a new rule field, a new emitter, or new-but-additive behavior;
-  existing rules and already-onboarded repos keep working unchanged.
-- **Major** — anything that requires action in an already-onboarded repo to
-  keep working (a changed rendered format, a removed field, a renamed
-  config key).
-
-**Cutting a release:** move [`CHANGELOG.md`](CHANGELOG.md)'s `[Unreleased]`
-entries under a new `## [X.Y.Z] - YYYY-MM-DD` heading (add the two
-comparison links at the file's bottom), bump `VERSION` to match, bump
-`ENGINE_REF` in **both** `docs/vault-ci/*.yml` templates to the new tag, tag
-`v<VERSION>`, and point the GitHub Release's notes at that changelog section
-rather than writing them by hand — one place to describe what changed, not
-two that can say different things. A **Major** entry in the changelog always
-names the specific action required, since that's the part a commit log
-can't supply on its own. `tests/test-release-consistency.sh` enforces the
-`VERSION`/changelog/`ENGINE_REF` half of that list, because a template pinned
-several releases back gives an adopter a workflow that quietly runs fewer
-checks than they think.
-
-**Then open the CI run for the tag.** A green `make check` locally is not
-evidence the pipeline passed: a linter's verdict is specific to its version, and
-v0.23.0 and v0.24.0 were both tagged with a failing lint that no local run could
-have shown. CI's shellcheck is now pinned to the same version this repo
-develops against, which removes that particular disagreement — it does not
-remove the class, and reading the run is the step that does.
-
-Every rendered file's provenance comment names both the commit and the
-engine version it came from, and a plain `.sbw-version` file is written at
-the target repo's root alongside the rendered output — nothing else in the
-target carried this before, so this is the one new file `render.py` writes
-outside `.cursor/rules`, `.claude/rules`, `AGENTS.md` and `CLAUDE.md`. Like
-any other rendered file, `--check` reports a stale `.sbw-version` as drift —
-visible as "this repo hasn't re-rendered since the engine moved on." Unlike
-every other rendered file, it can't carry the usual provenance comment (it's
-a bare version string, not markdown), so it's the one file `render.py`
-always overwrites rather than checking for a hand-written override — don't
-hand-edit it.
-
-See [Quickstart](#quickstart) for cloning at the newest release; drop the
-`git checkout` line there to track `main` instead.
-
-### Upgrading a set-up machine
-
-```bash
-make upgrade              # preview: print what would happen, change nothing
-make upgrade YES=1        # switch the checkout, then report
-```
-
-Preview is the default and `YES=1` is the only thing that acts, the same
-convention as [`make uninstall`](#removing-them-again). It prints
-`current → target`, then **every `### Major` section from `CHANGELOG.md` in that
-range, verbatim, before proposing anything** — that step is the skippable one
-and the only one carrying required action, which is why it comes first and why
-it is read from the target ref's own changelog rather than the working tree's.
-Then, in order: refuse if the checkout is dirty or holds local commits the
-target doesn't contain, switch the checkout, update the submodule, re-link
-skills, run [`doctor`](docs/GUARD.md#make-doctor) inline, run `render.py
---check` across every onboarded repo — from the registry *and* the scan, so a
-repo the registry does not name is still checked — reporting drift per repo with
-the exact command that fixes each, and report a vault CI `ENGINE_REF` left
-behind the target.
-
-Every one of those reports states the scan's scope, on clean runs too — see
-[the repo registry](#the-repo-registry). In preview, drift is measured against
-the checkout as it stands, so its counts are lower bounds and the summary line
-says so: switching stamps a new
-version into every rendered file and into `.sbw-version`, so expect every
-registered repo to need re-rendering afterwards. A preview targeting the
-version already checked out has nothing pending, and says it plainly.
-
-It never renders, commits, pushes, or writes to a vault. `--check` reports and
-you decide; a stale `ENGINE_REF` is named, not edited.
-
-`make upgrade REF=v0.9.0` targets a specific tag instead of the newest, and
-`NO_FETCH=1` skips contacting the remote. Exit codes: `0` nothing to act on,
-`1` findings, `2` refused (or `doctor` found a misconfiguration), `3` **the
-onboarded repo set is undetermined** — meaning no scan root could be read, so
-there was no second source to compare the registry against and the question
-"which repos need re-rendering" has no answer. The run says so and fails rather
-than printing a zero that reads as success. An empty registry is *not* that
-state: the scan answers it, and a repo it finds is drift-checked and labelled
-as unregistered, with one command that re-renders and registers it.
-
-**Rollback:** in the engine checkout,
-
-```bash
-version=v0.2.0                            # the release to roll back to
-git checkout "$version"
-git submodule update --init --recursive   # vendor/obsidian-skills is pinned per-commit, not per-tag
-./scripts/sync-skills.sh                  # installed skills are symlinks into that submodule
-```
-
-then re-render each onboarded repo (`./scripts/render.py <repo>`) — the
-[repo registry](#the-repo-registry) is the list of which those are, and
-`make upgrade REF=v0.2.0` runs this whole sequence (minus the render) with a
-preview first. Checking
-out a tag alone does not move `vendor/obsidian-skills` to the commit that tag
-pinned — skipping the submodule step leaves vendored skills at whatever they
-were before the rollback, which defeats the point of pinning. [`make
-doctor`](docs/GUARD.md#make-doctor) reports a submodule left at the wrong commit, so a
-switch-and-forget doesn't go unnoticed. Rules and vault content are untouched
-by any of this — only the tooling that renders/audits/installs them moves.
+Next morning, in any repo:
+
+> **check my tasks**
+
+`check-follow-ups` reports the one open item above — under **this repo** when
+run from `payments-service`, under **other repos** anywhere else, and never
+hidden either way. It walks back to the last daily notes that actually exist
+rather than a fixed number of calendar days, so a weekend, a holiday or a
+vacation gap does not swallow anything.
+
+That is the whole loop. Say **onboard repo** in a project to wire rules into it,
+and keep going. Practice notes accumulate from what you actually did — do not
+scaffold them.
+
+## Why this doesn't rot
+
+This is the part that matters at month six rather than week one. Each item below
+is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics.
+
+- **The maturity gradient is earned, not counted.** A note starts at `idea` from
+  one observation, reaches `trialing` only after deliberate re-application in a
+  second unrelated repo, and `enforced` only after holding across three or more
+  without contradiction — one rung per pass. Clearing a bar is necessary, not
+  sufficient, and **you** do the promoting. See
+  [the maturity gradient](docs/REFERENCE.md#the-maturity-gradient).
+- **One rule set, every agent.** Write short imperative rules once
+  (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's `CLAUDE.md`,
+  and a portable `AGENTS.md` from the same source, each with a provenance header
+  naming the source SHA, and `--check` fails CI on drift. See
+  [One rule set, every agent](docs/REFERENCE.md#one-rule-set-every-agent).
+- **The rule set has a budget.** `rule-budget.py` measures what an always-on
+  rule set costs every session and reports when it is over — the mechanism that
+  stops the rendered output becoming the same unread wall the vault exists to
+  replace. See [Review loop](docs/REFERENCE.md#review-loop).
+- **Lineage is recorded, and audited.** A rule's `source:` frontmatter names the
+  practice note it came from. `make audit` reports orphaned rules, stale claims,
+  thin evidence, and follow-ups still open past the window `check-follow-ups`
+  covers — read-only, nothing blocking but an orphaned rule. See
+  [docs/AUDIT.md](docs/AUDIT.md).
+- **One vault per machine, isolated per commit.** Rules flow outward freely;
+  a practice learned on employer work landing in a personal or public repo is a
+  *vault write*, so every commit is checked against the machine's expected vault
+  identity — read from this machine's config, never from the vault being
+  checked. Enforced three ways, one of which survives `--no-verify`. See
+  [docs/GUARD.md](docs/GUARD.md).
+- **Rendering into a repo you do not own.** `--local` renders normally and adds
+  exactly the files it wrote to that repo's `.git/info/exclude`, so the rules
+  load in your sessions and the remote never sees them. It refuses if a path it
+  would write is already tracked, rather than half-keeping the promise. See
+  [Rendering into a repo you do not own](docs/REFERENCE.md#rendering-into-a-repo-you-do-not-own).
+- **Bring your own skills.** The engine ships five of its own and no roster of
+  other people's. Declare the ones you want in a `skills.json`, pinned by sha
+  and allowlisted per source, so two machines reading the same manifest install
+  the same thing. See
+  [Bringing your own skills](docs/REFERENCE.md#bringing-your-own-skills).
+- **Upgrades tell you what breaks first.** `make upgrade` previews by default,
+  prints every `### Major` changelog section in range verbatim before proposing
+  anything, then drift-checks every onboarded repo — from a registry *and* a
+  scan, so a repo the registry never recorded is still checked. See
+  [Versioning](docs/REFERENCE.md#versioning).
+- **`make doctor` says what this machine cannot do.** Including whether it has
+  any rules to render at all, and whether an empty rules directory is a decision
+  or an unfinished setup. See [`make doctor`](docs/GUARD.md#make-doctor).
+
+## Documentation
+
+| Document | What is in it |
+|----------|---------------|
+| [docs/NEW-MACHINE.md](docs/NEW-MACHINE.md) | Setup, step by step, with a **Check.** after each; the git-identity setup; every refusal explained; troubleshooting from real failures |
+| [docs/REFERENCE.md](docs/REFERENCE.md) | Rendering, skills and the manifest, the repo registry, the vault layout, versioning and upgrades |
+| [docs/GUARD.md](docs/GUARD.md) | The commit guard's mechanics, its trust model, and what `make doctor` verifies |
+| [docs/AUDIT.md](docs/AUDIT.md) | Each audit check, and the CI template that runs them weekly |
+| [config.example](config.example) | Every configuration key |
 
 ## License
 

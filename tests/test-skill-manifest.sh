@@ -1146,8 +1146,9 @@ case "${out}" in
   *) fail "two entries at one ref are named as mergeable" "${out}" ;;
 esac
 
-# The README shows the pattern, and a snippet that does not parse is worse than
-# no snippet: it is copied first and debugged second.
+# The docs show the pattern, and a snippet that does not parse is worse than no
+# snippet: it is copied first and debugged second. Both reader-facing files are
+# scanned, so moving a fence between them cannot quietly drop it from the check.
 snip_dir="${SANDBOX}/readme-snippets"
 mkdir -p "${snip_dir}"
 awk -v out="${snip_dir}" '
@@ -1155,12 +1156,12 @@ awk -v out="${snip_dir}" '
   /^[ \t]*```/     { if (f && buf ~ /"sources"/) { n++; printf "%s", buf > (out "/s" n ".json") }
                      f = 0; next }
   f                { buf = buf $0 "\n" }
-' "${ENGINE}/README.md"
+' "${ENGINE}/README.md" "${ENGINE}/docs/REFERENCE.md"
 TESTS_RUN=$((TESTS_RUN + 1))
 if grep -rq "pinned_apart" "${snip_dir}"; then
-  pass "the README documents the pinned-apart pattern"
+  pass "the docs document the pinned-apart pattern"
 else
-  fail "the README documents the pinned-apart pattern" "no manifest fence mentions it"
+  fail "the docs document the pinned-apart pattern" "no manifest fence mentions it"
 fi
 snippet_bad=""
 for snip in "${snip_dir}"/*.json; do
@@ -1168,7 +1169,7 @@ for snip in "${snip_dir}"/*.json; do
   SBW_SKILLS_MANIFEST="${snip}" python3 "${MANIFEST_PY}" validate >/dev/null 2>&1 \
     || snippet_bad="${snippet_bad}${snip} "
 done
-assert_str "" "${snippet_bad}" "every manifest snippet in the README is a valid manifest"
+assert_str "" "${snippet_bad}" "every manifest snippet in the docs is a valid manifest"
 
 # --- candidate validation ---------------------------------------------------
 bad_case "{\"sources\":[{\"name\":\"f\",\"repo\":\"r\",\"ref\":\"${SHA1}\",\"allow\":[\"animate\"]}],\"candidates\":[{\"name\":\"animate\",\"repo\":\"r\",\"when\":\"w\"}]}" \

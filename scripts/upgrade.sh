@@ -209,7 +209,7 @@ report_version() {
     eq) echo "        already at the target — nothing to switch, everything below still checked" ;;
     gt) echo "        the target is older than this checkout: this is a rollback, and the"
         echo "        required actions for it are the ones between the two releases, read in"
-        echo "        reverse. See the README section on Versioning." ;;
+        echo "        reverse. See docs/REFERENCE.md, Versioning." ;;
   esac
 }
 

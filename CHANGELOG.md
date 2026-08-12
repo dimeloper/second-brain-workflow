@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version numbers
-follow the bump policy in the README's [Versioning](README.md#versioning)
+follow the bump policy in the reference's [Versioning](docs/REFERENCE.md#versioning)
 section.
 
 A **Major** entry always names the specific action required to keep an
@@ -16,6 +16,32 @@ link to the matching section here rather than duplicating it — one place to
 write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
+
+### Changed
+- **The README is now five sections and a Quickstart, down from 965 lines.** It
+  had grown into the reference manual as well as the pitch, and the two want
+  opposite things: a reference is complete, an introduction is ruthless about
+  what a reader needs before they believe the premise. Everything a first-time
+  reader has no use for — the skills manifest, the repo registry, render
+  targets, verification, upgrade mechanics — moved to a new
+  `docs/REFERENCE.md`, unchanged in content.
+
+  What replaced it is structured around when the value actually arrives. A
+  **benefit ladder** states the schedule plainly (session 1: a daily note; next
+  morning: `check my tasks`; week 2: applicable notes found for you; month 1: a
+  note reaches `enforced`; month 3: `make audit`), because the value here is
+  deferred and a page that implies otherwise loses the reader at week one. The
+  two load-bearing assumptions — git plus a markdown vault, and **the promotion
+  gate being manual by design** — are now stated in the first 200 words rather
+  than inferable from the mechanics several screens down. That costs the readers
+  who wanted automation and keeps the ones who would actually use this.
+- Every cross-file link into a moved section was repointed rather than left to
+  resolve to nothing: `GUARD.md`, `NEW-MACHINE.md`, `CHANGELOG.md`,
+  `docs/vault-ci/README.md`, and one message `upgrade.sh` prints. `doc_links.py`
+  only checks same-document anchors, so a stale `../README.md#…` would have gone
+  unreported — which is why `docs/REFERENCE.md` was added to every doc check in
+  `test-doc-snippets.sh` at the same time, rather than shipping a reader-facing
+  document with less checking than the one it was carved out of.
 
 ## [0.26.1] - 2026-08-12
 
