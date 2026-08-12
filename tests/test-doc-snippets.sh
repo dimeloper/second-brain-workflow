@@ -124,6 +124,32 @@ case "${QS}" in
   *) fail "and labels the two cases as a choice between them" "${QS}" ;;
 esac
 
+# --- the Quickstart pins a release ------------------------------------------
+# Dropping these lines makes the default path a clone of `main`, and the two
+# guard tiers then enforce different code: the pre-commit hook runs whatever
+# `main` is while the CI backstop checks out the tag its ENGINE_REF pins. CI
+# exists to catch what `--no-verify` skips, so a divergence there is not
+# cosmetic. `upgrade.sh` already warns about a vault workflow that pins
+# nothing, for exactly this reason — the README must not recommend the thing
+# the tooling warns about.
+TESTS_RUN=$((TESTS_RUN + 1))
+# shellcheck disable=SC2016  # matching the literal text `$latest` in the
+# README, which must not expand here — that is the whole assertion.
+case "${QS}" in
+  *"git tag --sort=-v:refname"*'[ -z "$latest" ] || git checkout "$latest"'*)
+    pass "the Quickstart pins the newest release rather than tracking main" ;;
+  *) fail "the Quickstart pins the newest release rather than tracking main" "${QS}" ;;
+esac
+
+# A tag checkout after --recurse-submodules leaves vendor/obsidian-skills at
+# whatever main pinned, so the pin above is only half-applied without this.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${QS}" in
+  *"git submodule update --init --recursive"*)
+    pass "and re-pins the submodule, which a tag checkout does not move" ;;
+  *) fail "and re-pins the submodule, which a tag checkout does not move" "${QS}" ;;
+esac
+
 # --- the placeholder cannot be left alone -----------------------------------
 # `YOUR_ACCOUNT` was visibly a placeholder and got substituted; `vault_id=
 # personal` looked like a working default and got kept. Readers replace what
@@ -193,6 +219,47 @@ case "${out}" in
   *"link to #no-such-heading"*) pass "the anchor checker finds a broken link" ;;
   *) fail "the anchor checker finds a broken link" "${out}" ;;
 esac
+
+# --- and the same across files ----------------------------------------------
+# Cutting the README down to a pitch moved its deep links into REFERENCE.md, so
+# the whole "why this doesn't rot" section — the part carrying the trust
+# argument — now points at another file. Same-document checking cannot see
+# that, and a check that cannot determine something falls through to green.
+# Renaming a heading in the target must turn this red.
+mkdir -p "${SANDBOX}/xfile/sub"
+printf '# Target\n\n## Real Section\n' > "${SANDBOX}/xfile/sub/target.md"
+printf '# Source\n\nSee [that](sub/target.md#real-section) and [this](sub/target.md#renamed-away).\n' \
+  > "${SANDBOX}/xfile/source.md"
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" "${SANDBOX}/xfile/source.md" 2>&1 || true)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"link to sub/target.md#renamed-away"*)
+    pass "the anchor checker finds a broken cross-file link" ;;
+  *) fail "the anchor checker finds a broken cross-file link" "${out}" ;;
+esac
+
+# Without this the check above passes just as happily against a checker that
+# reports every cross-file link, which would make it useless rather than wrong.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"#real-section"*)
+    fail "and leaves a cross-file link that does resolve alone" "${out}" ;;
+  *) pass "and leaves a cross-file link that does resolve alone" ;;
+esac
+
+# An external link is somebody else's uptime, and a path that does not resolve
+# is a different defect this deliberately does not claim to catch. Both must
+# stay silent, or the checker cannot be run over docs that link outward.
+printf '# S\n\n[a](https://example.com/x#frag) [b](nope/missing.md#frag)\n' \
+  > "${SANDBOX}/xfile/quiet.md"
+out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" "${SANDBOX}/xfile/quiet.md" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "an external link and an unresolvable path are both left alone"
+else
+  fail "an external link and an unresolvable path are both left alone" "${out}"
+fi
 
 # --- a command a Major changelog entry tells the reader to run --------------
 # upgrade.sh prints ### Major sections verbatim, so a command named there is
