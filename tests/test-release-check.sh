@@ -63,7 +63,16 @@ chmod +x "${BIN}/gh"
 # are real git operations rather than more stubbing. The push in the --yes case
 # has to actually land somewhere, or "it tagged" is untested.
 git init -q --bare "${UPSTREAM}"
+# Both HEADs set explicitly. `init.defaultBranch` is unset in the sandbox (there
+# is no global git config in here by design), so the branch name a bare repo
+# picks is whatever the git build defaults to — `main` on this machine, `master`
+# on the runners. The script reads `git ls-remote origin HEAD`, which follows
+# the *bare* repo's HEAD, so on a runner it resolved to a branch nothing was
+# ever pushed to: every case after the first two refused with "cannot read
+# origin's HEAD" and the suite failed in CI while passing locally.
+git -C "${UPSTREAM}" symbolic-ref HEAD refs/heads/main
 git clone -q "${UPSTREAM}" "${REPO}" 2>/dev/null
+git -C "${REPO}" symbolic-ref HEAD refs/heads/main
 git -C "${REPO}" config user.email "test@example.com"
 git -C "${REPO}" config user.name "Test"
 mkdir -p "${REPO}/scripts/lib"
@@ -72,7 +81,6 @@ cp "${ENGINE}/scripts/lib/invocation.sh" "${REPO}/scripts/lib/"
 printf '0.99.0\n' > "${REPO}/VERSION"
 git -C "${REPO}" add -A
 git -C "${REPO}" commit -q -m "release commit"
-git -C "${REPO}" branch -M main
 git -C "${REPO}" push -q -u origin main 2>/dev/null
 
 CHECK="${REPO}/scripts/release-check.sh"
