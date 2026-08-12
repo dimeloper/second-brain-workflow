@@ -814,7 +814,9 @@ unasserted. To check it by hand, put a second canary in a rule with no `paths:`
 and ask for it while editing a file that matches no glob.
 
 Verified 2026-08-02 on Cursor 3.14.7: known immediately on `*.component.ts`, and
-on a `.txt` file the agent had to grep for it. Scoping confirmed on both agents.
+on a `.txt` file the agent had to grep for it. **Scoping** is confirmed on both
+agents; **always-on delivery** is confirmed on Claude Code only (v0.23.0's third
+probe) and remains unverified on Cursor, per the note above.
 
 ## Versioning
 

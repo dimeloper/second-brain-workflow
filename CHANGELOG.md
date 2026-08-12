@@ -17,6 +17,35 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-08-12
+
+### Fixed
+- **Three acceptance criteria v0.25.0 left unmet**, found by reading the review
+  against the shipped result rather than against the commit message.
+
+  **The worked example still had no always-on rule.** v0.25.0 deleted the
+  superseded de-duplication sentence and left the example alone — so the only
+  **Major** since v0.10.0, the one that changed what a rendered `AGENTS.md`
+  contains, had no worked example anywhere. `docs/NEW-MACHINE.md` gains
+  *"...and a rule with no `paths:`"*: the source rule, the Cursor `.mdc` with
+  `alwaysApply: true`, the block appended to `AGENTS.md` with its own provenance
+  header, the statement that **no** `.claude/rules/<name>.md` is written, and the
+  two cases that fall back to one.
+
+  **"Scoping confirmed on both agents" survived underneath the new *not
+  covered* paragraph** — the same shape as the finding it was fixing: a
+  correction added above, the superseded claim left standing below. It now says
+  scoping is confirmed on both agents, always-on delivery on Claude Code only,
+  and Cursor's always-on path remains unverified.
+
+  **The scope of `test-troubleshooting.sh`'s green is now stated in the
+  document.** It counts `**Check.**` blocks against numbered steps and verifies
+  that messages the troubleshooting table quotes still exist in the emitting
+  source. It never reads what is *inside* a Check block — so an expected-output
+  sample can drift release by release with nothing failing, which is how step 5's
+  block reached three releases stale. Same blind spot `stated_counts.py`
+  documents for fenced samples.
+
 ## [0.25.0] - 2026-08-11
 
 No **Major** entry: a new `make` target, a pinned CI dependency, two checks, and
@@ -1805,7 +1834,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.23.0...v0.24.0
