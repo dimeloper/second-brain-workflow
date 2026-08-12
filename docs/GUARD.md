@@ -1,6 +1,6 @@
 # The vault commit guard
 
-Full mechanics for [the README's "A vault per machine"](../README.md#a-vault-per-machine)
+Full mechanics for [the reference's "A vault per machine"](REFERENCE.md#a-vault-per-machine)
 model: creating a vault, what the commit guard blocks, the three ways it's
 enforced, the trust model behind it, and what `make doctor` checks. Read the
 README first for why any of this exists — this is the reference material,
@@ -285,8 +285,8 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   ours: the local backstop above.
 - **Skill parity across `SKILLS_DIRS`** — a skill installed into one
   configured skills directory but missing from another is invisible from
-  whichever agent reads the second one. See the README's
-  [Skills](../README.md#skills) section.
+  whichever agent reads the second one. See the reference's
+  [Skills](REFERENCE.md#skills) section.
 - **Skill-roster parity** — the third-party skills a `skills.json` declares,
   against what is actually on this machine, in three directions: a source that
   was never fetched, a source whose checkout sits at a **different sha** than the
@@ -296,12 +296,12 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   machines can be running different versions of the same adopted skill with
   nothing anywhere reporting it. Skipped entirely when no manifest is configured
   — the check reads a declared roster, so with none declared there is nothing to
-  compare and it must not manufacture a finding. See the README's
-  [Bringing your own skills](../README.md#bringing-your-own-skills) section.
+  compare and it must not manufacture a finding. See the reference's
+  [Bringing your own skills](REFERENCE.md#bringing-your-own-skills) section.
 - **Vendored submodule drift** — `vendor/obsidian-skills` checked out at a
   commit other than the one this engine checkout's tag actually pins, the
-  state a bare `git checkout <tag>` leaves behind. See the README's
-  [Rollback](../README.md#versioning) section.
+  state a bare `git checkout <tag>` leaves behind. See the reference's
+  [Rollback](REFERENCE.md#rollback) section.
 - **The repo registry, both directions** — the registry is compared against a
   scan of this machine for repos carrying rendered output, because the registry
   alone only knows what a render told it. Registered repos that are gone or no
@@ -310,7 +310,7 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   with the command that registers each. Every report states the scan's scope —
   `roots=… depth=…`, on clean runs too — because a scan cannot claim
   completeness, and *undetermined* now means only that no configured root could
-  be read. See the README's [repo registry](../README.md#the-repo-registry)
+  be read. See the reference's [repo registry](REFERENCE.md#the-repo-registry)
   section.
 
 `-h` prints this same list from the script itself, so it can't drift out of

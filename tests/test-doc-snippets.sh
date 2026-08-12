@@ -19,7 +19,7 @@
 . "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 setup_sandbox
 
-DOCS="README.md docs/NEW-MACHINE.md docs/GUARD.md docs/AUDIT.md docs/vault-ci/README.md"
+DOCS="README.md docs/REFERENCE.md docs/NEW-MACHINE.md docs/GUARD.md docs/AUDIT.md docs/vault-ci/README.md"
 
 # Report every paste hazard inside shell-tagged fences of one markdown file.
 scan_file() {
@@ -151,8 +151,8 @@ esac
 # times now" above four entries in a list *about* wrong counts. Proofreading is
 # not the fix; a claim about a list being checkable is.
 out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" \
-  "${ENGINE}/README.md" "${ENGINE}/docs/NEW-MACHINE.md" "${ENGINE}/docs/GUARD.md" \
-  "${ENGINE}/docs/AUDIT.md" "${ENGINE}/CHANGELOG.md" 2>&1 || true)"
+  "${ENGINE}/README.md" "${ENGINE}/docs/REFERENCE.md" "${ENGINE}/docs/NEW-MACHINE.md" \
+  "${ENGINE}/docs/GUARD.md" "${ENGINE}/docs/AUDIT.md" "${ENGINE}/CHANGELOG.md" 2>&1 || true)"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${out}" = "clean" ]; then
   pass "no heading states a count its list does not have"
@@ -177,8 +177,8 @@ esac
 # link that silently does nothing is the same class as a heading that states a
 # count its list does not have.
 out="$(python3 "${ENGINE}/scripts/lib/doc_links.py" \
-  "${ENGINE}/README.md" "${ENGINE}/docs/NEW-MACHINE.md" "${ENGINE}/docs/GUARD.md" \
-  "${ENGINE}/docs/AUDIT.md" 2>&1 || true)"
+  "${ENGINE}/README.md" "${ENGINE}/docs/REFERENCE.md" "${ENGINE}/docs/NEW-MACHINE.md" \
+  "${ENGINE}/docs/GUARD.md" "${ENGINE}/docs/AUDIT.md" 2>&1 || true)"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${out}" = "clean" ]; then
   pass "every in-document anchor link resolves to a heading"
