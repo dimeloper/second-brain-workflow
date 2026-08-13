@@ -21,7 +21,9 @@ BIN="${SANDBOX}/bin"
 REPO="${SANDBOX}/engine"
 UPSTREAM="${SANDBOX}/upstream.git"
 RUNS="${SANDBOX}/runs.json"
+RELEASE="${SANDBOX}/release.args"
 export RUNS_FILE="${RUNS}"
+export RELEASE_FILE="${RELEASE}"
 
 mkdir -p "${BIN}"
 
@@ -31,11 +33,24 @@ mkdir -p "${BIN}"
 # query the script starts making without a fixture fails loudly here rather than
 # silently returning nothing (which would read as "no run" — a refusal, and so
 # an easy way for a broken test to look like a passing one).
+#
+# `release create` writes its whole argv to RELEASE_FILE instead of publishing.
+# That file existing is the only evidence that a Release was published, which is
+# what lets "the tag was pushed but no Release followed" — the bug that left
+# four releases unpublished — be an assertion rather than something noticed on
+# the repo's front page a week later. GH_RELEASE_FAILS makes it exit non-zero.
 cat > "${BIN}/gh" <<'STUB'
 #!/usr/bin/env bash
 case "$1 $2" in
   "auth status")
     [ -n "${GH_UNAUTHED:-}" ] && exit 1
+    exit 0 ;;
+  "repo view")
+    echo "https://github.example/owner/repo"
+    exit 0 ;;
+  "release create")
+    [ -n "${GH_RELEASE_FAILS:-}" ] && exit 1
+    printf '%s\n' "$*" > "${RELEASE_FILE}"
     exit 0 ;;
 esac
 if [ "$1 $2" = "run list" ]; then
@@ -215,6 +230,49 @@ else
   fail "a plain check leaves the repo untagged" "$(git -C "${REPO}" tag -l)"
 fi
 
+# --- the Release, resolved before the tag ------------------------------------
+#
+# A missing changelog section has to refuse *before* tagging. Afterwards the tag
+# is an artefact adopters can already have fetched, and the only thing left to
+# discover is a Release whose link 404s.
+
+out="$(run --yes)"
+rc=$?
+assert_exit 2 "${rc}" "no changelog at all is refused"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"describe itself"*) pass "and says the release would otherwise have to describe itself" ;;
+  *) fail "and says the release would otherwise have to describe itself" "${out}" ;;
+esac
+
+# The likelier version of that mistake: a changelog that exists, with the bump
+# made and the section not yet written.
+printf '## [0.98.0] - 2026-01-01\n\n### Added\n- An older thing.\n' > "${REPO}/CHANGELOG.md"
+git -C "${REPO}" add -A
+git -C "${REPO}" commit -q -m "docs: a changelog with no section for this version"
+git -C "${REPO}" push -q origin main 2>/dev/null
+
+out="$(run --yes)"
+rc=$?
+assert_exit 2 "${rc}" "a changelog with no section for this version is refused"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"nothing to publish until it is written"*) pass "and says the Release links to that section, not a copy of it" ;;
+  *) fail "and says the Release links to that section, not a copy of it" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -z "$(git -C "${REPO}" tag -l)" ]; then
+  pass "and refuses before tagging, while retyping the command is the only cost"
+else
+  fail "and refuses before tagging, while retyping the command is the only cost" \
+    "$(git -C "${REPO}" tag -l)"
+fi
+
+printf '## [0.99.0] - 2026-01-01\n\n### Added\n- A thing.\n' > "${REPO}/CHANGELOG.md"
+git -C "${REPO}" add -A
+git -C "${REPO}" commit -q -m "docs: cut v0.99.0 — the summary line"
+git -C "${REPO}" push -q origin main 2>/dev/null
+
 out="$(run --yes)"
 rc=$?
 assert_exit 0 "${rc}" "--yes on a green run tags and pushes"
@@ -230,10 +288,70 @@ else
   fail "and pushed — a local-only tag would gate nothing" "not on the remote"
 fi
 
+# The assertion the missing Releases needed. A tag with no Release is invisible
+# on the repo's front page, which goes on reporting the last release anyone
+# remembered to publish by hand.
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -f "${RELEASE}" ]; then
+  pass "and the Release is published in the same act, not left to be remembered"
+else
+  fail "and the Release is published in the same act, not left to be remembered" \
+    "no gh release create"
+fi
+args="$(cat "${RELEASE}" 2>/dev/null || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${args}" in
+  *"CHANGELOG.md#0990---2026-01-01"*) pass "the notes link to that version's section by its own anchor" ;;
+  *) fail "the notes link to that version's section by its own anchor" "${args}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${args}" in
+  *"--title v0.99.0 — the summary line"*) pass "and the title comes from the cut commit, not a hand-typed one" ;;
+  *) fail "and the title comes from the cut commit, not a hand-typed one" "${args}" ;;
+esac
+# --verify-tag, so gh cannot create a tag that skipped this gate entirely.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${args}" in
+  *"--verify-tag"*) pass "against the tag just pushed, never one gh would create itself" ;;
+  *) fail "against the tag just pushed, never one gh would create itself" "${args}" ;;
+esac
+
 # Cutting the same release twice is a mistake worth catching, and the tag now
 # exists to catch it with.
 out="$(run --yes)"
 rc=$?
 assert_exit 2 "${rc}" "an already-existing tag is refused rather than re-pushed"
+
+# --- the Release failing after the tag is pushed -----------------------------
+#
+# The tag is gone from this script's control by then, so the only useful thing
+# left is to say so plainly and hand over the exact command — a silent success
+# here is how the front page went stale for four releases.
+printf '0.99.1\n' > "${REPO}/VERSION"
+printf '## [0.99.1] - 2026-01-02\n\n### Fixed\n- Another thing.\n' > "${REPO}/CHANGELOG.md"
+git -C "${REPO}" add -A
+git -C "${REPO}" commit -q -m "docs: cut v0.99.1 — the patch"
+git -C "${REPO}" push -q origin main 2>/dev/null
+rm -f "${RELEASE}"
+
+out="$(GH_RELEASE_FAILS=1 run --yes)"
+rc=$?
+assert_exit 1 "${rc}" "a Release that fails to publish is not reported as a clean cut"
+TESTS_RUN=$((TESTS_RUN + 1))
+if git -C "${UPSTREAM}" rev-parse -q --verify "refs/tags/v0.99.1" >/dev/null 2>&1; then
+  pass "the tag stays pushed — it is not this script's to take back"
+else
+  fail "the tag stays pushed — it is not this script's to take back" "not on the remote"
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"The tag is pushed; the Release is not"*) pass "and the state it left behind is named exactly" ;;
+  *) fail "and the state it left behind is named exactly" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"gh release create v0.99.1"*) pass "with the command to finish it by hand" ;;
+  *) fail "with the command to finish it by hand" "${out}" ;;
+esac
 
 finish

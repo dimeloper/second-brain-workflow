@@ -45,6 +45,8 @@ help:
 	@echo "make verify-claude       prove Claude Code loads rendered rules (3 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
 	@echo "                         (skips shellcheck if it isn't installed)"
+	@echo "make release-check       refuse to cut on a red or pending CI run; WAIT=1 to"
+	@echo "                         block, YES=1 to tag, push, and publish the Release"
 	@echo ""
 	@echo "Render into a repo:  ./scripts/render.py <repo> [--targets ...]"
 	@echo "VAULT=$(VAULT)"
@@ -173,7 +175,8 @@ practices-for:
 # run once per cut rather than on every edit. Preview unless YES=1, the same
 # shape as uninstall and upgrade — so the tag is something you opt into, and the
 # wait between pushing main and pushing the tag is a command rather than a thing
-# to remember not to chain with &&.
+# to remember not to chain with &&. YES=1 publishes the GitHub Release in the
+# same act: leaving that to be remembered separately lost four of them.
 release-check:
 	@./scripts/release-check.sh $(if $(YES),--yes,) $(if $(WAIT),--wait,) \
 	  $(if $(RELEASE_VERSION),--version $(RELEASE_VERSION),)

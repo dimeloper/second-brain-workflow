@@ -17,6 +17,31 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`make release-check YES=1` now publishes the GitHub Release, not just the
+  tag.** Publishing it was a sentence in the release instructions and nothing
+  else, so it was skipped for v0.28.0, v0.28.1, v0.29.0 and v0.30.0 — four tags
+  pushed, four Releases missing, and the repo's front page reading
+  `Latest: v0.27.0` for a week while `VERSION` said `0.30.0`. The tags were
+  never wrong; the page reads Releases, and nothing was watching the gap
+  between the two. The four missing Releases have been created against their
+  existing tags — no tag was moved or re-cut.
+
+  This is the same failure the gate itself was written about, one step further
+  along: a step with no representation in any command is a step with nothing to
+  skip and nothing to notice skipping. A tag and its notes are not two
+  decisions, so `--yes` now tags, pushes, and publishes as one act.
+
+  The notes are generated as a link to that version's changelog section plus
+  the compare diff, never a copy — `CHANGELOG.md` has said "one place to write
+  release notes, not two to keep in sync by hand" since v0.2.0 — and the title
+  comes from the `docs: cut vX.Y.Z — …` commit subject. A missing changelog
+  section is a **refusal before tagging**, while retyping the command is still
+  the only cost; after the tag is pushed the only thing left to discover would
+  be a Release whose link 404s. If publishing fails once the tag is gone, the
+  script says so plainly and prints the command to finish by hand rather than
+  reporting a clean cut.
+
 ## [0.30.0] - 2026-08-12
 
 ### Changed

@@ -752,18 +752,29 @@ and then tag through the gate:
 ```bash
 git push origin main            # the release commit, on its own — no tag here
 make release-check WAIT=1       # blocks until the run for THIS commit reports
-make release-check YES=1        # tags and pushes, only if that run was green
+make release-check YES=1        # tags, pushes, and publishes, if that run was green
 ```
 
-Point the GitHub Release's notes at that changelog section rather than writing
-them by hand — one place to describe what changed, not two that can say different
-things.
+`YES=1` publishes the GitHub Release too, in the same act as the tag. Its notes
+are generated as a link to that version's changelog section plus the compare
+diff — one place to describe what changed, not two that can say different
+things — and its title comes from the `docs: cut vX.Y.Z — …` commit subject. Add
+a summary paragraph above the link with `gh release edit` when a release
+warrants one; the link is the part that has to be right, and it is the part
+generated for you.
+
+That used to be a sentence here and nothing else, which is exactly how v0.28.0,
+v0.28.1, v0.29.0 and v0.30.0 were all tagged with no Release behind them — four
+pushed tags, and a front page reading "Latest: v0.27.0" for a week. A tag and
+its notes are not two decisions.
 
 `make release-check` refuses on a red run, a pending run, a run that does not
-exist, a dirty tree, an unpushed `HEAD`, and a tag that already exists. It never
-re-runs a failed job: a red that is really a flake is a judgement made with the
-log open, and a gate that retried until green could not refuse. On a red it
-prints `gh run view --log-failed` and `gh run rerun --failed` for you to run
+exist, a dirty tree, an unpushed `HEAD`, a tag that already exists, and a
+changelog with no section for the version being cut — that last one before
+tagging, while retyping the command is still the only cost. It never re-runs a
+failed job: a red that is really a flake is a judgement made with the log open,
+and a gate that retried until green could not refuse. On a red it prints
+`gh run view --log-failed` and `gh run rerun --failed` for you to run
 deliberately.
 
 The separate `WAIT=1` and `YES=1` steps are the point rather than an

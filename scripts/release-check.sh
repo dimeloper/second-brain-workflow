@@ -8,10 +8,11 @@
 #   ./release-check.sh --version X  # check that version instead of VERSION's
 #
 # Exit codes:
-#   0  the run for HEAD is complete and green (and tagged, with --yes)
+#   0  the run for HEAD is complete and green (and tagged + released, with --yes)
 #   1  refused on the run: red, still pending, or no run for this commit
 #   2  refused before looking: dirty tree, unpushed HEAD, the tag already
-#      exists, bad arguments, or no usable gh
+#      exists, no changelog section for this version, bad arguments, or no
+#      usable gh
 #
 # Why this exists as a command rather than a checklist line. The practice —
 # [[gate-the-release-tag-on-the-ci-run-not-the-local-suite]] — was held by hand
@@ -35,6 +36,13 @@
 # It also never re-runs a failed job. A red that is actually a flake is a
 # judgement someone has to make, and a gate that quietly retried until green
 # would be a gate that always passes.
+#
+# Publishing the GitHub Release is part of --yes for the same reason the gate
+# exists at all. It used to be a sentence in the release instructions and
+# nothing else, so it was skipped for v0.28.0, v0.28.1, v0.29.0 and v0.30.0 —
+# four tags pushed, four Releases missing, and the repo's front page reading
+# "Latest: v0.27.0" for a week. A tag and its notes are not two decisions, and
+# the only step here worth pausing between is the one that is already gated.
 set -euo pipefail
 
 ENGINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -96,6 +104,55 @@ if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null 2>&1; then
 fi
 if [ -n "$(git ls-remote --tags origin "refs/tags/${TAG}" 2>/dev/null)" ]; then
   refuse "${TAG} already exists on origin. Nothing to gate — this release is cut." 2
+fi
+
+# --- the notes, resolved before anything irreversible ------------------------
+#
+# Everything here happens while the only cost of refusing is retyping the
+# command. Once the tag is pushed it is an artefact adopters can already have
+# fetched, so "no changelog section for this version" has to be a refusal now
+# rather than a broken link discovered afterwards.
+#
+# The body is a *pointer*, never a copy. CHANGELOG.md says so at the top of the
+# file: one place to write release notes, not two to keep in sync by hand. Add
+# a summary paragraph above it with `gh release edit` when a release warrants
+# one — the link is what has to be right, and it is the part generated here.
+anchor_of() {
+  # GitHub's heading slug: lowercase, drop punctuation, spaces to hyphens.
+  # "[0.30.0] - 2026-08-12" -> "0300---2026-08-12"
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:] _-' | tr ' ' '-'
+}
+
+if [ "${ACT}" -eq 1 ]; then
+  CHANGELOG="${ENGINE}/CHANGELOG.md"
+  [ -f "${CHANGELOG}" ] || refuse "no CHANGELOG.md in ${ENGINE}, so the release
+  would have to describe itself. Write the section first." 2
+
+  heading="$(grep -m1 -F "## [${VERSION}]" "${CHANGELOG}" || true)"
+  [ -n "${heading}" ] || refuse "CHANGELOG.md has no '## [${VERSION}]' section.
+  The Release links to that section rather than restating it, so there is
+  nothing to publish until it is written." 2
+
+  ANCHOR="$(anchor_of "${heading#\#\# }")"
+  # Read before the new tag exists, so it is genuinely the previous release.
+  PREV_TAG="$(git tag -l 'v*' --sort=-v:refname | head -n 1)"
+  REPO_URL="$(gh repo view --json url --jq .url 2>/dev/null || true)"
+  [ -n "${REPO_URL}" ] || refuse "cannot read this repository's URL from gh." 2
+
+  # The cut commit already names the release in the form the Releases page
+  # wants; anything else (a lone fix tagged as a patch, say) gets the bare tag.
+  subject="$(git log -1 --format=%s)"
+  case "${subject}" in
+    *"cut ${TAG} — "*) TITLE="${TAG} — ${subject#*"cut ${TAG} — "}" ;;
+    *)                 TITLE="${TAG}" ;;
+  esac
+
+  NOTES="See [CHANGELOG.md — ${VERSION}](${REPO_URL}/blob/${TAG}/CHANGELOG.md#${ANCHOR}) for what changed"
+  if [ -n "${PREV_TAG}" ]; then
+    NOTES="${NOTES}, and the [full diff](${REPO_URL}/compare/${PREV_TAG}...${TAG})."
+  else
+    NOTES="${NOTES}."
+  fi
 fi
 
 SHA="$(git rev-parse HEAD)"
@@ -173,7 +230,7 @@ echo "  CI is green on this commit."
 
 if [ "${ACT}" -eq 0 ]; then
   echo
-  note "Nothing tagged — this was a check. To tag and push:"
+  note "Nothing tagged — this was a check. To tag, push, and publish the Release:"
   note "  $(say_remediation "make release-check YES=1" "./scripts/release-check.sh --yes")"
   exit 0
 fi
@@ -181,6 +238,23 @@ fi
 git tag -a "${TAG}" -m "${TAG}"
 git push origin "${TAG}"
 echo "  tagged ${TAG} and pushed it."
+
+# --verify-tag rather than letting gh create the tag for us: the tag is the
+# artefact this whole script gates, and it has just been made deliberately
+# above. A gh that could invent one would route around the gate.
+if gh release create "${TAG}" --verify-tag --latest \
+     --title "${TITLE}" --notes "${NOTES}" >/dev/null; then
+  echo "  published the Release, pointing at CHANGELOG.md#${ANCHOR}."
+else
+  echo
+  note "The tag is pushed; the Release is not. Nothing to undo — publish it with:"
+  note "  gh release create ${TAG} --verify-tag --latest \\"
+  note "    --title '${TITLE}' --notes '${NOTES}'"
+  refuse "tagged ${TAG}, but publishing the Release failed." 1
+fi
+
 note "Now open the run for the tag itself — a tag builds separately from the"
 note "branch, and this gate has only seen the branch's:"
 note "  gh run list --limit 3"
+note "Add a summary above the changelog link if this release warrants one:"
+note "  gh release edit ${TAG} --notes-file -"
