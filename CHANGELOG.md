@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-08-14
+
 ### Added
 - **`make repos-check` — which onboarded repos are behind, asked after a rule
   changes rather than before a version does.** `make upgrade` step 7 already
@@ -2322,7 +2324,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.1...v0.29.0
 [0.28.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.0...v0.28.1
