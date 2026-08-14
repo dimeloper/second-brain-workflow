@@ -236,6 +236,12 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   anything, then drift-checks every onboarded repo — from a registry *and* a
   scan, so a repo the registry never recorded is still checked. See
   [Versioning](docs/REFERENCE.md#versioning).
+- **Editing a rule stales every copy of it, and `make repos-check` says which.**
+  The same drift check `make upgrade` runs, available at the other moment it
+  matters — after you change a rule, rather than before you change versions. It
+  reports and never renders; a `post-commit` hook in the rules repo is the
+  natural place to call it. See
+  [After a rule changes](docs/REFERENCE.md#after-a-rule-changes).
 - **`make doctor` says what this machine cannot do.** Including whether it has
   any rules to render at all, and whether an empty rules directory is a decision
   or an unfinished setup. See [`make doctor`](docs/GUARD.md#make-doctor).

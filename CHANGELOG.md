@@ -17,6 +17,31 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`make repos-check` — which onboarded repos are behind, asked after a rule
+  changes rather than before a version does.** `make upgrade` step 7 already
+  drift-checked every onboarded repo, but an upgrade is not the only thing that
+  stales a rendered copy: editing a rule stales every copy of it, immediately,
+  on the whole machine. That state was reachable only by remembering to run
+  `upgrade`, and the failure it hides — a rule everyone believes is live,
+  rendered nowhere — is invisible precisely because nobody thinks to look for
+  it.
+
+  `scripts/repos-check.sh` keeps the family's contract: it reports and never
+  renders, reads the repo set through `lib/registry.sh` (registry ∪ scan, so a
+  rendered-but-unregistered repo is still checked), and states the scope its
+  answer holds in. Exit codes are `0` clean, `1` repos need re-rendering, `3`
+  undetermined — `3` deliberately distinct from `1`, because "nothing to do" and
+  "cannot tell you" are different answers and a hook has to tell them apart.
+  `REGISTRY_ONLY=1` skips the disk walk and says which narrower question it
+  answered instead of implying the wider one.
+
+  The intended caller is a `post-commit` hook in whichever repo holds `rules/`,
+  gated on the commit having touched rendered content; the hook is documented in
+  [After a rule changes](docs/REFERENCE.md#after-a-rule-changes) rather than
+  installed, since it is local to one clone and names a path only that machine
+  can know.
+
 ### Fixed
 - **`make release-check YES=1` now publishes the GitHub Release, not just the
   tag.** Publishing it was a sentence in the release instructions and nothing

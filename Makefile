@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
-        vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain render guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain render repos-check guard doctor audit \
         init \
         verify-claude check release-check
 
@@ -19,6 +19,7 @@ SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
                  scripts/lib/registry.sh scripts/upgrade.sh scripts/release-check.sh \
+                 scripts/repos-check.sh \
                  scripts/lib/resolve-vault.sh scripts/uninstall.sh \
                  scripts/fetch-skill-sources.sh scripts/lib/skill-links.sh \
                  tests/lib.sh $(wildcard tests/test-*.sh)
@@ -37,6 +38,7 @@ help:
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make render REPO=...     render rules into one repo (also registers it)"
 	@echo "                         LOCAL=1 also excludes them from that repo's git"
+	@echo "make repos-check         which onboarded repos are behind; reports, never renders"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make init              explain this engine, detect the machine, preview a config"
 	@echo "                         (make init YES=1 VAULT_ID=... writes it, then runs doctor)"
@@ -105,6 +107,14 @@ explain:
 render:
 	@if [ -z "$(REPO)" ]; then echo "usage: make render REPO=/path/to/repo" >&2; exit 2; fi
 	@./scripts/render.py "$(REPO)" $(if $(LOCAL),--local,)
+
+# The same question `make upgrade` asks in step 7, asked at the other moment it
+# matters: after editing a rule, when every rendered copy on the machine has
+# just gone stale and nothing says so. Reports; never renders. Not part of
+# `make check`: it reads this machine's registry and walks its disk, so CI has
+# nothing for it to answer about.
+repos-check:
+	@./scripts/repos-check.sh $(if $(REGISTRY_ONLY),--registry-only,)
 
 guard:
 	@./scripts/guard-vault-commit.sh --vault "$(VAULT)"
