@@ -709,6 +709,55 @@ only what it says: no configured root could be read, so there was no second
 source to compare against at all. `make uninstall` leaves the registry file
 alone.
 
+### After a rule changes
+
+```bash
+make repos-check                    # registry ∪ scan, the honest set
+make repos-check REGISTRY_ONLY=1    # registered repos only, and it says so
+```
+
+`scripts/repos-check.sh` asks the same question [`make upgrade`](#upgrading-a-set-up-machine)
+asks at step 7 — which onboarded repos are behind — at the other moment it
+matters. An upgrade is not the only thing that stales a rendered copy: **editing
+a rule stales every copy of it**, immediately, everywhere on the machine. Until
+this existed, that state was reachable only by remembering to run `make upgrade`,
+which is a poor place to keep a fact that goes stale the moment you save a file.
+
+It reports and never renders — same contract as everything else in this family:
+`--check` reports, you decide. Exit codes are `0` clean, `1` at least one repo
+needs re-rendering, `3` the set is undetermined (no scan root could be read).
+`3` is deliberately not `1`: "nothing to do" and "cannot tell you" are different
+answers, and a caller has to be able to tell them apart.
+
+`REGISTRY_ONLY=1` skips the disk walk. It is the cheaper answer to a narrower
+question, and the report says which question it answered rather than implying
+the wider one.
+
+The natural caller is a `post-commit` hook in whichever repo holds `rules/` —
+that is where a rendered copy actually goes stale, and the hook fires at the one
+moment you still know why you changed the rule. Gate it on the commit having
+touched rendered content, so a README typo does not pay for a disk walk:
+
+```bash
+#!/usr/bin/env bash
+# .git/hooks/post-commit in the rules repo. Advisory: never renders, always
+# exits 0 — post-commit runs after the commit exists, so a failure here could
+# not undo anything and would only look like the commit failed.
+set -uo pipefail
+CHECK="${HOME}/second-brain-workflow/scripts/repos-check.sh"
+[ -x "${CHECK}" ] || exit 0
+git diff-tree --no-commit-id --name-only -r HEAD \
+  | grep -qE '^(rules/|AGENTS\.md$)' || exit 0
+echo
+echo "rules changed — onboarded repos now carrying an older copy:"
+"${CHECK}" || true
+exit 0
+```
+
+Local to that clone, like every `.git/hooks` file. That is the honest scope: the
+check is about repos rendered on *this* machine, and a fresh clone elsewhere has
+neither the hook nor the repos.
+
 ### The repo-path cache
 
 `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repo-paths` — `name<TAB>path`
