@@ -238,3 +238,74 @@ EOF
   printf '%s' "${found}" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u
   return 0
 }
+
+# --- the third direction ----------------------------------------------------
+#
+# Both sources above ask the same question — does this repo carry our rendered
+# output — so both answer no for a repo whose rendered output has stopped being
+# readable. It is not registered (nothing registered it), it is not found by the
+# scan (no marker survives to match), and it is therefore not in the denominator
+# of any count either one prints. A repo whose rules broke does not report as
+# broken. It reports as out of scope, and the run goes green.
+#
+# That is how a repo here spent two weeks loading nothing: four `.cursor/rules`
+# symlinks into `~/dev-standards`, the engine's own name before the rebrand,
+# every one of them dangling from the moment the directory was renamed. Every
+# check on this machine passed throughout, because each one had already decided
+# the repo was not its business.
+#
+# What is reported is deliberately narrow: a rule file that cannot be read *at
+# all*. A dangling symlink delivers nothing to any agent regardless of who wrote
+# it or which tool rendered it, so the finding needs no claim about ownership —
+# which is what keeps a hand-written `.cursor/rules/*.mdc`, the common and
+# correct case, from being called a fault. A regular file whose content is
+# merely stale is a different question, and `render.py --check` already answers
+# that one for repos it knows about.
+#
+# Not folded into sbw_scan_one_root: that walk answers "is this repo onboarded"
+# and its callers count what it returns. A broken repo added to that return
+# would inflate the onboarded count with repos that are onboarded to nothing.
+sbw_scan_broken_rules_one_root() {
+  local root="$1" depth="$2" f
+  # depth + 3, not depth: a rule file sits three levels below its repo
+  # (`.cursor/rules/x.mdc`), so reusing the repo depth here would search a
+  # strictly shallower set of repos than the marker scan does — the same
+  # silently-narrowed coverage this check exists to catch, reintroduced one
+  # directory at a time.
+  find "${root}" -maxdepth "$((depth + 3))" \
+    -type d \( -name node_modules -o -name Library -o -name .git -o -name vaults \) -prune \
+    -o -type l -path '*/.cursor/rules/*' -print \
+    -o -type l -path '*/.claude/rules/*' -print \
+    2>/dev/null |
+  while IFS= read -r f; do
+    [ -n "${f}" ] || continue
+    # `if`, not `[ -e "${f}" ] && continue`: under `set -e` a bare AND-list
+    # whose left side fails is a failed command, and the loop would exit on the
+    # first *intact* symlink it saw — leaving a check that only ever reports
+    # findings when the very first file is already broken.
+    if [ -e "${f}" ]; then continue; fi
+    printf '%s\t%s\n' "$(dirname "$(dirname "$(dirname "${f}")")")" "${f}"
+  done
+}
+
+# One "repo<TAB>dangling-file" per line, sorted. Pure, like
+# sbw_scan_rendered_repos, and prepares roots itself for the same reason.
+sbw_scan_broken_rules() {
+  local depth root found=""
+  depth="$(sbw_scan_depth_configured)"
+  sbw_scan_prepare_roots
+
+  while IFS= read -r root; do
+    [ -n "${root}" ] || continue
+    found="${found}$(sbw_scan_broken_rules_one_root "${root}" "${depth}")
+"
+  done <<EOF
+${SBW_SCAN_USABLE_ROOTS}
+EOF
+
+  # `|| true` on the filter: with nothing found, `grep -v` matches nothing and
+  # exits 1, which under pipefail is a failed command substitution on precisely
+  # the machine that has nothing wrong with it.
+  printf '%s' "${found}" | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u || true
+  return 0
+}

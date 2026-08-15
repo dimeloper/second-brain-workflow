@@ -16,9 +16,15 @@
 # closes (a rule everyone believes is live, rendered nowhere) is invisible
 # precisely because nobody thinks to look.
 #
-# Exit codes match the family: 0 clean, 1 repos need re-rendering, 3 the set is
-# undetermined. 3 is not 1 on purpose — "nothing to do" and "cannot tell you"
-# are different answers and a caller must be able to distinguish them.
+# Exit codes match the family: 0 clean, 1 repos need re-rendering *or* carry
+# rule files that resolve to nothing, 3 the set is undetermined. 3 is not 1 on
+# purpose — "nothing to do" and "cannot tell you" are different answers and a
+# caller must be able to distinguish them.
+#
+# The broken case is reported under --scan only, and is not drift: it is a repo
+# whose rendered output stopped being readable, which both the registry and the
+# scan read as "not onboarded" and drop from every count. That is how five repos
+# here spent two weeks loading nothing while this script printed all clear.
 set -euo pipefail
 
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -103,6 +109,32 @@ done <<EOF
 ${targets}
 EOF
 
+# A repo whose rule files resolve to nothing never reaches the loop above: it
+# carries no marker, so neither the registry nor the scan puts it in `targets`,
+# and it is absent from every count this script prints. Reported separately
+# because it is a separate answer — not "behind", which re-rendering fixes, but
+# "loading nothing", where re-onboarding and deleting the links are both valid
+# and the script must not assume which you meant. Only reported under --scan:
+# --registry-only promises an answer about registered repos alone, and these are
+# by definition not registered.
+broken_repos=0
+if [ "${SCAN}" -eq 1 ]; then
+  broken_repo=""
+  while IFS="$(printf '\t')" read -r repo dangler; do
+    [ -n "${repo}" ] || continue
+    if [ "${repo}" != "${broken_repo}" ]; then
+      broken_repo="${repo}"
+      broken_repos=$((broken_repos + 1))
+      echo "  BROKEN rule files resolve to nothing: ${repo}"
+      echo "        re-onboard: ${STANDARDS_DIR}/scripts/render.py ${repo}"
+      echo "        or delete the dangling links, if that repo is abandoned."
+    fi
+    echo "          ${dangler} -> $(readlink "${dangler}" 2>/dev/null || echo '?')"
+  done <<EOF
+$(sbw_scan_broken_rules)
+EOF
+fi
+
 echo
 if [ "${drift}" -gt 0 ]; then
   echo "  ${drift} of ${live} checkable repo(s) need re-rendering, with the commands above."
@@ -115,7 +147,16 @@ elif [ "${live}" -eq 0 ]; then
     echo "  ok    no repos carry rendered output here, and the registry names none"
   fi
 else
+  # Scoped to what was actually checked. "all N are up to date" alone was true
+  # and still misread as a clean machine, because the repos it silently excluded
+  # are exactly the ones a reader most needs told about.
   echo "  ok    all ${live} checkable repo(s) are up to date"
+fi
+
+if [ "${broken_repos}" -gt 0 ]; then
+  echo "  ${broken_repos} further repo(s) carry rule files that resolve to nothing, above."
+  echo "  They are in no count on this line: carrying no readable rendered output,"
+  echo "  they are invisible to both the registry and the scan."
 fi
 
 if [ "${unreg}" -gt 0 ]; then
@@ -133,5 +174,10 @@ else
   echo "        never registered was not looked for."
 fi
 
-[ "${drift}" -eq 0 ] || exit 1
+# Exit 1 covers both findings: each one means a repo on this machine is not
+# loading the rules you believe it is, which is the question the caller asked.
+# They stay distinguishable in the report rather than in the code.
+if [ "${drift}" -ne 0 ] || [ "${broken_repos}" -ne 0 ]; then
+  exit 1
+fi
 exit 0

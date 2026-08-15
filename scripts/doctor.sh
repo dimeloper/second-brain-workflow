@@ -11,6 +11,8 @@
 #   - a vendored submodule isn't left at the wrong commit after a tag switch
 #   - every repo the registry names still exists, and still carries rendered output
 #   - every repo on this machine that carries rendered output is in the registry
+#   - no repo has rule files that resolve to nothing, which both checks above
+#     read as "not onboarded" rather than as the fault it is
 # Changes nothing. Not part of `make check` — like `make guard` and
 # `make vault-index-check`, it needs a real vault, and CI has none.
 #
@@ -63,7 +65,7 @@ while [ $# -gt 0 ]; do
     # the closing paragraph mid-sentence each time a bullet was added.
     # tests/test-registry-scan.sh asserts the final line still reaches the
     # reader, so the next edit here cannot truncate it silently.
-    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -324,6 +326,7 @@ check_submodules() {
 # engine old enough that re-rendering is a decision).
 check_registry() {
   local file entries scan repo registered=0 stale=0 unregistered=0 line
+  local broken broken_repo dangler broken_repos=0
 
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
@@ -400,7 +403,32 @@ ${repo}
 ${scan}
 EOF
 
-  if [ "${stale}" -eq 0 ] && [ "${unregistered}" -eq 0 ]; then
+  # Direction three: a repo whose rule files resolve to nothing. Neither source
+  # above can see it — see the comment on sbw_scan_broken_rules — so without
+  # this the run goes green over a repo that has been loading no rules at all.
+  #
+  # ERROR, not warn: doctor's warnings mean setup is unfinished, and this is the
+  # other thing. A dangling symlink is a path that points nowhere, which is the
+  # same fault the vault-path check calls an error, and no amount of finishing
+  # setup resolves it.
+  broken="$(sbw_scan_broken_rules)"
+  broken_repo=""
+  while IFS="$(printf '\t')" read -r repo dangler; do
+    [ -n "${repo}" ] || continue
+    if [ "${repo}" != "${broken_repo}" ]; then
+      broken_repo="${repo}"
+      broken_repos=$((broken_repos + 1))
+      err "rule files resolve to nothing: ${repo}
+        the agent loads no rules from these, and says nothing about it.
+        Re-onboard the repo (./scripts/render.py ${repo}), or delete the
+        dangling links if you meant to drop it. Dangling:"
+    fi
+    echo "          ${dangler} -> $(readlink "${dangler}" 2>/dev/null || echo '?')"
+  done <<EOF
+${broken}
+EOF
+
+  if [ "${stale}" -eq 0 ] && [ "${unregistered}" -eq 0 ] && [ "${broken_repos}" -eq 0 ]; then
     if [ "${registered}" -eq 0 ]; then
       # Determined, not unknown. The scan ran, found nothing, and states the
       # boundary it ran inside — which is a measurement. What is refused is a

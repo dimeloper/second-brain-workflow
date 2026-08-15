@@ -101,6 +101,39 @@ rc_is 0 "an unreachable path is a warning, not drift"
 out_has "registered, but not there" "and it is named"
 out_lacks "up to date" "and nothing is claimed to be current"
 
+# --- a repo whose rule files resolve to nothing ------------------------------
+# The one case that needs the scan, so it does not use run_check. Not drift: the
+# repo carries no readable rendered output at all, so it is in neither source
+# and appears in none of the counts above — which is exactly how it went
+# unreported. `all N up to date` was true of the repos that were checkable and
+# read, on the machine this came from, as a clean bill of health.
+: > "${REGISTRY}"
+BROKEN_ROOT="${SANDBOX}/scan-root"
+BROKEN_REPO="${BROKEN_ROOT}/repo-dangling"
+mkdir -p "${BROKEN_REPO}/.cursor/rules"
+ln -s "${SANDBOX}/gone/frontend-angular.mdc" \
+  "${BROKEN_REPO}/.cursor/rules/frontend-angular.mdc"
+
+RC=0
+SBW_RULES_DIR="${RULES_FIXTURES}" SBW_SCAN_ROOTS="$(real "${BROKEN_ROOT}")" SBW_SCAN_DEPTH=5 \
+  "${CHECK}" >"${OUT}" 2>&1 || RC=$?
+rc_is 1 "a repo loading no rules exits 1, like drift — both mean a repo is not ruled"
+out_has "BROKEN rule files resolve to nothing: $(real "${BROKEN_REPO}")" \
+  "and the repo is named"
+out_has "or delete the dangling links, if that repo is abandoned." \
+  "with both repairs offered, since the script cannot know which was meant"
+out_has "They are in no count on this line" \
+  "and the summary says the broken repos are outside its counts"
+
+# --registry-only promises an answer about registered repos alone. A finding
+# about a repo that is by definition unregistered would be that promise broken,
+# and the flag exists for callers who need the narrower question answered.
+RC=0
+SBW_RULES_DIR="${RULES_FIXTURES}" SBW_SCAN_ROOTS="$(real "${BROKEN_ROOT}")" SBW_SCAN_DEPTH=5 \
+  "${CHECK}" --registry-only >"${OUT}" 2>&1 || RC=$?
+out_lacks "BROKEN" "--registry-only does not report it, having promised not to look"
+rc_is 0 "and stays clean, because the question it answered had no findings"
+
 # --- an unknown option ------------------------------------------------------
 RC=0
 "${CHECK}" --nonsense >"${OUT}" 2>&1 || RC=$?

@@ -267,6 +267,80 @@ else
   fail "the scan agrees with sbw_registry_marker_present on every in-scope fixture"
 fi
 
+# --- 13a. rule files that resolve to nothing --------------------------------
+# The direction neither source above can see. A repo whose rendered output has
+# stopped being readable carries no marker, so the scan does not find it and the
+# registry never named it — it drops out of every count rather than reporting as
+# the fault it is. On the machine this came from, five repos sat in that state
+# for two weeks with every check passing.
+BROKEN="${SCAN}/repo-dangling-rules"
+mkdir -p "${BROKEN}/.cursor/rules"
+ln -s "${SANDBOX}/gone/cursor-rules/frontend-angular.mdc" \
+  "${BROKEN}/.cursor/rules/frontend-angular.mdc"
+
+# The two shapes that must never be called a fault. A hand-written rule is the
+# common and correct case, and an intact symlink is a working install — if
+# either were reported, the check would cost more attention than it saves.
+HANDW="${SCAN}/repo-handwritten-rules"
+mkdir -p "${HANDW}/.cursor/rules"
+printf -- '- a rule nobody generated\n' > "${HANDW}/.cursor/rules/local.mdc"
+INTACT="${SCAN}/repo-intact-rules"
+mkdir -p "${INTACT}/.claude/rules" "${SANDBOX}/real-rules"
+printf -- '- a rule that is really there\n' > "${SANDBOX}/real-rules/frontend-next.md"
+ln -s "${SANDBOX}/real-rules/frontend-next.md" "${INTACT}/.claude/rules/frontend-next.md"
+
+SBW_SCAN_ROOTS="${SCAN}" SBW_SCAN_DEPTH=5
+out_broken="$(sbw_scan_broken_rules)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -qF "${BROKEN}	${BROKEN}/.cursor/rules/frontend-angular.mdc" <<< "${out_broken}"; then
+  pass "a dangling rule symlink is reported, with the repo and the file"
+else
+  fail "a dangling rule symlink is reported, with the repo and the file" "${out_broken}"
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -qF "${HANDW}" <<< "${out_broken}"; then
+  fail "a hand-written rule file is not a finding" "${out_broken}"
+else
+  pass "a hand-written rule file is not a finding"
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -qF "${INTACT}" <<< "${out_broken}"; then
+  fail "and neither is a symlink that resolves" "${out_broken}"
+else
+  pass "and neither is a symlink that resolves"
+fi
+
+# Depth is the repo set, not the file set: a rule file sits three levels below
+# its repo, so a check reusing the repo depth verbatim would cover a strictly
+# shallower set of repos than the scan it sits beside — the same quiet narrowing
+# this whole direction exists to catch.
+mkdir -p "${SCAN}/nested/repo-deep-dangling/.cursor/rules"
+ln -s "${SANDBOX}/gone/x.mdc" "${SCAN}/nested/repo-deep-dangling/.cursor/rules/x.mdc"
+SBW_SCAN_ROOTS="${SCAN}" SBW_SCAN_DEPTH=3
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -qF "${SCAN}/nested/repo-deep-dangling" <<< "$(sbw_scan_broken_rules)"; then
+  pass "a repo at the depth limit still has its rule files reached"
+else
+  fail "a repo at the depth limit still has its rule files reached" "$(sbw_scan_broken_rules)"
+fi
+SBW_SCAN_ROOTS="${SCAN}" SBW_SCAN_DEPTH=5
+
+# And doctor's severity. ERROR, not warn: a warning here means setup is
+# unfinished, and a path that points nowhere is not an unfinished step.
+printf '%s\n' "${SCAN}/repo-sbw-only" "${SCAN}/repo-agents-marker" \
+  "${SCAN}/repo-claude-marker" "${SCAN}/repo with spaces" \
+  "${SCAN}/nested/repo-one-deeper" > "${REGISTRY}"
+doctor "${SCAN}" && rc=0 || rc=$?
+out_has "ERROR rule files resolve to nothing: ${BROKEN}" \
+  "doctor reports it as an error, by repo"
+out_has "${BROKEN}/.cursor/rules/frontend-angular.mdc -> ${SANDBOX}/gone/cursor-rules/frontend-angular.mdc" \
+  "naming the file and where it points, so the reader can tell what broke"
+out_lacks "onboarded repo(s) registered, all still rendered, and none unregistered" \
+  "and the clean-run summary is withheld while a repo loads nothing"
+assert_exit 2 "${rc}" "exiting 2, the code for something no setup step will fix"
+
+rm -rf "${BROKEN}" "${HANDW}" "${INTACT}" "${SCAN}/nested/repo-deep-dangling"
+
 # --- 14. --help still prints the whole header block -------------------------
 # The range is a line count, and it has silently truncated twice already.
 "${DOCTOR}" --help > "${OUT}" 2>&1

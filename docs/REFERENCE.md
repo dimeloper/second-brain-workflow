@@ -725,9 +725,32 @@ which is a poor place to keep a fact that goes stale the moment you save a file.
 
 It reports and never renders — same contract as everything else in this family:
 `--check` reports, you decide. Exit codes are `0` clean, `1` at least one repo
-needs re-rendering, `3` the set is undetermined (no scan root could be read).
-`3` is deliberately not `1`: "nothing to do" and "cannot tell you" are different
-answers, and a caller has to be able to tell them apart.
+needs re-rendering **or carries rule files that resolve to nothing**, `3` the set
+is undetermined (no scan root could be read). `3` is deliberately not `1`:
+"nothing to do" and "cannot tell you" are different answers, and a caller has to
+be able to tell them apart.
+
+#### Rule files that resolve to nothing
+
+Both sources above identify an onboarded repo the same way — by the rendered
+output it carries — so both answer "not onboarded" for a repo whose rendered
+output has stopped being readable. It is in neither the registry nor the scan,
+so it is in no count either prints, and the run goes green over a repo that is
+loading nothing.
+
+That is not hypothetical: five repos on the machine this was written from held
+`.cursor/rules` symlinks into `~/dev-standards`, the engine's own name before
+the rebrand, dangling from the moment that directory was renamed. Every check
+passed for two weeks, because each had already decided those repos were not its
+business.
+
+`repos-check` and `doctor` now report them, naming each dangling file and where
+it pointed. The finding is deliberately narrow — a rule file that cannot be read
+*at all* — so it needs no claim about who rendered a file, which is what keeps a
+hand-written `.cursor/rules/*.mdc` from being called a fault. Both repairs are
+offered and neither is performed: re-onboard with `render.py`, or delete the
+links if the repo is abandoned. `--registry-only` does not report it, having
+promised an answer about registered repos alone.
 
 `REGISTRY_ONLY=1` skips the disk walk. It is the cheaper answer to a narrower
 question, and the report says which question it answered rather than implying

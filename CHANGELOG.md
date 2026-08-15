@@ -17,6 +17,29 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`repos-check` and `doctor` report repos whose rule files resolve to
+  nothing.** Both sources that answer "which repos are onboarded" identify one
+  the same way — by the rendered output it carries — so both answered "not
+  onboarded" for a repo whose rendered output had *stopped being readable*. Such
+  a repo was in neither the registry nor the scan, therefore in no count either
+  printed, and a run over it went green.
+
+  Found by looking for it: five repos on one machine held `.cursor/rules`
+  symlinks into `~/dev-standards`, the engine's own name before the rebrand,
+  dangling from the moment that directory was renamed. Every check passed
+  throughout, because each had already excluded them.
+
+  The finding is narrow on purpose — a rule file that cannot be read *at all* —
+  so it rests on no claim about who rendered a file, which is what keeps a
+  hand-written `.cursor/rules/*.mdc` (the common, correct case) from being
+  reported as a fault. Each dangling file is named with where it pointed, both
+  repairs are offered (re-render, or delete the links) and neither is performed.
+  `doctor` calls it an ERROR, not a warning: a warning there means setup is
+  unfinished, and a path that points nowhere is not an unfinished step.
+  `repos-check` exits `1` under `--scan`; `--registry-only` stays silent about
+  it, having promised an answer about registered repos alone.
+
 ### Changed
 - **`check-lineage.py` applies one-lineage-counts-once instead of printing that
   it does not.** The rule was prose in `00-maps/promotion-candidates.md`, and
