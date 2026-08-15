@@ -129,15 +129,42 @@ if grep -q "^maturity: idea" "${LVAULT}/practices/cross-cutting/ready-to-promote
 else
   fail "reporting a ready note does not promote it" "the fixture's maturity changed"
 fi
-# The count is distinct `repos:` entries, and the vault's one-lineage-counts-once
-# rule is prose that nothing here applies. Said on every run, including when the
-# list is empty — a caveat printed only when it bites is one the reader has
-# already taken the number without.
+# One lineage counts once, read from the vault's own ```lineages block rather
+# than left as prose with a caveat saying the script cannot apply it. The
+# fixture's same-lineage note has three `repos:` entries, two of them one
+# codebase renamed — it clears the trialing->enforced bar of 3 only if the
+# rename is counted twice, so its absence here is the whole fix.
+ready_section="$(printf '%s\n' "${out}" | awk '/^Ready to promote/{f=1;next} /^$/{f=0} f')"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${ready_section}" in
+  *"same-lineage:"*)
+    fail "two names for one codebase do not add up to a promotion" "${ready_section}" ;;
+  *) pass "two names for one codebase do not add up to a promotion" ;;
+esac
+# The same collapse in the other direction, which the prose caveat never even
+# claimed to cover: a rename must not carry a note over an *entry* bar either.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"one-lineage-counts-once rule is prose"*)
-    pass "the ready count names the rule it does not apply" ;;
-  *) fail "the ready count names the rule it does not apply" "${out}" ;;
+  *"same-lineage-thin (trialing, 1 of 2 repo(s)"*)
+    pass "a rename does not clear an entry bar either" ;;
+  *) fail "a rename does not clear an entry bar either" "${out}" ;;
+esac
+# The judged number is lower than the `repos:` list the reader can see, so the
+# line says which is which — otherwise the visible one is the one they trust.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"2 listed, 1 collapsed by lineage"*)
+    pass "a collapsed count says so on the line" ;;
+  *) fail "a collapsed count says so on the line" "${out}" ;;
+esac
+# Stated on every run, including when nothing collapsed — the reason the old
+# caveat was printed unconditionally still holds, only now it reports what was
+# applied rather than what could not be.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"counted as distinct lineages, applying the 1 group(s)"*)
+    pass "the ready count names the groups it applied" ;;
+  *) fail "the ready count names the groups it applied" "${out}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
@@ -448,6 +475,83 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_ambig}" in
   *"conflicting trialing->enforced thresholds"*) pass "conflicting thresholds are named, not silently resolved to the first match" ;;
   *) fail "conflicting thresholds are named, not silently resolved to the first match" "${out_ambig}" ;;
+esac
+
+# --- lineage groups: absent is fine, malformed is fatal ----------------------
+# A vault whose repos have never been renamed has no groups, and that is a real
+# answer rather than a missing one — so no fence must not degrade the run. The
+# synthetic vaults above already exercise the path; this asserts what it prints,
+# because a reader of a raw count needs to know it is raw.
+lin_vault() {  # $1 = dest — a vault with both bars and one note, no fence yet
+  mkdir -p "$1/practices/cross-cutting" "$1/00-maps"
+  cp "${LVAULT}/practices/cross-cutting/covered.md" "$1/practices/cross-cutting/"
+  cat > "$1/00-maps/promotion-candidates.md" <<'EOF'
+# Promotion candidates
+
+- `idea` -> `trialing`: observed in **2+** repos
+- `trialing` -> `enforced`: observed in **3+** repos
+
+```dataview
+TABLE maturity
+FROM "practices"
+WHERE (maturity = "idea" AND length(repos) >= 2)
+   OR (maturity = "trialing" AND length(repos) >= 3)
+```
+EOF
+}
+
+NOLIN_V="${SANDBOX}/no-lineage-vault"
+lin_vault "${NOLIN_V}"
+out_nolin="$("${CHECK}" --vault "${NOLIN_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nolin}" in
+  *"declares no lineage"*)
+    pass "a vault with no lineage groups says the count is raw" ;;
+  *) fail "a vault with no lineage groups says the count is raw" "${out_nolin}" ;;
+esac
+
+# A group of one collapses nothing, so it is a typo rather than a declaration —
+# and a typo that silently does nothing is exactly the failure the fence was
+# added to end.
+ONE_V="${SANDBOX}/one-name-lineage-vault"
+lin_vault "${ONE_V}"
+cat >> "${ONE_V}/00-maps/promotion-candidates.md" <<'EOF'
+
+```lineages
+fixture-a
+```
+EOF
+out_one="$("${CHECK}" --vault "${ONE_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+rc_one=$?
+assert_exit 1 "${rc_one}" "a one-name lineage group fails loudly"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_one}" in
+  *"names 1 repo(s) — a group needs at least 2"*)
+    pass "a one-name lineage group names what was wrong with it" ;;
+  *) fail "a one-name lineage group names what was wrong with it" "${out_one}" ;;
+esac
+
+# One repo in two groups has no answer, and picking either would quietly change
+# a promotion count. Same trade as a conflicting threshold: exit, don't guess.
+TWO_V="${SANDBOX}/two-group-lineage-vault"
+lin_vault "${TWO_V}"
+# Both groups start with the same name deliberately: comparing group *labels*
+# instead of declarations would read this as one group restated and pass.
+cat >> "${TWO_V}/00-maps/promotion-candidates.md" <<'EOF'
+
+```lineages
+fixture-a, fixture-b
+fixture-a, fixture-c
+```
+EOF
+out_two="$("${CHECK}" --vault "${TWO_V}" --rules-dir "${CLEAN_R}" --as-of "${AS_OF}" 2>&1)"
+rc_two=$?
+assert_exit 1 "${rc_two}" "a repo in two lineage groups fails loudly"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_two}" in
+  *"'fixture-a' appears in two lineage groups (lines 1 and 2"*)
+    pass "a repo in two lineage groups is named, not silently merged" ;;
+  *) fail "a repo in two lineage groups is named, not silently merged" "${out_two}" ;;
 esac
 
 # --- a rule may declare several sources --------------------------------------
