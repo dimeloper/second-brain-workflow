@@ -220,6 +220,98 @@ case "${out}" in
   *) fail "the stated-count checker finds a real mismatch" "${out}" ;;
 esac
 
+# --- a count inside a fenced sample -----------------------------------------
+# The `make skills-for` sample in REFERENCE.md is a transcript, and a transcript
+# is not a claim the document makes — which is why fences were skipped, and why
+# `Adopted and scoped to this repo: 5` above two entries had to be caught by
+# hand. A count *inside* the sample is a claim about the sample's own list, and
+# is exactly this file's shape.
+fenced_counts="${SANDBOX}/fenced-counts.md"
+cat > "${fenced_counts}" <<'EOF'
+Sample:
+
+```
+Adopted and scoped to this repo: 5
+  - animate  (matched App.tsx)
+  - app-store-screenshots  (matched app.json)
+```
+EOF
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" "${fenced_counts}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"claims 5, list has 2"*) pass "a count inside a fenced sample is checked" ;;
+  *) fail "a count inside a fenced sample is checked" "${out}" ;;
+esac
+
+# The count sits after the colon in tool output and before it in prose. Only the
+# prose shape was ever recognised, so the sample above was unchecked twice over
+# — fenced, and in a shape nothing looked at.
+trailing_ok="${SANDBOX}/trailing-ok.md"
+printf 'Adopted and scoped to this repo: 2\n\n  - animate\n  - app-store-screenshots\n' \
+  > "${trailing_ok}"
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" "${trailing_ok}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "a trailing count matching its list is clean"
+else
+  fail "a trailing count matching its list is clean" "${out}"
+fi
+
+# A fence bounds the scan in one direction only. Inside one, the list ends at
+# the closing delimiter — a sample must not annex the prose list below it.
+fence_bound="${SANDBOX}/fence-bound.md"
+cat > "${fence_bound}" <<'EOF'
+```
+Three results:
+```
+
+- a
+- b
+EOF
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" "${fence_bound}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "a claim inside a fence does not reach the list after it"
+else
+  fail "a claim inside a fence does not reach the list after it" "${out}"
+fi
+
+# ...and outside one, a fenced block indented under a bullet is that bullet's
+# continuation, not a boundary. NEW-MACHINE.md's "Two ways to add your own
+# conventions:" puts a `git clone` block inside the first option; stopping there
+# counts one way and reports a false mismatch against the second.
+fence_cont="${SANDBOX}/fence-cont.md"
+cat > "${fence_cont}" <<'EOF'
+Two ways to add your own conventions:
+
+- **Separate repo:**
+  ```bash
+  git clone git@example.com:you/rules.git
+  ```
+  Then point the engine at it.
+- **Self-contained:** write `rules/*.md` directly here.
+EOF
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" "${fence_cont}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "a fence nested in a list item does not end the list"
+else
+  fail "a fence nested in a list item does not end the list" "${out}"
+fi
+
+# A numbered step ending in a colon claims nothing — the number is its own list
+# marker. Without this every such step reads as a count of whatever follows.
+ordered="${SANDBOX}/ordered-marker.md"
+printf '4. **Auth from that repo**, not an interactive login:\n\n- a\n- b\n- c\n' \
+  > "${ordered}"
+out="$(python3 "${ENGINE}/scripts/lib/stated_counts.py" "${ordered}" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${out}" = "clean" ]; then
+  pass "an ordered-list marker is not read as a stated count"
+else
+  fail "an ordered-list marker is not read as a stated count" "${out}"
+fi
+
 # --- an anchor link that resolves to no heading -----------------------------
 # `[rules/](#the-rules-live-somewhere-else)` pointed at a heading that does not
 # exist, in the paragraph explaining why the engine ships no rules of its own. A

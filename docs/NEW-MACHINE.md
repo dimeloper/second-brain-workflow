@@ -652,9 +652,10 @@ a hypothetical.
 still exist in the source that emits them, and that every numbered step above
 has a `**Check.**` block. It does **not** read what is inside those blocks — an
 expected-output sample can drift release by release with nothing failing, which
-is how step 5's block came to be three releases stale. Same blind spot
-`stated_counts.py` documents for fenced samples: the green is narrower than it
-looks.
+is how step 5's block came to be three releases stale. `stated_counts.py` now
+reads *counts* inside a fenced sample, so a list that disagrees with its own
+stated total is caught; nothing still compares a sample against what the tool
+actually prints today. The green is narrower than it looks.
 
 | Symptom | Cause and fix |
 |---|---|
