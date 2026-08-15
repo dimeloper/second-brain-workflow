@@ -17,6 +17,50 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **`check-lineage.py` applies one-lineage-counts-once instead of printing that
+  it does not.** The rule was prose in `00-maps/promotion-candidates.md`, and
+  the report carried a paragraph on every run saying it could not be applied —
+  which put the correction on the reader, including on the runs where it did not
+  bite. The groups are now declared in a ` ```lineages ` fence in that same map
+  note, one group per line, read the way both promotion bars already are.
+
+  Applied in **both** directions, not only the one the caveat described. The
+  caveat named "ready to promote", but the same double-count reaches "maturity
+  above its evidence" and in the more damaging direction: two names for one
+  codebase can carry a note *over* an entry bar, and the check that exists to
+  catch exactly that would have agreed with it.
+
+  No fence is a valid vault with nothing to collapse, and the report says the
+  counts are raw so a reader knows which kind of number they have. A malformed
+  block is fatal like an unparseable threshold — a group of one name collapses
+  nothing and is a typo, one repo in two groups has no answer. Where a judged
+  count is lower than the visible `repos:` list, the line says so
+  (`3 listed, 1 collapsed by lineage`).
+
+### Fixed
+- **`stated_counts.py` reads counts inside fenced samples, and the shape tool
+  output actually uses.** Both halves hid the same failure. Fences were skipped
+  on the reasoning that a transcript is not a claim the document makes — true of
+  the transcript, false of a count inside it — and the recognised shape was
+  prose introducing a list (`Three rules worth knowing:`), never a tool
+  labelling one (`Adopted and scoped to this repo: 2`). The `skills-for` sample
+  that said `5` above two entries was therefore unchecked twice over, and was
+  fixed by hand.
+
+  A fence bounds a claim in one direction only: inside one, the list ends at the
+  closing delimiter, so a sample cannot annex the prose list below it; outside
+  one, a fenced block indented under a bullet is that bullet's continuation, and
+  stopping there would have counted the first of NEW-MACHINE.md's "Two ways to
+  add your own conventions" and reported a false mismatch against the second.
+
+  Also stops reading a numbered step's own list marker as a stated count —
+  `4. **Auth from that repo's `.env`**…:` claims nothing about what follows it.
+
+  Still not covered, and still worth saying: nothing compares a sample against
+  what the tool prints today. A fenced sample whose counts agree with its own
+  bullets can be a faithful record of a version that no longer runs.
+
 ## [0.31.0] - 2026-08-14
 
 ### Added
