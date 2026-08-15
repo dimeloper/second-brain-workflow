@@ -63,13 +63,33 @@ Obsidian and nowhere else — so until it was reported here, neither `make audit
 nor CI could answer it, which is where a backlog actually gets read. It is
 reported and never acted on: automated promotion was rejected deliberately, and
 a report is what keeps a human gate being exercised rather than quietly
-stopping. The count is **distinct `repos:` entries**; the vault's own
-one-lineage-counts-once rule is prose in that same map note and is not applied,
-so the report says so on every run rather than only when it bites.
+stopping.
+
+Both comparisons count **distinct lineages**, not `repos:` entries. A repo that
+was renamed, or seeded by `git archive` out of another, is one piece of evidence
+under two names, and counting it twice promotes a note on evidence it does not
+have — in the entry-bar direction as much as the ready-to-promote one. The
+groups are declared in a ` ```lineages ` fence in `00-maps/promotion-candidates.md`,
+one group per line, first name labelling the group:
+
+```lineages
+dev-standards, dev-conventions, second-brain-workflow
+```
+
+Keep the prose beside it explaining *why* a group exists rather than restating
+its members, so the two can't drift. A vault with no fence has nothing to
+collapse — a normal state, and the report says the counts are raw so a reader
+knows which kind of number they have. Where a note's judged count is lower than
+the `repos:` list they can see, the line says so (`3 listed, 1 collapsed by
+lineage`); the visible list would otherwise be the one they trust.
 
 If either threshold can't be read unambiguously — the file is missing, reworded past
 recognition, or states two different numbers — the script exits with a
-named, specific error rather than silently skipping the check.
+named, specific error rather than silently skipping the check. A malformed
+`lineages` block is fatal the same way and for the same reason: a group of one
+name collapses nothing and is a typo, and one repo named in two groups has no
+answer. Raw counts silently substituted for lineage counts would be specific,
+plausible, and wrong in the direction that generates work.
 
 Both lineage directions are computed from the rules that declare a `source:`,
 which makes their coverage worth stating explicitly:

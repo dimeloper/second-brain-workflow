@@ -39,6 +39,15 @@ This reports six things, none of which anything else currently checks:
                     automated promotion was rejected deliberately, and a report
                     is what a human gate needs to keep being exercised.
 
+Both comparisons count *distinct lineages*, not `repos:` entries. A repo that
+was renamed, or seeded by `git archive` from another, is one piece of evidence
+under two names, and counting it twice promotes a note on evidence it does not
+have. The groups are declared in a ```lineages fence in the vault's own
+00-maps/promotion-candidates.md — the same file both bars are read from, for the
+same reason: the number this script judges on has to be the number the vault
+means. No fence is a valid vault with nothing to collapse; a malformed one is a
+hard error, never a silent fallback to raw counts.
+
 Rules trace back to notes via a `source:` frontmatter field naming their
 slugs (a slug is the filename, no extension — the same identifier every
 `[[wikilink]]` in the vault already uses, since Obsidian's link namespace is
@@ -266,6 +275,80 @@ def _threshold(vault, pattern, rung, wording):
     return matches.pop()
 
 
+LINEAGES_FENCE_RE = re.compile(r'^```lineages[ \t]*$\n(.*?)^```', re.M | re.S)
+
+
+def load_lineages(vault):
+    """Read the one-lineage-counts-once groups from the vault's own map note.
+
+    Returns a dict mapping every declared repo name to a shared group id, so
+    two names for one codebase collapse to a single unit of evidence. An empty
+    dict means nothing was declared, which is a real answer: a vault whose repos
+    have never been renamed has no groups, and inventing one would be worse.
+
+    This was prose for a long time, and the script printed a caveat saying it
+    could not apply it — which put the correction on the reader of every run,
+    including the runs where it did not bite. The fence is the same trade the
+    thresholds already make: state it once, where the vault states it, and let
+    the tool read it rather than describe its own blind spot.
+
+    Malformed input exits rather than degrading to raw counts, for the reason
+    an unparseable threshold does: a `ready` list computed on evidence the vault
+    says is double-counted is specific, plausible, and wrong in the direction
+    that generates work.
+    """
+    path = vault / "00-maps" / "promotion-candidates.md"
+    if not path.is_file():
+        return {}  # the threshold read already exits on a missing map note
+    text = path.read_text(encoding="utf-8")
+    blocks = LINEAGES_FENCE_RE.findall(text)
+    if not blocks:
+        return {}
+    if len(blocks) > 1:
+        sys.exit(
+            f"{path}: found {len(blocks)} ```lineages blocks — ambiguous, "
+            "merge them into one"
+        )
+
+    lineage = {}
+    # Which *declaration* claimed each name, tracked separately from the group
+    # label. Two groups can share a first name — `a, b` then `a, c` — and
+    # comparing labels alone would read that as one group restated rather than
+    # as the contradiction it is.
+    declared_by = {}
+    for lineno, raw in enumerate(blocks[0].splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        names = [n.strip().strip("`") for n in line.split(",")]
+        names = [n for n in names if n]
+        if len(names) < 2:
+            sys.exit(
+                f"{path}: lineage group on line {lineno} of the ```lineages "
+                f"block names {len(names)} repo(s) — a group needs at least 2, "
+                "since a name grouped with nothing collapses nothing"
+            )
+        for name in names:
+            if name in declared_by:
+                sys.exit(
+                    f"{path}: '{name}' appears in two lineage groups "
+                    f"(lines {declared_by[name]} and {lineno} of the "
+                    "```lineages block) — ambiguous, a repo belongs to one "
+                    "lineage"
+                )
+            declared_by[name] = lineno
+            # Collapse onto the group's first name: it is a member itself, so
+            # an ungrouped repo mapping to its own name can never collide with
+            # a group key.
+            lineage[name] = names[0]
+    return lineage
+
+
+def distinct_repos(repos, lineage):
+    """How many separate codebases a `repos:` list actually names."""
+    return len({lineage.get(r, r) for r in repos})
+
+
 def parse_date(value):
     try:
         return date.fromisoformat(value)
@@ -344,6 +427,17 @@ def audit(vault, rules_dir, stale_months, as_of):
 
     threshold = enforced_threshold(vault)  # exits on an unparseable vault source
     trialing_bar = trialing_threshold(vault)
+    lineage = load_lineages(vault)
+
+    # Judged on lineages, not `repos:` entries, in *both* directions. The
+    # double-count was only ever described under "ready to promote", but it
+    # reaches "maturity above its evidence" identically and in the more
+    # damaging direction: two names for one codebase can carry a note over an
+    # entry bar, and the check that exists to catch exactly that would agree
+    # with it.
+    for n in notes:
+        n["distinct"] = distinct_repos(n["repos"], lineage)
+        n["collapsed"] = len(n["repos"]) - n["distinct"]
 
     # The bar a note's *current* maturity had to clear to be set. Judged for
     # every rung that has one, not only `enforced`: a note promoted to
@@ -354,7 +448,7 @@ def audit(vault, rules_dir, stale_months, as_of):
     thin = [
         n for n in notes
         if n["maturity"] in entry_bar
-        and len(n["repos"]) < entry_bar[n["maturity"]]
+        and n["distinct"] < entry_bar[n["maturity"]]
         and not n["preference_enforced"]
     ]
     for n in thin:
@@ -373,11 +467,13 @@ def audit(vault, rules_dir, stale_months, as_of):
     next_bar = {"idea": trialing_bar, "trialing": threshold}
     ready = [
         n for n in notes
-        if n["maturity"] in next_bar and len(n["repos"]) >= next_bar[n["maturity"]]
+        if n["maturity"] in next_bar and n["distinct"] >= next_bar[n["maturity"]]
     ]
 
     return {
         "ready": ready,
+        "lineage_groups": len(set(lineage.values())),
+        "lineage_collapsed": sum(n["collapsed"] for n in notes),
         "trialing_bar": trialing_bar,
         "coverage": coverage,
         "sourced_rules": len(sourced_rules),
@@ -392,6 +488,17 @@ def audit(vault, rules_dir, stale_months, as_of):
         "note_problems": note_problems,
         "rule_problems": rule_problems,
     }
+
+
+def _collapsed_note(note):
+    """Say when a count is lower than the `repos:` list a reader can see.
+
+    Without this the two numbers disagree with no explanation on the line, and
+    the visible one — the list in the note — is the wrong one to trust.
+    """
+    if not note["collapsed"]:
+        return ""
+    return f", {len(note['repos'])} listed, {note['collapsed']} collapsed by lineage"
 
 
 def report(result, vault, rules_dir, stale_months):
@@ -452,8 +559,8 @@ def report(result, vault, rules_dir, stale_months):
     )
     for n in result["thin"]:
         lines.append(
-            f"  - {n['slug']} ({n['maturity']}, {len(n['repos'])} of "
-            f"{n['missed_bar']} repo(s))"
+            f"  - {n['slug']} ({n['maturity']}, {n['distinct']} of "
+            f"{n['missed_bar']} repo(s){_collapsed_note(n)})"
         )
     lines.append("")
 
@@ -467,16 +574,23 @@ def report(result, vault, rules_dir, stale_months):
     for n in result["ready"]:
         nxt = "trialing" if n["maturity"] == "idea" else "enforced"
         lines.append(
-            f"  - {n['slug']}: {n['maturity']} -> {nxt} ({len(n['repos'])} repo(s))"
+            f"  - {n['slug']}: {n['maturity']} -> {nxt} "
+            f"({n['distinct']} repo(s){_collapsed_note(n)})"
         )
-    lines.append(
-        "  counted as distinct `repos:` entries. The vault's own "
-        "one-lineage-counts-once rule is prose in\n"
-        "  00-maps/promotion-candidates.md and is not applied here, so a note "
-        "naming two repos that\n"
-        "  share a history is counted twice — check the list before promoting "
-        "on this number."
-    )
+    groups = result["lineage_groups"]
+    if groups:
+        lines.append(
+            f"  counted as distinct lineages, applying the {groups} group(s) "
+            f"in 00-maps/promotion-candidates.md\n"
+            f"  ({result['lineage_collapsed']} repo name(s) collapsed across "
+            f"all notes)."
+        )
+    else:
+        lines.append(
+            "  counted as distinct `repos:` entries — "
+            "00-maps/promotion-candidates.md declares no lineage\n"
+            "  groups, so no two names were read as one codebase."
+        )
     lines.append("")
 
     lines.append(
