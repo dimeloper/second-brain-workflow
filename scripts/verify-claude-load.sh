@@ -19,16 +19,52 @@ set -euo pipefail
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 command -v claude >/dev/null || { echo "claude not on PATH" >&2; exit 2; }
 
-# Pick a rule with globs, and build a filename its first glob matches.
-read -r RULE GLOB <<EOF
-$("${STANDARDS_DIR}/scripts/render.py" --explain \
-  | awk '/\[scoped: /{name=$1; sub(/.*\[scoped: /,""); sub(/\].*/,""); split($0,g,", "); print name, g[1]; exit}')
+# Pick a rule, a glob, and a path that glob actually matches.
+#
+# What this replaces took the *first* scoped rule's *first* glob and built
+# `probe` + the glob's basename with a leading `*` stripped. That is right for
+# `**/*.tsx` and silently wrong for any glob whose basename is literal:
+# `**/lib/auth.ts` became `probeauth.ts`, which matches nothing. The check then
+# reported FAIL — indistinguishable, to a reader, from path scoping being
+# broken, which is the thing it exists to prove.
+#
+# Nothing changed in the script for that to happen. The rule set was
+# reorganised (`app-expo-flutter` split, `app-auth-session` added), a different
+# rule sorted first, and a check that had passed began failing on a repo where
+# everything was fine. So the selection now scans every rule and every glob for
+# one it can satisfy *by construction*, and refuses outright rather than
+# guessing at a shape it does not recognise.
+read -r RULE GLOB PROBE <<EOF
+$("${STANDARDS_DIR}/scripts/render.py" --explain | python3 -c '
+import re, sys
+for line in sys.stdin:
+    m = re.match(r"^(\S+)\s+\[scoped: (.+)\]\s*$", line.strip())
+    if not m:
+        continue
+    rule, globs = m.group(1), [g.strip() for g in m.group(2).split(",")]
+    for g in globs:
+        # A leading **/ means "at any depth", so the probe gets a directory
+        # under it — matching at depth zero is not universally supported and is
+        # not what a real repo looks like anyway.
+        anydepth = g.startswith("**/")
+        rest = g[3:] if anydepth else g
+        if "*" not in rest:
+            probe = rest                       # **/lib/auth.ts, data/db.ts, app.json
+        elif re.fullmatch(r"\*(\.[A-Za-z0-9.]+)", rest):
+            probe = "probe" + rest[1:]         # **/*.tsx -> probe.tsx
+        else:
+            continue                           # targets/**/*.swift, app.config.* — skip
+        print(rule, g, ("src/" + probe) if anydepth else probe)
+        sys.exit(0)
+')
 EOF
-[ -n "${RULE:-}" ] || { echo "No glob-scoped rule to test." >&2; exit 1; }
-
-# `**/*.component.ts` -> `probe.component.ts`
-MATCHING="probe$(basename "${GLOB}" | sed 's/^\*//')"
-case "${MATCHING}" in */*|"") MATCHING="probe.ts" ;; esac
+[ -n "${PROBE:-}" ] || {
+  echo "No glob-scoped rule with a glob this script can build a probe for." >&2
+  echo "Every rule's globs used a shape it does not synthesise (a ** in the" >&2
+  echo "middle, or a wildcard outside the extension). Teach it the shape, or" >&2
+  echo "add a rule with a simple glob — do not loosen the match." >&2
+  exit 1
+}
 
 # Resolved the same way render.py resolves it, so the probe rules directory is
 # a copy of the one this machine actually renders from rather than a guess.
@@ -42,8 +78,8 @@ trap 'rm -rf "${WORK}"' EXIT INT TERM
 cd "${WORK}"
 git init -q .
 
-mkdir -p src
-printf '// probe file for %s\n' "${RULE}" > "src/${MATCHING}"
+mkdir -p src "$(dirname "${PROBE}")"
+printf '// probe file for %s\n' "${RULE}" > "${PROBE}"
 printf 'plain text, matches no rule glob\n' > "src/probe-nonmatching.txt"
 
 # A rules directory of our own: the real one, plus an always-on rule carrying a
@@ -107,8 +143,8 @@ PY
 
 echo "Rule under test: ${RULE}  (glob ${GLOB})"
 echo
-echo "  1. reading src/${MATCHING} — expect the rule to load"
-out1="$(probe "src/${MATCHING}" "${RULE}.md")"
+echo "  1. reading ${PROBE} — expect the rule to load"
+out1="$(probe "${PROBE}" "${RULE}.md")"
 echo "${out1}" | sed '$d'
 r1="$(echo "${out1}" | tail -1)"
 
