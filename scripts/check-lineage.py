@@ -150,6 +150,7 @@ def load_notes(vault):
             problems.extend((str(rel), w) for w in warnings)
 
         repos = fm.get("repos") or []
+        applications = fm.get("applications") or []
         observed_in = extract_observed_in(text)
         notes.append(
             {
@@ -158,6 +159,19 @@ def load_notes(vault):
                 "maturity": fm.get("maturity") or "?",
                 "last_reviewed": fm.get("last-reviewed") or "",
                 "repos": repos if isinstance(repos, list) else [repos],
+                "applications": (
+                    applications if isinstance(applications, list) else [applications]
+                ),
+                # A process note (`applies-to: ""`) claims only that it kept
+                # being right, never that it holds outside where it was found,
+                # so a repo count is not the bar it is judged against — see
+                # 00-maps/promotion-candidates.md. Counting it in repos anyway
+                # is what left 143 of this vault's 170 process notes at `idea`
+                # while the scoped notes promoted normally, and what the
+                # "provisional rules" exemptions were being hand-written
+                # around, seven times, each saying some version of "no repo
+                # count will mature this".
+                "process": not (fm.get("applies-to") or ""),
                 # A note can be `enforced` by the user's own standing
                 # preference rather than by clearing the repo-count bar —
                 # an established, self-documented exception in this vault's
@@ -439,6 +453,21 @@ def audit(vault, rules_dir, stale_months, as_of):
         n["distinct"] = distinct_repos(n["repos"], lineage)
         n["collapsed"] = len(n["repos"]) - n["distinct"]
 
+    # The count each note is actually judged on. Lineage collapsing applies to
+    # repos and to nothing else: two names for one codebase are one codebase,
+    # whereas two applications in one repo are two applications — that is the
+    # whole point of the second bar, so collapsing them would re-impose the
+    # constraint it exists to lift.
+    #
+    # A process note with no `applications:` list is uncounted, not zero, and is
+    # left out of both directions below. Reporting 143 notes as "maturity above
+    # its evidence" the day the bar changed would say nothing about any of them.
+    for n in notes:
+        n["evidence"] = (
+            len(n["applications"]) if n["process"] else n["distinct"]
+        )
+        n["uncounted"] = n["process"] and not n["applications"]
+
     # The bar a note's *current* maturity had to clear to be set. Judged for
     # every rung that has one, not only `enforced`: a note promoted to
     # `trialing` without clearing the idea->trialing bar is the same claim
@@ -448,7 +477,8 @@ def audit(vault, rules_dir, stale_months, as_of):
     thin = [
         n for n in notes
         if n["maturity"] in entry_bar
-        and n["distinct"] < entry_bar[n["maturity"]]
+        and not n["uncounted"]
+        and n["evidence"] < entry_bar[n["maturity"]]
         and not n["preference_enforced"]
     ]
     for n in thin:
@@ -467,7 +497,9 @@ def audit(vault, rules_dir, stale_months, as_of):
     next_bar = {"idea": trialing_bar, "trialing": threshold}
     ready = [
         n for n in notes
-        if n["maturity"] in next_bar and n["distinct"] >= next_bar[n["maturity"]]
+        if n["maturity"] in next_bar
+        and not n["uncounted"]
+        and n["evidence"] >= next_bar[n["maturity"]]
     ]
 
     return {
@@ -483,6 +515,13 @@ def audit(vault, rules_dir, stale_months, as_of):
         "no_source": no_source,
         "stale": stale,
         "thin": thin,
+        # Only the rungs that had to be earned: an `idea` with no applications
+        # is the normal starting state, not a backlog item.
+        "uncounted": [
+            n for n in notes
+            if n["uncounted"] and n["maturity"] in entry_bar
+            and not n["preference_enforced"]
+        ],
         "near_miss": near_miss,
         "threshold": threshold,
         "note_problems": note_problems,
@@ -561,6 +600,23 @@ def report(result, vault, rules_dir, stale_months):
         lines.append(
             f"  - {n['slug']} ({n['maturity']}, {n['distinct']} of "
             f"{n['missed_bar']} repo(s){_collapsed_note(n)})"
+        )
+    lines.append("")
+
+    # Undetermined, and reported as such rather than folded into either
+    # direction above. A process note promoted before `applications:` existed
+    # has a maturity nobody can now check: counting its repos would judge it
+    # against a bar it is not held to, and leaving it out entirely would exempt
+    # it silently — which is how a migration backlog becomes permanent. The
+    # count is the honest size of that backlog, and it should fall to zero.
+    lines.append(
+        "Maturity set before its evidence was countable "
+        f"(process notes, no `applications:`): {len(result['uncounted'])}"
+    )
+    for n in result["uncounted"]:
+        lines.append(
+            f"  - {n['slug']} ({n['maturity']}, {len(n['repos'])} repo(s) seen, "
+            "applications not recorded)"
         )
     lines.append("")
 

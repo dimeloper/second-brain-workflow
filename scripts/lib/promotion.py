@@ -18,12 +18,27 @@ refactoring a tested file and catches the drift that matters.
 import re
 import sys
 
-# The queries are Dataview, so the numbers sit inside a `length(repos) >= N`
+# The queries are Dataview, so the numbers sit inside a `length(<field>) >= N`
 # comparison next to the maturity they gate.
-BAR_RE = re.compile(
-    r'"?(?P<maturity>idea|trialing)"?[^\n]*?length\(\s*repos\s*\)\s*>=\s*(?P<n>\d+)',
-    re.IGNORECASE,
-)
+#
+# Two fields, because a note is promoted on the evidence it actually claims.
+# `repos:` answers "does this hold outside the codebase that produced it", which
+# is the right question for a rule carrying a real `applies-to` glob and the
+# wrong one for a process rule about how you work — that can only ever be
+# re-encountered in the same place, so a repo-only bar made it unpromotable
+# however often it was applied. `applications:` counts deliberate
+# re-applications instead. Same numbers, different denominator.
+def _bar_re(field):
+    return re.compile(
+        r'"?(?P<maturity>idea|trialing)"?[^\n]*?length\(\s*'
+        + field
+        + r'\s*\)\s*>=\s*(?P<n>\d+)',
+        re.IGNORECASE,
+    )
+
+
+BAR_RE = _bar_re("repos")
+APPLICATION_BAR_RE = _bar_re("applications")
 
 
 def bars(vault):
@@ -34,6 +49,20 @@ def bars(vault):
     one being reached. Naming the return value after the rung reached is
     deliberate: every caller asks "what does this need to become X".
     """
+    return _read_bars(vault, BAR_RE, "repos")
+
+
+def application_bars(vault):
+    """The same two rungs, counted in `applications:` for process notes.
+
+    Separate function rather than a flag: the caller has to know which kind of
+    note it is holding to pick a bar at all, so making that choice explicit at
+    the call site is the point. A note with `applies-to: ""` takes these.
+    """
+    return _read_bars(vault, APPLICATION_BAR_RE, "applications")
+
+
+def _read_bars(vault, pattern, field):
     path = vault / "00-maps" / "promotion-candidates.md"
     if not path.is_file():
         sys.exit(
@@ -44,7 +73,7 @@ def bars(vault):
         )
 
     found = {}
-    for m in BAR_RE.finditer(path.read_text(encoding="utf-8")):
+    for m in pattern.finditer(path.read_text(encoding="utf-8")):
         rung = m.group("maturity").lower()
         n = int(m.group("n"))
         if rung in found and found[rung] != n:
@@ -58,9 +87,9 @@ def bars(vault):
     missing = [r for r in ("idea", "trialing") if r not in found]
     if missing:
         sys.exit(
-            "Cannot read the promotion bars from %s: no `length(repos) >= N` "
+            "Cannot read the promotion bars from %s: no `length(%s) >= N` "
             "found for %s. Reworded past recognition, or the queries changed — "
             "either way this must not guess."
-            % (path, " and ".join(missing))
+            % (path, field, " and ".join(missing))
         )
     return found["idea"], found["trialing"]

@@ -691,4 +691,90 @@ case "${out_dup}" in
   *) fail "the second colliding path is named in full" "${out_dup}" ;;
 esac
 
+# --- two bars: repos for scoped notes, applications for process notes -------
+#
+# Built as its own vault rather than added to the shared lineage fixture, whose
+# counts several assertions above depend on exactly.
+#
+# The case that matters is `stuck`: three deliberate applications, all in one
+# repo. Under a repo-only bar it counts as 1 and can never leave `idea`, which
+# is what left 143 of the author's 170 process notes there while every scoped
+# note promoted normally.
+PV="${SANDBOX}/pvault"
+mkdir -p "${PV}/00-maps" "${PV}/practices/cross-cutting"
+cat > "${PV}/00-maps/promotion-candidates.md" <<'MAP'
+# Promotion candidates
+```dataview
+WHERE (maturity = "idea" AND length(repos) >= 2)
+   OR (maturity = "trialing" AND length(repos) >= 3)
+```
+```dataview
+WHERE (maturity = "idea" AND length(applications) >= 2)
+   OR (maturity = "trialing" AND length(applications) >= 3)
+```
+MAP
+
+pnote() {  # slug maturity applies-to repos applications
+  cat > "${PV}/practices/cross-cutting/$1.md" <<NOTE
+---
+domain: cross-cutting
+applies-to: $3
+maturity: $2
+last-reviewed: 2026-08-01
+repos: $4
+applications: $5
+---
+
+# $1
+
+**Rule:** placeholder.
+**Observed in:** fixture, 2026-08-01.
+NOTE
+}
+
+pnote stuck            idea     '""'          '["one"]'        '["one 2026-01-01", "one 2026-02-02", "one 2026-03-03"]'
+pnote earned           trialing '""'          '["one"]'        '["one 2026-01-01", "one 2026-02-02"]'
+pnote unmigrated       enforced '""'          '["one", "two"]' '[]'
+pnote scoped_thin      enforced '"**/*.ts"'   '["one"]'        '[]'
+
+out_bar="$("${CHECK}" --vault "${PV}" --rules-dir "${LRULES}" --as-of "${AS_OF}" 2>/dev/null)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"- stuck"*) pass "three applications in one repo clear the bar a repo count never could" ;;
+  *) fail "three applications in one repo clear the bar a repo count never could" "${out_bar}" ;;
+esac
+
+# Meets its own bar on applications, so it must not be reported as thin — under
+# the old rule its single repo would have been "1 of 2".
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"- earned ("*) fail "a process note meeting the applications bar is not thin" "${out_bar}" ;;
+  *) pass "a process note meeting the applications bar is not thin" ;;
+esac
+
+# Promoted before applications existed: undetermined, and reported as its own
+# finite backlog rather than silently exempted or judged against a bar it is
+# not held to.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"Maturity set before its evidence was countable (process notes, no \`applications:\`): 1"*)
+    pass "a process note promoted before the field existed is reported as undetermined" ;;
+  *) fail "a process note promoted before the field existed is reported as undetermined" "${out_bar}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"- unmigrated (enforced, 2 repo(s) seen, applications not recorded)"*)
+    pass "naming it, with what it was seen in and what is missing" ;;
+  *) fail "naming it, with what it was seen in and what is missing" "${out_bar}" ;;
+esac
+
+# The scoped half is untouched: a real glob still means repos, still thin at 1.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"- scoped_thin (enforced, 1 of 3 repo(s))"*)
+    pass "a scoped note is still judged on repos" ;;
+  *) fail "a scoped note is still judged on repos" "${out_bar}" ;;
+esac
+
 finish

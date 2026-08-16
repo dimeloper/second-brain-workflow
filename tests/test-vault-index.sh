@@ -27,8 +27,51 @@ assert_contains "${VAULT}/practices/INDEX.md" 'Parse untrusted input' "summarise
 assert_contains "${VAULT}/practices/INDEX.md" 'input()' "summarises multi-line Rule block"
 assert_not_contains "${VAULT}/practices/INDEX.md" '2026-08' "no timestamp — it would churn daily"
 
-# repos: is a count, and an aspirational note legitimately has zero.
-assert_contains "${VAULT}/practices/INDEX.md" '| 3 |' "counts repos"
+# The Evidence column carries the count that actually gates each note, with the
+# unit attached. A bare number was ambiguous once two bars existed: `1` beside a
+# process rule read as "one repo, two to go" when the repo count is not what
+# that note is promoted on and never will be.
+assert_contains "${VAULT}/practices/INDEX.md" '| 3 repos |' \
+  "a scoped note is counted in repos"
+
+# The three states of a process note, walked in order on the sandbox copy —
+# tests/fixtures is left alone so the vault other suites read is unchanged.
+#
+# Nothing recorded at all is `—`. Zero would be a claim: it would read as
+# evidence against every process note in a vault that has not migrated yet.
+assert_contains "${VAULT}/practices/INDEX.md" '| — |' \
+  "a process note with nothing recorded is uncounted, not zero"
+
+SIGNALS="${VAULT}/practices/frontend/prefer-signals.md"
+edit_note() {
+  python3 - "${SIGNALS}" "$1" "$2" <<'PY'
+import sys
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(path).read()
+assert old in s, f"fixture no longer contains {old!r}"
+open(path, 'w').write(s.replace(old, new, 1))
+PY
+  "${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+}
+
+# Repos but no applications: show what was seen, labelled so nobody reads it as
+# progress toward a bar this note is not held to.
+edit_note 'repos: []' 'repos: ["fixture-api", "fixture-web"]'
+assert_contains "${VAULT}/practices/INDEX.md" '| 2 seen |' \
+  "a process note with repos but no applications shows what was seen"
+
+# Once applications exist they are the count, and the fallback stops.
+edit_note 'applies-to: ""' 'applies-to: ""
+applications: ["fixture-api 2026-01-01", "fixture-api 2026-02-02", "fixture-web 2026-03-03"]'
+assert_contains "${VAULT}/practices/INDEX.md" '| 3 applied |' \
+  "a process note with applications is counted in applications"
+assert_not_contains "${VAULT}/practices/INDEX.md" '| 2 seen |' \
+  "and stops being reported as merely seen"
+
+# The point of the second bar, stated as an assertion: two applications in one
+# repo count as two. Under the repo bar this note would show 2 and stall.
+assert_contains "${VAULT}/practices/INDEX.md" '| 3 applied |' \
+  "two applications in the same repo count separately"
 
 # Malformed frontmatter warns but never fails the run.
 out="$("${INDEX}" --vault "${VAULT}" 2>&1 >/dev/null)"

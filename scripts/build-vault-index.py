@@ -115,6 +115,7 @@ def collect(vault):
             problems.append((str(rel), "no **Rule:** line"))
 
         repos = fm.get("repos") or []
+        applications = fm.get("applications") or []
         notes.append(
             {
                 "group": rel.parts[0] if len(rel.parts) > 1 else ".",
@@ -122,11 +123,42 @@ def collect(vault):
                 "title": title or path.stem,
                 "maturity": maturity,
                 "repos": repos if isinstance(repos, list) else [repos],
+                "applications": (
+                    applications if isinstance(applications, list) else [applications]
+                ),
+                # "" and absent are the same claim — this note asserts nothing
+                # about holding outside where it was found — so both take the
+                # applications bar. Anything else is a scoped rule.
+                "process": not (fm.get("applies-to") or ""),
                 "tags": fm.get("tags") or [],
                 "rule": first_sentence(rule) if rule else "",
             }
         )
     return notes, problems
+
+
+def evidence_cell(note):
+    """The count that gates this note, labelled with which kind it is.
+
+    A bare number was ambiguous once two bars existed: `1` next to a process
+    rule read as "observed in one repo, needs two more", when the repo count is
+    not what that note is promoted on and never will be. The unit is the part
+    that carries the meaning, so it travels with the number.
+
+    A process note with no `applications:` list yet falls back to `N seen` — the
+    repos it was observed in, which is real information, marked as not the thing
+    it is promoted on. Rendering those as `0` would read as evidence against
+    160-odd notes at once, and rendering them as `—` would throw away a count
+    the note actually carries. Only a note with nothing recorded at all is `—`:
+    nothing counted is a different claim from counted and found nothing.
+    """
+    if not note["process"]:
+        return f"{len(note['repos'])} repos"
+    if note["applications"]:
+        return f"{len(note['applications'])} applied"
+    if note["repos"]:
+        return f"{len(note['repos'])} seen"
+    return "—"
 
 
 def render(notes):
@@ -146,8 +178,12 @@ def render(notes):
         f"> {total} notes · {summary}",
         "",
         "Read this file first. Open a note only when a row below looks relevant;",
-        "each lives at `practices/<group>/<note>.md`. `repos` is the count of",
-        "repos a practice has been observed in — it drives promotion.",
+        "each lives at `practices/<group>/<note>.md`. `Evidence` is the count",
+        "that gates promotion: `N repos` for a scoped rule, which claims to hold",
+        "outside where it was found, and `N applied` for a process rule",
+        "(`applies-to: \"\"`), which only claims to have kept being right.",
+        "`N seen` is a process rule whose applications are not recorded yet — the",
+        "repos it turned up in, which do not gate it. `—` is uncounted, not zero.",
         "",
     ]
 
@@ -156,14 +192,14 @@ def render(notes):
         rows.sort(key=lambda n: (MATURITY_ORDER.get(n["maturity"], 9), n["slug"]))
         out.append(f"## {group} ({len(rows)})")
         out.append("")
-        out.append("| Note | Maturity | Repos | Tags | Rule |")
+        out.append("| Note | Maturity | Evidence | Tags | Rule |")
         out.append("|---|---|---|---|---|")
         for n in rows:
             out.append(
-                "| [[{slug}]] | {maturity} | {repos} | {tags} | {rule} |".format(
+                "| [[{slug}]] | {maturity} | {evidence} | {tags} | {rule} |".format(
                     slug=cell(n["slug"]),
                     maturity=cell(n["maturity"]),
-                    repos=len(n["repos"]),
+                    evidence=evidence_cell(n),
                     tags=cell(", ".join(n["tags"])),
                     rule=cell(n["rule"]),
                 )
