@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-08-16
+
 ### Added
 - **`repos-check` and `doctor` report repos whose rule files resolve to
   nothing.** Both sources that answer "which repos are onboarded" identify one
@@ -2391,7 +2393,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.28.1...v0.29.0
