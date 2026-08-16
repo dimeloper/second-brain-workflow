@@ -34,29 +34,12 @@ command -v claude >/dev/null || { echo "claude not on PATH" >&2; exit 2; }
 # everything was fine. So the selection now scans every rule and every glob for
 # one it can satisfy *by construction*, and refuses outright rather than
 # guessing at a shape it does not recognise.
+# The selection itself lives in scripts/lib/probe_path.py, where it can be unit
+# tested — the two model calls below keep this script out of `make check`, and
+# the untested half was precisely the half that broke.
 read -r RULE GLOB PROBE <<EOF
-$("${STANDARDS_DIR}/scripts/render.py" --explain | python3 -c '
-import re, sys
-for line in sys.stdin:
-    m = re.match(r"^(\S+)\s+\[scoped: (.+)\]\s*$", line.strip())
-    if not m:
-        continue
-    rule, globs = m.group(1), [g.strip() for g in m.group(2).split(",")]
-    for g in globs:
-        # A leading **/ means "at any depth", so the probe gets a directory
-        # under it — matching at depth zero is not universally supported and is
-        # not what a real repo looks like anyway.
-        anydepth = g.startswith("**/")
-        rest = g[3:] if anydepth else g
-        if "*" not in rest:
-            probe = rest                       # **/lib/auth.ts, data/db.ts, app.json
-        elif re.fullmatch(r"\*(\.[A-Za-z0-9.]+)", rest):
-            probe = "probe" + rest[1:]         # **/*.tsx -> probe.tsx
-        else:
-            continue                           # targets/**/*.swift, app.config.* — skip
-        print(rule, g, ("src/" + probe) if anydepth else probe)
-        sys.exit(0)
-')
+$("${STANDARDS_DIR}/scripts/render.py" --explain \
+  | PYTHONPATH="${STANDARDS_DIR}/scripts" python3 -m lib.probe_path || true)
 EOF
 [ -n "${PROBE:-}" ] || {
   echo "No glob-scoped rule with a glob this script can build a probe for." >&2

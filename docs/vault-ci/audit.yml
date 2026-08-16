@@ -26,12 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out this vault
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: vault
 
       - name: Check out the engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.ENGINE_REPO }}
           ref: ${{ env.ENGINE_REF }}
@@ -61,7 +61,7 @@ jobs:
       # no need to remove the other input.
       - name: Check out the rules repo
         if: vars.RULES_REPO != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ vars.RULES_REPO }}
           ssh-key: ${{ secrets.RULES_DEPLOY_KEY }}

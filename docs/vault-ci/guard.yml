@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out this vault
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: vault
           fetch-depth: 0   # need the pre-push commit, not just the new tip
@@ -50,7 +50,7 @@ jobs:
       # pinned above. Both are versioned together, so a template copied from a
       # release always has the engine that matches it.
       - name: Check out the engine
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.ENGINE_REPO }}
           ref: ${{ env.ENGINE_REF }}

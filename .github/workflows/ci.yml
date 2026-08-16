@@ -8,7 +8,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true   # vendor/obsidian-skills is a pinned submodule
           # Tags and history, both required by the release-tag check in
@@ -47,7 +47,7 @@ jobs:
   bash32:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
           fetch-depth: 0     # see the check job — the release-tag check needs both
