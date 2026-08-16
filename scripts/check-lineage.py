@@ -529,6 +529,19 @@ def audit(vault, rules_dir, stale_months, as_of):
     }
 
 
+def _evidence_note(note):
+    """The count with the unit it was actually measured in.
+
+    `3 repo(s)` beside a note promoted on applications is not a rounding error,
+    it is the wrong number: that note's repo count is 1 and always will be.
+    Printing the unit is what stops a reader checking the claim against the
+    field it does not depend on.
+    """
+    if note["process"]:
+        return f"{len(note['applications'])} application(s)"
+    return f"{note['distinct']} repo(s){_collapsed_note(note)}"
+
+
 def _collapsed_note(note):
     """Say when a count is lower than the `repos:` list a reader can see.
 
@@ -597,9 +610,11 @@ def report(result, vault, rules_dir, stale_months):
         f"enforced needs {result['threshold']}): {len(result['thin'])}"
     )
     for n in result["thin"]:
+        unit = "application(s)" if n["process"] else "repo(s)"
+        collapsed = "" if n["process"] else _collapsed_note(n)
         lines.append(
-            f"  - {n['slug']} ({n['maturity']}, {n['distinct']} of "
-            f"{n['missed_bar']} repo(s){_collapsed_note(n)})"
+            f"  - {n['slug']} ({n['maturity']}, {n['evidence']} of "
+            f"{n['missed_bar']} {unit}{collapsed})"
         )
     lines.append("")
 
@@ -624,14 +639,13 @@ def report(result, vault, rules_dir, stale_months):
     # too: a reader who only ever sees it when it bites will read the number
     # underneath as exact.
     lines.append(
-        f"Ready to promote (repo count already clears the next bar): "
+        f"Ready to promote (evidence already clears the next bar): "
         f"{len(result['ready'])}"
     )
     for n in result["ready"]:
         nxt = "trialing" if n["maturity"] == "idea" else "enforced"
         lines.append(
-            f"  - {n['slug']}: {n['maturity']} -> {nxt} "
-            f"({n['distinct']} repo(s){_collapsed_note(n)})"
+            f"  - {n['slug']}: {n['maturity']} -> {nxt} ({_evidence_note(n)})"
         )
     groups = result["lineage_groups"]
     if groups:
