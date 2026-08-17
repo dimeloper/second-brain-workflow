@@ -25,8 +25,16 @@ def repo_files(repo, limit=20000):
         out = subprocess.run(
             ["git", "-C", str(repo), "ls-files"],
             capture_output=True, text=True, timeout=30, check=False)
-        if out.returncode == 0:
-            return [line for line in out.stdout.splitlines() if line][:limit]
+        tracked = [line for line in out.stdout.splitlines() if line]
+        # An *empty* success is not an answer. `git init` with nothing added
+        # yet exits 0 and prints nothing, which is indistinguishable from "this
+        # repo has no files" unless you fall through — and the repo being
+        # onboarded is exactly the one whose files are not committed yet. Every
+        # caller asks "what is here", so a repo full of uncommitted work
+        # answering "nothing" makes rules render nowhere and skills look
+        # irrelevant.
+        if out.returncode == 0 and tracked:
+            return tracked[:limit]
     except (OSError, ImportError):
         pass
 

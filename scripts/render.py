@@ -51,6 +51,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
 from lib.registry import register as register_repo  # noqa: E402
+from lib.repo_match import repo_files, path_matches  # noqa: E402
 
 ENGINE = Path(__file__).resolve().parent.parent
 RULES_SRC = ENGINE / "rules"
@@ -160,6 +161,58 @@ def load_rules():
             }
         )
     return rules
+
+
+def scope_rules(rules, repo, scope):
+    """The rules to render here. -> (rules, note) — note is "" under `all`.
+
+    Under `all` every rule is written into every repo and the globs decide
+    which ones *attach* at load time. That is safe and was never examined: on
+    the machine this was written from it put 101 of 170 rendered files into
+    repos where their globs cannot match anything — `app-flutter` in three Astro
+    sites, `frontend-angular` in a Python API — so a rule that applies to one
+    repo still had to be committed to ten.
+
+    Under `relevant` a scoped rule is rendered only where one of its globs
+    matches a file that is actually there. Always-on rules are unconditional:
+    having no globs is a claim that they apply everywhere, and the absence of a
+    matching file cannot contradict that.
+
+    The set is a function of the repo's *current* files, which is the risk worth
+    naming: a repo that later grows its first test file needs the test rule and
+    will not have it. Nothing here papers over that — `--check` recomputes this
+    same set, so the newly-matching rule shows up as a file that should exist
+    and does not, which is drift and reported as such. That is why this may not
+    be a write-time-only filter.
+
+    Matching goes through lib/repo_match, the same code `skill_manifest relevant`
+    and `practices-for` use, so "does this apply here" cannot get two answers on
+    one repo depending on which command asked.
+    """
+    if scope != "relevant":
+        return rules, ""
+
+    # Our own output is not evidence about the repo. `rule-scoping` is scoped to
+    # `**/.cursor/rules/*.mdc` and `**/.claude/rules/*.md`, so once a repo
+    # commits what we rendered, that rule matches — because we put the files
+    # there. It measured 10 of 10 repos on this machine for exactly that reason,
+    # and every rule that renders more files would inherit the same circularity.
+    #
+    # A hand-written rule file still counts: those are the repo's own, and a rule
+    # about writing path globs genuinely does apply where someone writes them.
+    files = [f for f in repo_files(repo) if not is_generated(repo / f)]
+    kept, dropped = [], []
+    for r in rules:
+        if r["always"] or any(path_matches(f, g) for g in r["globs"] for f in files):
+            kept.append(r)
+        else:
+            dropped.append(r["name"])
+    if not dropped:
+        return kept, f"Scope:  relevant — all {len(kept)} rule(s) apply here"
+    return kept, (
+        f"Scope:  relevant — {len(kept)} of {len(rules)} rule(s) apply here; "
+        f"not rendered: {', '.join(sorted(dropped))}"
+    )
 
 
 def check_globs(rules, targets):
@@ -474,6 +527,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("target_repo", nargs="?", help="repo to render into")
     ap.add_argument("--targets", help="override RENDER_TARGETS for this run")
+    ap.add_argument("--scope", choices=("all", "relevant"),
+                    help="override SBW_RENDER_SCOPE for this run")
     ap.add_argument("--rules-dir", help="override SBW_RULES_DIR for this run")
     ap.add_argument("--check", action="store_true", help="exit 1 on drift, write nothing")
     ap.add_argument("--dry-run", action="store_true", help="print planned actions")
@@ -489,6 +544,13 @@ def main():
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
     targets_raw = args.targets or cfg["RENDER_TARGETS"]
     targets = [t.strip() for t in targets_raw.split(",") if t.strip()]
+    scope = args.scope or cfg["SBW_RENDER_SCOPE"]
+    if scope not in ("all", "relevant"):
+        sys.exit(
+            f"SBW_RENDER_SCOPE is {scope!r}; expected 'all' or 'relevant'. "
+            "Refusing rather than picking one, since the two render different "
+            "file sets and the wrong guess would delete rules from a repo."
+        )
     unknown = [t for t in targets if t not in ALL_TARGETS]
     if unknown:
         sys.exit(f"Unknown target(s): {', '.join(unknown)}. Known: {', '.join(ALL_TARGETS)}")
@@ -556,6 +618,10 @@ def main():
         elif git_dir(repo) is None:
             sys.exit(f"--local needs a git work tree: {repo} is not one. There is "
                      "nothing to keep out of a remote here.")
+
+    rules, scope_note = scope_rules(rules, repo, scope)
+    if scope_note:
+        print(scope_note)
 
     fold = agents_is_writable(repo)
     rendered = plan(rules, targets, content_sha,

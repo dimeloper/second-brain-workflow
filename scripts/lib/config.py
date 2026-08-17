@@ -34,6 +34,16 @@ DEFAULTS = {
     # know about is a key one of them warns is unknown.
     "SBW_SCAN_ROOTS": "~",
     "SBW_SCAN_DEPTH": "5",
+    # Which rules a render writes into a repo: `all` (every rule, scoping left
+    # to the globs at load time) or `relevant` (only rules whose globs match a
+    # file that is actually there).
+    #
+    # Defaults to `all` because switching an existing machine to `relevant`
+    # *deletes* rendered files from every onboarded repo — correct, and not
+    # something an engine upgrade should do to someone who did not ask. Opting
+    # in is a line in the machine config, which is where the person saying so
+    # already says everything else.
+    "SBW_RENDER_SCOPE": "all",
 }
 
 

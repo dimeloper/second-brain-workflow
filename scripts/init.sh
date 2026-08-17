@@ -79,6 +79,7 @@ describe_key() {
     SBW_EXPECTED_VAULT_ID) echo "the vault.json id this machine expects — the commit guard's anchor" ;;
     SBW_SCAN_ROOTS)        echo "where doctor looks for repos carrying rendered output" ;;
     SBW_SCAN_DEPTH)        echo "how deep that scan goes, counted from each root" ;;
+    SBW_RENDER_SCOPE)      echo "render every rule into every repo (all), or only the ones whose globs match something there (relevant)" ;;
     *)                     echo "" ;;
   esac
 }

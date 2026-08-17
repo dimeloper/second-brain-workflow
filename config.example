@@ -71,3 +71,25 @@ SBW_SCAN_ROOTS=
 # four directories deep. Raising it costs scan time; lowering it silently
 # narrows what "no repos found" means, which is why the scope is printed.
 SBW_SCAN_DEPTH=
+
+# Which rules a render writes into a repo.
+#
+#   all       every rule, everywhere. The globs still decide what *attaches* at
+#             load time, so nothing misapplies — but a rule that governs one
+#             repo is still a file committed to all of them. Default.
+#   relevant  only rules whose globs match a file that is actually in the repo.
+#             Always-on rules are unconditional: having no globs is a claim to
+#             apply everywhere.
+#
+# `relevant` is opt-in because switching an existing machine to it *deletes*
+# rendered files from every onboarded repo — correct, and not something an
+# engine upgrade should do on your behalf. On the machine this was written from
+# it dropped 101 of 170 rendered files: `app-flutter` in three Astro sites,
+# `frontend-angular` in a Python API.
+#
+# The trade-off to know: the set is computed from the repo's files at render
+# time, so a repo that later grows its first test file needs the test rule and
+# will not have it. `render.py --check` recomputes the same set and reports that
+# as drift, so it surfaces on the next check rather than staying silent — but it
+# does mean `--check` is what tells you, not the render itself.
+SBW_RENDER_SCOPE=all

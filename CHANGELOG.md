@@ -17,6 +17,39 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`SBW_RENDER_SCOPE=relevant` renders a rule only into repos where it can
+  match.** By default every rule goes into every onboarded repo and the globs
+  decide what attaches at load time. Nothing misapplies — but a rule governing
+  one repo is still a file committed to all of them, so every new rule is a
+  commit everywhere. On one machine, 101 of 170 rendered files sat where their
+  globs can never match: `app-flutter` in three Astro sites, `frontend-angular`
+  in a Python API. Mean repos touched per rule change: all of them, versus about
+  four in ten under `relevant`.
+
+  Always-on rules are unconditional — having no globs is a claim to apply
+  everywhere, which no absent file can contradict.
+
+  **Opt-in**, since switching an existing machine to it deletes rendered files
+  from every onboarded repo. Correct, and not something an upgrade should do on
+  your behalf. `--scope relevant` overrides per run.
+
+  Two properties make it safe rather than merely smaller. **A rule that starts
+  matching is drift**: `--check` recomputes the same set, so a repo that grows
+  its first test file reports the missing rule instead of silently lacking it —
+  this is deliberately not a write-time-only filter. And **the render's own
+  output is not evidence**: a rule scoped to `**/.cursor/rules/*.mdc` would
+  otherwise match because the render put files there, so generated files are
+  excluded from matching while hand-written rule files still count.
+
+### Fixed
+- **`repo_files()` no longer reads an empty `git ls-files` as "no files".** A
+  repo with nothing committed yet exits 0 and prints nothing, which was taken as
+  an answer — so a freshly-onboarded repo full of uncommitted work looked empty.
+  It now falls through to the filesystem walk, which also fixes
+  `skill_manifest relevant` and `practices-for` reporting nothing on a repo
+  mid-onboarding.
+
 ## [0.34.0] - 2026-08-17
 
 ### Changed

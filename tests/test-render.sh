@@ -400,5 +400,140 @@ case "${out}" in
 esac
 assert_file "${HANDWRITTEN}/CLAUDE.md" "CLAUDE.md still renders alongside it"
 
+# --- SBW_RENDER_SCOPE=relevant ----------------------------------------------
+# Under `all` (the default) every rule is written into every repo and the globs
+# decide what attaches at load time. That put 101 of 170 rendered files into
+# repos where they can never match — app-flutter in three Astro sites — so a
+# rule applying to one repo still had to be committed to ten.
+SCOPE_RULES="${SANDBOX}/scope-rules"
+mkdir -p "${SCOPE_RULES}"
+cat > "${SCOPE_RULES}/only-dart.md" <<'RULE'
+---
+paths:
+  - "**/*.dart"
+description: matches nothing in a TypeScript repo
+---
+- dart only.
+RULE
+cat > "${SCOPE_RULES}/only-ts.md" <<'RULE'
+---
+paths:
+  - "**/*.ts"
+description: matches the fixture repo
+---
+- ts only.
+RULE
+cat > "${SCOPE_RULES}/always.md" <<'RULE'
+---
+description: no paths, so always-on
+---
+- everywhere.
+RULE
+
+SCOPED="${SANDBOX}/scoped-repo"
+mkdir -p "${SCOPED}/src"
+git -C "${SCOPED}" init -q 2>/dev/null || (cd "${SCOPED}" && git init -q)
+echo "export const x = 1" > "${SCOPED}/src/index.ts"
+
+scoped_render() {
+  "${ENGINE}/scripts/render.py" "${SCOPED}" --rules-dir "${SCOPE_RULES}" \
+    --no-register "$@"
+}
+
+# The scope line alone, so a rule name appearing in a "would write:" line
+# cannot be mistaken for it appearing in the omitted list.
+scope_line() { printf '%s\n' "$1" | grep '^Scope:' || true; }
+
+out="$(scoped_render --scope relevant --dry-run 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(scope_line "${out}")" in
+  *"2 of 3 rule(s) apply here"*) pass "relevant renders only the rules that can match" ;;
+  *) fail "relevant renders only the rules that can match" "$(scope_line "${out}")" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"not rendered: only-dart"*) pass "and names what it left out, so the omission is visible" ;;
+  *) fail "and names what it left out, so the omission is visible" "${out}" ;;
+esac
+
+scoped_render --scope relevant >/dev/null 2>&1
+assert_file "${SCOPED}/.cursor/rules/only-ts.mdc" "the matching rule is written"
+assert_no_file "${SCOPED}/.cursor/rules/only-dart.mdc" "the unmatched rule is not"
+# Always-on is unconditional: having no globs is a claim to apply everywhere,
+# and no absent file can contradict it. It lands in .claude/rules/ here rather
+# than AGENTS.md because this engine checkout ships no AGENTS.md of its own —
+# the same "not folded" path a repo with a hand-written AGENTS.md takes.
+assert_file "${SCOPED}/.claude/rules/always.md" \
+  "an always-on rule renders regardless of what is here"
+
+# The safety property the whole feature rests on. A repo that later grows its
+# first matching file needs that rule and does not have it — so --check has to
+# recompute the same set and call the absence drift, or this trades visible
+# churn for a silent gap.
+scoped_render --scope relevant --check >/dev/null 2>&1
+assert_exit 0 $? "a repo that gained nothing stays clean"
+echo "void main() {}" > "${SCOPED}/lib.dart"
+out="$(scoped_render --scope relevant --check 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "a rule that starts matching is drift, not a silent absence"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"DRIFT: .cursor/rules/only-dart.mdc"*) pass "naming the rule that should now be there" ;;
+  *) fail "naming the rule that should now be there" "${out}" ;;
+esac
+rm -f "${SCOPED}/lib.dart"
+
+# Our own output is not evidence about the repo. A rule scoped to
+# `**/.cursor/rules/*.mdc` would otherwise match because the render put files
+# there — self-justifying, and every rule that renders more files inherits it.
+cat > "${SCOPE_RULES}/only-rule-files.md" <<'RULE'
+---
+paths:
+  - "**/.cursor/rules/*.mdc"
+description: matches rule files
+---
+- about rule files.
+RULE
+out="$(scoped_render --scope relevant --dry-run 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(scope_line "${out}")" in
+  *"not rendered: only-dart, only-rule-files"*)
+    pass "a rule is not made applicable by the files this render wrote" ;;
+  *) fail "a rule is not made applicable by the files this render wrote" "$(scope_line "${out}")" ;;
+esac
+# ...but a hand-written rule file is the repo's own and does count.
+printf -- '---\ndescription: local\n---\n\n- hand written\n' \
+  > "${SCOPED}/.cursor/rules/local-only.mdc"
+out="$(scoped_render --scope relevant --dry-run 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(scope_line "${out}")" in
+  *only-rule-files*)
+    fail "a hand-written rule file does count as evidence" "$(scope_line "${out}")" ;;
+  *"not rendered: only-dart"*) pass "a hand-written rule file does count as evidence" ;;
+  *) fail "a hand-written rule file does count as evidence" "$(scope_line "${out}")" ;;
+esac
+rm -f "${SCOPED}/.cursor/rules/local-only.mdc"
+
+# The default is unchanged, which is what makes this safe to ship: switching an
+# existing machine to `relevant` deletes rendered files from every onboarded
+# repo, and an engine upgrade must not do that to someone who did not ask.
+out="$(scoped_render --dry-run 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Scope:"*) fail "the default says nothing about scope, and renders everything" "${out}" ;;
+  *only-dart*) pass "the default says nothing about scope, and renders everything" ;;
+  *) fail "the default says nothing about scope, and renders everything" "${out}" ;;
+esac
+
+# An unrecognised value refuses rather than picking one — the two scopes render
+# different file sets, so a guess would delete rules from a repo.
+out="$(SBW_RENDER_SCOPE=some-typo scoped_render --dry-run 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "an unknown SBW_RENDER_SCOPE refuses"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"expected 'all' or 'relevant'"*) pass "naming what it expected" ;;
+  *) fail "naming what it expected" "${out}" ;;
+esac
 
 finish

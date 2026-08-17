@@ -273,6 +273,41 @@ something a check has to catch.
 ./scripts/render.py --explain                          # resolution per target
 ```
 
+### Which rules reach which repos
+
+By default every rule is rendered into every onboarded repo, and the globs decide
+which ones *attach* at load time. Nothing misapplies — but a rule that governs
+one repo is still a file committed to all of them, so every new rule is a commit
+everywhere. On the machine this was written from, **101 of 170 rendered files sat
+in repos where their globs cannot match anything**: `app-flutter` in three Astro
+sites, `frontend-angular` in a Python API.
+
+`SBW_RENDER_SCOPE=relevant` (or `--scope relevant`) renders a scoped rule only
+where one of its globs matches a file that is actually there. Always-on rules are
+unconditional — having no globs is a claim to apply everywhere, which no absent
+file can contradict. Mean repos touched per rule change goes from *all of them*
+to about four in ten here.
+
+It is **opt-in**, because switching an existing machine to it deletes rendered
+files from every onboarded repo. That is the correct result and not something an
+engine upgrade should do on your behalf.
+
+Two things make it safe rather than merely smaller:
+
+- **A rule that starts matching is drift.** The set is computed from the repo's
+  files, so a repo that later grows its first test file needs the test rule and
+  does not have it. `--check` recomputes the same set, so the absent rule is
+  reported exactly like a modified one — this is not a write-time-only filter,
+  which is the difference between visible churn and a silent gap.
+- **Our own output is not evidence.** A rule scoped to `**/.cursor/rules/*.mdc`
+  would otherwise match because the render put files there. Generated files are
+  excluded from the match; a hand-written rule file still counts, because that
+  one is the repo's own.
+
+Matching goes through `lib/repo_match`, the same code behind
+`skill_manifest relevant` and `practices-for`, so "does this apply here" cannot
+get two answers for one repo depending on which command asked.
+
 `--no-register` renders normally but leaves the [repo registry](#the-repo-registry)
 alone. Reach for it when the target is a throwaway — a probe, a scratch checkout,
 a fixture you are about to delete — because the registry is a record of intent
