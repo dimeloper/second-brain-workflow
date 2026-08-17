@@ -90,8 +90,12 @@ if [ -f "${REAL_RULES}/../AGENTS.md" ]; then
   cp "${REAL_RULES}/../AGENTS.md" "${PROBE_SRC}/AGENTS.md"
 fi
 
+# --no-register: ${WORK} is a mktemp directory this script deletes on exit, so
+# recording it as an onboarded repo leaves a registry line pointing at nothing
+# within seconds — and doctor never prunes, so every run of this check used to
+# cost a permanent warning.
 "${STANDARDS_DIR}/scripts/render.py" "${WORK}" --rules-dir "${RULES_COPY}" \
-  --targets claude-code,agents >/dev/null
+  --targets claude-code,agents --no-register >/dev/null
 
 mkdir -p .claude
 cat > .claude/settings.json <<'JSON'

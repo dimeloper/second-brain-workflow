@@ -62,11 +62,29 @@ assert_no_file "${REGISTRY}" "--check records nothing"
 render "${REPO}" --dry-run >/dev/null 2>&1
 assert_no_file "${REGISTRY}" "--dry-run records nothing"
 
+# --- --no-register writes the repo but not the registry ----------------------
+# Asserted before the first real render, so an already-present registry cannot
+# make it pass by accident — the same reason the two cases above come first.
+#
+# The case this exists for: verify-claude-load.sh renders into a mktemp
+# directory and deletes it on exit. Registering that left a line pointing at
+# nothing seconds later, and doctor never prunes (an unmounted volume is not a
+# deleted repo), so each run of that check cost a permanent warning. Four had
+# accumulated on the author's machine in a day.
+PROBE="${SANDBOX}/probe-repo"
+make_target_repo "${PROBE}"
+render "${PROBE}" --no-register >/dev/null 2>&1
+assert_exit 0 $? "--no-register still renders"
+assert_file "${PROBE}/.sbw-version" "...writing the target normally"
+assert_no_file "${REGISTRY}" "...and recording nothing"
+
 # --- a successful render records the target ----------------------------------
 render "${REPO}" >/dev/null 2>&1
 assert_exit 0 $? "render succeeds"
 assert_file "${REGISTRY}" "a successful render creates the registry"
 assert_contains "${REGISTRY}" "^$(real "${REPO}")\$" "registry holds the target's realpath"
+assert_not_contains "${REGISTRY}" "^$(real "${PROBE}")\$" \
+  "and the --no-register target is still absent once the file exists"
 
 # --- idempotent -------------------------------------------------------------
 render "${REPO}" >/dev/null 2>&1

@@ -17,6 +17,26 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`verify-claude-load.sh` no longer registers the throwaway repo it renders
+  into.** It builds a fixture with `mktemp` and deletes it on exit, but
+  `render.py` records every successful write-mode render — so each run left a
+  registry line pointing at a directory that ceased to exist seconds later.
+  `doctor` then warns about it forever, deliberately: it never prunes, because
+  an unmounted volume is not a deleted repo. Three runs in one day put three
+  dead entries in the author's registry, and the noise is indistinguishable
+  from the finding the check exists for.
+
+  `render.py` gains `--no-register` for this: render normally, record nothing.
+  A flag rather than "skip anything under `$TMPDIR`" — the registry records
+  intent, and sniffing the path would be a guess about what a directory means
+  in a file whose whole value is that its entries were put there on purpose.
+
+  If you have run `verify-claude-load.sh` before, delete the
+  `verify-claude-load.*` lines from
+  `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repos` by hand. Nothing
+  prunes them for you, and that is still the right default.
+
 ## [0.33.0] - 2026-08-17
 
 ### Added

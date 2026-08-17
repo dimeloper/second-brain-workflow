@@ -480,6 +480,9 @@ def main():
     ap.add_argument("--local", action="store_true",
                     help="also exclude the rendered files locally, so the repo's "
                          "remote never sees them")
+    ap.add_argument("--no-register", action="store_true",
+                    help="render without recording the repo as onboarded "
+                         "(throwaway fixtures, probes)")
     ap.add_argument("--explain", action="store_true", help="print resolution and exit")
     args = ap.parse_args()
 
@@ -676,7 +679,21 @@ def main():
     # rather than propagating — but it does warn, because an unwritable
     # registry is exactly how the onboarded set becomes undetermined later with
     # nothing left to explain it.
-    if mode == "write":
+    # `--no-register` is for a render into something that is not a repo you
+    # onboarded: a throwaway fixture, a probe, a scratch checkout. Without it,
+    # verify-claude-load.sh — which renders into a mktemp directory and deletes
+    # it seconds later — added a permanent registry line per run, and the
+    # author's registry accumulated four dead entries in one day: three probes
+    # and one canary fixture. doctor then reports each of them forever, since
+    # it deliberately never prunes (an unmounted volume is not a deleted repo),
+    # so the noise is not self-clearing and it is indistinguishable from the
+    # finding that matters.
+    #
+    # A flag rather than "skip anything under $TMPDIR": the registry records
+    # intent, and intent is the caller's to state. Sniffing the path would be a
+    # guess about what a directory means, in a file whose whole value is that
+    # its entries were put there deliberately.
+    if mode == "write" and not args.no_register:
         register_repo(repo, warn=lambda m: print(f"warning: {m}", file=sys.stderr))
 
     if args.local and mode == "write":

@@ -269,8 +269,15 @@ something a check has to catch.
 ./scripts/render.py /path/to/repo                      # all configured targets
 ./scripts/render.py /path/to/repo --targets cursor     # one target
 ./scripts/render.py /path/to/repo --check              # exit 1 on drift; for CI
+./scripts/render.py /path/to/repo --no-register        # a fixture, not an onboarding
 ./scripts/render.py --explain                          # resolution per target
 ```
+
+`--no-register` renders normally but leaves the [repo registry](#the-repo-registry)
+alone. Reach for it when the target is a throwaway — a probe, a scratch checkout,
+a fixture you are about to delete — because the registry is a record of intent
+and `doctor` never prunes it, so one line pointing at a deleted directory is a
+warning you keep forever.
 
 `RENDER_TARGETS` sets the default per machine. Every output is a real file with
 a provenance header naming the source SHA (the rules repo's own commit when it
