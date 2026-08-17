@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-08-17
+
 ### Fixed
 - **`verify-claude-load.sh` no longer registers the throwaway repo it renders
   into.** It builds a fixture with `mktemp` and deletes it on exit, but
@@ -2479,7 +2481,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.1...HEAD
+[0.33.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.30.0...v0.31.0
