@@ -47,10 +47,13 @@ traces back to it), an **orphaned rule** (its source note is gone or demoted
 below `enforced`), a **stale claim** (`enforced`, unreviewed past
 `--stale-months`, default 6 — the same 180-day window `review-queue.md` uses
 for a different purpose), **maturity above its evidence** (a maturity whose
-entry bar the note's repo count does not meet — `trialing` under the
-idea→trialing bar, `enforced` under the trialing→enforced one, both read from
-`00-maps/promotion-candidates.md` rather than a second hardcoded copy of the
-numbers; `idea` is the floor and has no bar to miss — exempting a note whose
+entry bar the note's evidence does not meet — repos for a scoped note,
+`applications:` for a process one where the vault declares that bar; `trialing`
+under the idea→trialing bar, `enforced` under the trialing→enforced one, both
+read from `00-maps/promotion-candidates.md` rather than a second hardcoded copy
+of the numbers; `idea` is the floor and has no bar to miss; a process note with
+no `applications:` recorded is *uncounted* and reported as its own backlog line
+rather than judged against either bar — exempting a note whose
 `**Observed in:**` line says exactly "enforced by preference," this vault's own
 way of marking a personal default that was never meant to clear that bar; a
 note that's close but doesn't match exactly is still counted *and* named
@@ -125,6 +128,15 @@ on the third. It has no evidence curve to climb, so the note it descends from
 will sit at `idea` indefinitely and the rule would read as orphaned forever. The
 alternatives were both worse: promote the note on one repo, which games the bar
 the whole promotion model rests on, or withdraw a constraint that is true today.
+
+**Check whether it is really provisional first.** Several exemptions written
+here said some version of *"no repo count will mature this"* — which was true of
+any process rule, not of these rules in particular, and was the repo bar's
+problem rather than theirs. A note with `applies-to: ""` is now counted in
+`applications:` (see [The maturity gradient](REFERENCE.md#the-maturity-gradient)),
+so re-application in
+the same repo *does* mature it. Reach for `provisional:` only when the rule has
+no evidence curve **at all** — not merely no *cross-repo* one.
 
 Two deliberate constraints:
 

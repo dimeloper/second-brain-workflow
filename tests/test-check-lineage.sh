@@ -691,6 +691,24 @@ case "${out_dup}" in
   *) fail "the second colliding path is named in full" "${out_dup}" ;;
 esac
 
+# --- opting out is the default, and it changes nothing -----------------------
+# The shared fixture vault declares no applications bar, so every note stays on
+# the repo bar and the report says nothing about a model this vault does not
+# use. An engine upgrade must not quietly relax an existing vault's audit: its
+# `enforced` process notes with thin repo evidence have to keep being flagged.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Maturity set before its evidence was countable"*)
+    fail "a vault with no applications bar sees no new section" "${out}" ;;
+  *) pass "a vault with no applications bar sees no new section" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Ready to promote (repo count already clears the next bar)"*)
+    pass "and keeps the wording that matches what it is counted on" ;;
+  *) fail "and keeps the wording that matches what it is counted on" "${out}" ;;
+esac
+
 # --- two bars: repos for scoped notes, applications for process notes -------
 #
 # Built as its own vault rather than added to the shared lineage fixture, whose

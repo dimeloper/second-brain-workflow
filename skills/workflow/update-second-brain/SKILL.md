@@ -142,16 +142,38 @@ for approval before writing any practice note.**
    `practices/<domain>/`. Unresolved `[[links]]` to not-yet-written notes are fine
    — mark them as proposed.
 
-2. **Update an existing note.** If the session re-observed a practice in a *new*
-   repo, add that repo to `repos:` and extend `**Observed in:**`. If it
-   contradicts a note, record the counterexample and consider demotion.
+2. **Update an existing note.** Record the re-application in the field that note
+   is actually judged on — see the two bars below. A **scoped** note
+   (`applies-to` set) gains an entry in `repos:` only when the repo is *new* to
+   it. A **process** note (`applies-to: ""`) gains an entry in `applications:`
+   every time it is deliberately re-applied, **including in a repo already
+   listed** — that is the whole point of the second field. Extend
+   `**Observed in:**` either way. If the session contradicts a note, record the
+   counterexample and consider demotion.
 
-3. **Promotion.** After updating `repos:`, apply the bar in
-   `00-maps/promotion-candidates.md`: `idea` → `trialing` at `length(repos) >= 2`,
-   `trialing` → `enforced` at `>= 3`. Promote **one rung per invocation** — never
-   skip `trialing`, which requires deliberate re-application. On reaching
-   `enforced`, set a real `applies-to` glob unless it is a pure process rule.
-   Bump `last-reviewed`.
+3. **Promotion.** Apply the bar in `00-maps/promotion-candidates.md` — which
+   bar depends on what the note claims:
+
+   - `applies-to` set → counted in `repos:`. The note claims to hold outside the
+     codebase that produced it, so make it prove that: `idea` → `trialing` at
+     `length(repos) >= 2`, `trialing` → `enforced` at `>= 3`.
+   - `applies-to: ""` → counted in `applications:`. A process rule about how you
+     work can only ever be re-encountered where you work, so distinct repos are
+     not the claim and never will be. Same numbers, over
+     `length(applications)`.
+
+   Two re-applications in one session are **one** entry. An entry is
+   `"<repo> <YYYY-MM-DD>"`. A process note with no `applications:` list yet is
+   uncounted, not zero — add the field when you first re-apply it, and do not
+   back-fill occasions the note does not already evidence.
+
+   Promote **one rung per invocation** — never skip `trialing`, which requires
+   deliberate re-application. On reaching `enforced`, set a real `applies-to`
+   glob unless it is a pure process rule. Bump `last-reviewed`.
+
+   If the vault's `00-maps/promotion-candidates.md` declares no
+   `length(applications)` bar, that vault has not adopted the second bar: keep
+   every note on `repos:` and change nothing about how it is counted.
 
 **Guardrails**
 
@@ -159,7 +181,10 @@ for approval before writing any practice note.**
   so and keep the note at `idea` with whatever is genuine.
 - Respect the **enforced-by-preference exception**: some `enforced` notes are the
   user's personal defaults with empty or single `repos:`. Never flag them for
-  demotion.
+  demotion. In a vault using the applications bar this exception should be
+  shrinking, not growing — most notes it covered were process rules with no way
+  to clear a repo bar, and `applications:` is the honest route for those. Reach
+  for it only when there is genuinely no re-application to record.
 - Empty `repos: []` on an aspirational note whose `**Observed in:**` says "not
   yet" is correct, not a gap. Do not back-fill it with invented evidence.
 - If a candidate is declined, record it under `## Vault writes (declined)` with a

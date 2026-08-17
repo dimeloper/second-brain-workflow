@@ -27,6 +27,34 @@ assert_contains "${VAULT}/practices/INDEX.md" 'Parse untrusted input' "summarise
 assert_contains "${VAULT}/practices/INDEX.md" 'input()' "summarises multi-line Rule block"
 assert_not_contains "${VAULT}/practices/INDEX.md" '2026-08' "no timestamp — it would churn daily"
 
+# --- the compatibility guarantee, asserted before the new behaviour ---------
+# A vault that has not declared an applications bar has not adopted the two-bar
+# model, and its index must keep the column it was built with. `--check` is a
+# drift gate: an engine upgrade that reformats a generated file would turn every
+# adopter's next CI run red for a change they did not make.
+assert_contains "${VAULT}/practices/INDEX.md" '| Note | Maturity | Repos |' \
+  "a vault with no applications bar keeps the Repos column"
+assert_contains "${VAULT}/practices/INDEX.md" '| 3 |' \
+  "...and a bare count, exactly as before"
+assert_not_contains "${VAULT}/practices/INDEX.md" 'Evidence' \
+  "...with nothing about a model it has not opted into"
+
+# Opting in is declaring the bar in the vault's own promotion map — the same
+# file the numbers have always been read from.
+mkdir -p "${VAULT}/00-maps"
+cat > "${VAULT}/00-maps/promotion-candidates.md" <<'MAP'
+# Promotion candidates
+```dataview
+WHERE (maturity = "idea" AND length(repos) >= 2)
+   OR (maturity = "trialing" AND length(repos) >= 3)
+```
+```dataview
+WHERE (maturity = "idea" AND length(applications) >= 2)
+   OR (maturity = "trialing" AND length(applications) >= 3)
+```
+MAP
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+
 # The Evidence column carries the count that actually gates each note, with the
 # unit attached. A bare number was ambiguous once two bars existed: `1` beside a
 # process rule read as "one repo, two to go" when the repo count is not what

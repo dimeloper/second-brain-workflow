@@ -257,10 +257,16 @@ write_if_absent "${VAULT}/_templates/practice-note.md" <<'EOF'
 ---
 domain:
 applies-to: ""          # glob this maps to when promoted, e.g. **/*.component.ts
+                        # set = a scoped rule, promoted on repos below
+                        # "" = a process rule, promoted on applications below
 maturity: idea          # idea | trialing | enforced
 last-reviewed:
-repos: []               # one entry per repo/session observed
-                        # length(repos) drives promotion: idea→trialing at 2, →enforced at 3
+repos: []               # one entry per repo observed in — the bar for a SCOPED
+                        # rule, which claims to hold outside where it was found
+applications: []        # "<repo> <YYYY-MM-DD>" per deliberate re-application —
+                        # the bar for a PROCESS rule, counted even when the repo
+                        # repeats, since that is all such a rule can demonstrate
+                        # either list: idea→trialing at 2, →enforced at 3
 tags: []
 ---
 
@@ -366,21 +372,51 @@ write_if_absent "${VAULT}/00-maps/promotion-candidates.md" <<'EOF'
 # Promotion candidates
 
 Notes that have cleared the maturity bar but haven't been promoted yet.
-Evidence = number of entries in each note's `repos:` list.
+
+**Which evidence counts depends on what the note claims.** A note with a real
+`applies-to` glob claims generality — that it holds outside the codebase that
+produced it — so it is counted in distinct repos. A note with `applies-to: ""`
+is a process rule about how you work; it can only ever be re-encountered where
+you work, so counting it in repos would leave it stuck at `idea` however often
+it was applied. Those are counted in deliberate re-applications instead.
+
+Scoped notes (`applies-to` set) — evidence = entries in `repos:`
 
 - `idea` → `trialing`: observed in **2+** repos
 - `trialing` → `enforced`: observed in **3+** repos
+
+Process notes (`applies-to: ""`) — evidence = entries in `applications:`
+
+- `idea` → `trialing`: applied on **2+** occasions
+- `trialing` → `enforced`: applied on **3+** occasions
+
+Same numbers, different denominator. An entry is `"<repo> <YYYY-MM-DD>"`; two
+re-applications in one session are one entry. A process note with no
+`applications:` list is uncounted, not zero.
 
 Clearing the bar is necessary, not sufficient: `trialing` has to be *earned* by
 deliberate re-application, so a note promoted today does not become `enforced`
 tomorrow on the same evidence.
 
+Delete the second block to opt out — the tooling reads these queries, and a
+vault declaring no `length(applications)` bar keeps every note on the repo bar.
+
 ```dataview
 TABLE maturity, length(repos) AS "repos", last-reviewed
 FROM "practices"
-WHERE (maturity = "idea" AND length(repos) >= 2)
-   OR (maturity = "trialing" AND length(repos) >= 3)
+WHERE applies-to != ""
+  AND ((maturity = "idea" AND length(repos) >= 2)
+    OR (maturity = "trialing" AND length(repos) >= 3))
 SORT length(repos) DESC
+```
+
+```dataview
+TABLE maturity, length(applications) AS "applications", last-reviewed
+FROM "practices"
+WHERE applies-to = ""
+  AND ((maturity = "idea" AND length(applications) >= 2)
+    OR (maturity = "trialing" AND length(applications) >= 3))
+SORT length(applications) DESC
 ```
 EOF
 

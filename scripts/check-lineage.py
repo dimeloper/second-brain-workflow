@@ -97,6 +97,7 @@ from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
+from lib.promotion import application_bars  # noqa: E402
 
 ENGINE = Path(__file__).resolve().parent.parent
 
@@ -441,6 +442,10 @@ def audit(vault, rules_dir, stale_months, as_of):
 
     threshold = enforced_threshold(vault)  # exits on an unparseable vault source
     trialing_bar = trialing_threshold(vault)
+    # None when this vault declares no applications bar — the opt-in switch.
+    # Left off, every note is judged on repos exactly as before, so upgrading
+    # the engine cannot quietly change what an existing vault's audit means.
+    app_bars = application_bars(vault, required=False)
     lineage = load_lineages(vault)
 
     # Judged on lineages, not `repos:` entries, in *both* directions. The
@@ -463,6 +468,7 @@ def audit(vault, rules_dir, stale_months, as_of):
     # left out of both directions below. Reporting 143 notes as "maturity above
     # its evidence" the day the bar changed would say nothing about any of them.
     for n in notes:
+        n["process"] = n["process"] and app_bars is not None
         n["evidence"] = (
             len(n["applications"]) if n["process"] else n["distinct"]
         )
@@ -514,6 +520,7 @@ def audit(vault, rules_dir, stale_months, as_of):
         "provisional": provisional,
         "no_source": no_source,
         "stale": stale,
+        "two_bars": app_bars is not None,
         "thin": thin,
         # Only the rungs that had to be earned: an `idea` with no applications
         # is the normal starting state, not a backlog item.
@@ -624,23 +631,28 @@ def report(result, vault, rules_dir, stale_months):
     # against a bar it is not held to, and leaving it out entirely would exempt
     # it silently — which is how a migration backlog becomes permanent. The
     # count is the honest size of that backlog, and it should fall to zero.
-    lines.append(
-        "Maturity set before its evidence was countable "
-        f"(process notes, no `applications:`): {len(result['uncounted'])}"
-    )
-    for n in result["uncounted"]:
+    # Only for a vault that has opted into the second bar. Elsewhere this
+    # section describes a model the vault does not use, and a section that is
+    # structurally always zero is the kind of line a reader learns to skip.
+    if result["two_bars"]:
         lines.append(
-            f"  - {n['slug']} ({n['maturity']}, {len(n['repos'])} repo(s) seen, "
-            "applications not recorded)"
+            "Maturity set before its evidence was countable "
+            f"(process notes, no `applications:`): {len(result['uncounted'])}"
         )
-    lines.append("")
+        for n in result["uncounted"]:
+            lines.append(
+                f"  - {n['slug']} ({n['maturity']}, {len(n['repos'])} repo(s) seen, "
+                "applications not recorded)"
+            )
+        lines.append("")
 
     # Printed at zero like every other count here. The caveat is printed at zero
     # too: a reader who only ever sees it when it bites will read the number
     # underneath as exact.
     lines.append(
-        f"Ready to promote (evidence already clears the next bar): "
-        f"{len(result['ready'])}"
+        "Ready to promote ("
+        + ("evidence" if result["two_bars"] else "repo count")
+        + f" already clears the next bar): {len(result['ready'])}"
     )
     for n in result["ready"]:
         nxt = "trialing" if n["maturity"] == "idea" else "enforced"

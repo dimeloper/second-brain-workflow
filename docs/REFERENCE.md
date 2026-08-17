@@ -72,6 +72,22 @@ rests on — a gate that promoted on `length(repos)` alone would be measuring ho
 often you wrote something down, which is exactly the failure mode of the rules
 file this replaces.
 
+**Which bar depends on what the note claims.** A note with a real `applies-to`
+glob claims generality — that it holds outside the codebase that produced it —
+so it is counted in distinct `repos:`. A note with `applies-to: ""` is a process
+rule about how you work: it can only ever be re-encountered where you work, so
+counting repos would leave it at `idea` however often it proved itself. Those
+are counted in `applications:` instead, one entry per deliberate re-application,
+`"<repo> <YYYY-MM-DD>"`, and the repo repeating is fine — that is the point.
+Same numbers on both, 2 then 3.
+
+This is **opt-in**: a vault whose `00-maps/promotion-candidates.md` declares no
+`length(applications)` bar keeps every note on the repo bar, and its index and
+audit output are unchanged byte for byte. Vaults created by `init-vault.sh` are
+seeded with both; delete the applications block to opt out. A process note with
+no `applications:` list is *uncounted*, not zero — neither promotable nor
+under-evidenced, and reported as its own backlog by `check-lineage`.
+
 The bars live in the vault's own `00-maps/promotion-candidates.md`, so they are
 yours to move. Tooling that depends on them reads them from there and treats an
 unreadable file as a hard error rather than falling back to a default — a report
@@ -601,9 +617,10 @@ in the `repos:` of, in two tiers:
   alone. **No promotion claim**, because a guess that said "clears ENFORCED"
   would invite adding a `repos:` entry for a note that does not govern this repo.
 
-The delta is the point: promotion runs on `length(repos)`, so one deliberate
-application is often the single act that clears a rung — and knowing which note
-is one repo short used to depend on remembering. The bars are read from the
+The delta is the point: promotion runs on `length(repos)` for a scoped note (and
+`length(applications)` for a process one), so one deliberate application is
+often the single act that clears a rung — and knowing which note is one short
+used to depend on remembering. The bars are read from the
 vault's own `00-maps/promotion-candidates.md`; an unreadable one is a **hard
 error**, never a default, because a report computed against a guessed bar names
 specific notes as ready when they are not.

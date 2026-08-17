@@ -26,6 +26,7 @@ from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
+from lib.promotion import application_bars  # noqa: E402
 
 GENERATED_BY = "scripts/build-vault-index.py"
 RULE_MAX = 140
@@ -137,7 +138,7 @@ def collect(vault):
     return notes, problems
 
 
-def evidence_cell(note):
+def evidence_cell(note, two_bars=True):
     """The count that gates this note, labelled with which kind it is.
 
     A bare number was ambiguous once two bars existed: `1` next to a process
@@ -152,6 +153,12 @@ def evidence_cell(note):
     the note actually carries. Only a note with nothing recorded at all is `—`:
     nothing counted is a different claim from counted and found nothing.
     """
+    # A vault that has not declared the applications bar keeps the column it
+    # was built with, bytes and all: `--check` is a drift gate, and an engine
+    # upgrade that reformats a generated file turns every adopter's next run
+    # red for a change they did not make.
+    if not two_bars:
+        return str(len(note["repos"]))
     if not note["process"]:
         return f"{len(note['repos'])} repos"
     if note["applications"]:
@@ -161,7 +168,7 @@ def evidence_cell(note):
     return "—"
 
 
-def render(notes):
+def render(notes, two_bars=True):
     total = len(notes)
     counts = {}
     for n in notes:
@@ -171,6 +178,24 @@ def render(notes):
         for m in sorted(counts, key=lambda k: MATURITY_ORDER.get(k, 9))
     )
 
+    # The legend has to describe the column that is actually rendered, so the
+    # two travel together. A vault that has not opted into the second bar keeps
+    # the wording it had, byte for byte.
+    if two_bars:
+        legend = [
+            "each lives at `practices/<group>/<note>.md`. `Evidence` is the count",
+            "that gates promotion: `N repos` for a scoped rule, which claims to hold",
+            "outside where it was found, and `N applied` for a process rule",
+            "(`applies-to: \"\"`), which only claims to have kept being right.",
+            "`N seen` is a process rule whose applications are not recorded yet — the",
+            "repos it turned up in, which do not gate it. `—` is uncounted, not zero.",
+        ]
+    else:
+        legend = [
+            "each lives at `practices/<group>/<note>.md`. `repos` is the count of",
+            "repos a practice has been observed in — it drives promotion.",
+        ]
+
     out = [
         "# Practices index",
         "",
@@ -178,12 +203,7 @@ def render(notes):
         f"> {total} notes · {summary}",
         "",
         "Read this file first. Open a note only when a row below looks relevant;",
-        "each lives at `practices/<group>/<note>.md`. `Evidence` is the count",
-        "that gates promotion: `N repos` for a scoped rule, which claims to hold",
-        "outside where it was found, and `N applied` for a process rule",
-        "(`applies-to: \"\"`), which only claims to have kept being right.",
-        "`N seen` is a process rule whose applications are not recorded yet — the",
-        "repos it turned up in, which do not gate it. `—` is uncounted, not zero.",
+        *legend,
         "",
     ]
 
@@ -192,14 +212,15 @@ def render(notes):
         rows.sort(key=lambda n: (MATURITY_ORDER.get(n["maturity"], 9), n["slug"]))
         out.append(f"## {group} ({len(rows)})")
         out.append("")
-        out.append("| Note | Maturity | Evidence | Tags | Rule |")
+        header = "Evidence" if two_bars else "Repos"
+        out.append(f"| Note | Maturity | {header} | Tags | Rule |")
         out.append("|---|---|---|---|---|")
         for n in rows:
             out.append(
                 "| [[{slug}]] | {maturity} | {evidence} | {tags} | {rule} |".format(
                     slug=cell(n["slug"]),
                     maturity=cell(n["maturity"]),
-                    evidence=evidence_cell(n),
+                    evidence=evidence_cell(n, two_bars),
                     tags=cell(", ".join(n["tags"])),
                     rule=cell(n["rule"]),
                 )
@@ -223,7 +244,12 @@ def main():
         sys.exit(message)
 
     notes, problems = collect(vault)
-    content = render(notes)
+    # Opt-in, read from the vault's own promotion map. A vault that has not
+    # declared an applications bar has not adopted the two-bar model, and its
+    # index must regenerate to the same bytes it had before the engine knew
+    # about one.
+    two_bars = application_bars(vault, required=False) is not None
+    content = render(notes, two_bars)
     index = vault / "practices" / "INDEX.md"
 
     for rel, problem in problems:

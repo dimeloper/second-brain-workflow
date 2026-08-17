@@ -52,14 +52,37 @@ def bars(vault):
     return _read_bars(vault, BAR_RE, "repos")
 
 
-def application_bars(vault):
+def application_bars(vault, required=True):
     """The same two rungs, counted in `applications:` for process notes.
 
-    Separate function rather than a flag: the caller has to know which kind of
-    note it is holding to pick a bar at all, so making that choice explicit at
-    the call site is the point. A note with `applies-to: ""` takes these.
+    Separate function rather than a flag on `bars`: the caller has to know
+    which kind of note it is holding to pick a bar at all, so making that
+    choice explicit at the call site is the point. A note with
+    `applies-to: ""` takes these.
+
+    `required=False` returns None when the vault declares no applications bar,
+    and that is the **opt-in switch for the whole two-bar model**. A vault that
+    has not declared one keeps the single repo bar it was built under: its
+    index renders the same bytes and its audit stays exactly as strict.
+
+    Silently applying the new model to such a vault would be worse than a hard
+    error. Process notes would move out of "maturity above its evidence" and
+    into "uncounted", so an audit that used to flag an `enforced` note on one
+    repo would stop — a check getting quietly *weaker* on upgrade, in a repo
+    whose owner never asked for a different model and would have no reason to
+    look. The vault is the authority on its own promotion rules; not declaring
+    a bar is an answer.
     """
+    if not required and not _declares(vault, APPLICATION_BAR_RE):
+        return None
     return _read_bars(vault, APPLICATION_BAR_RE, "applications")
+
+
+def _declares(vault, pattern):
+    path = vault / "00-maps" / "promotion-candidates.md"
+    if not path.is_file():
+        return False
+    return bool(pattern.search(path.read_text(encoding="utf-8")))
 
 
 def _read_bars(vault, pattern, field):
