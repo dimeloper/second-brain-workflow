@@ -17,6 +17,72 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-08-17
+
+### Added
+- **A note is promoted on the evidence it actually claims.** `repos:` was the
+  only currency, which conflated two different properties. *Generality* — does
+  this hold outside the codebase that produced it — is the right question for a
+  rule carrying a real `applies-to` glob. It is the wrong one for a process rule
+  about committing, verifying, or note-keeping: those can only ever be
+  re-encountered where you work, so a repo bar left them at `idea` however often
+  they proved themselves.
+
+  In the vault this was written from, split by kind: scoped notes 25 `enforced`
+  / 7 `trialing` / 23 `idea`; process notes **2 / 25 / 143**. Its single
+  most-followed rule, cited in 13 daily notes, was an `idea` and always would
+  have been. `check-lineage`'s own "provisional rules" section carried seven
+  hand-written exemptions each saying a version of *"no repo count will mature
+  this"*, and `init-vault.sh` shipped a note conceding *"a process rule cannot
+  satisfy its own criterion"*. Three places documenting one bug.
+
+  So `applies-to: ""` notes are now counted in a new `applications:` frontmatter
+  list — one entry per deliberate re-application, `"<repo> <YYYY-MM-DD>"`,
+  counted even when the repo repeats. Same 2/3 bars. A frontmatter list rather
+  than prose dates or inbound-link counting, because the vault's own
+  `make-tier-promotion-criteria-machine-countable` requires a countable field.
+
+  Lineage collapsing stays on `repos:` alone: two names for one codebase are one
+  codebase, but two applications in one repo are two applications — collapsing
+  those would re-impose the constraint being lifted.
+
+  A process note with no `applications:` list is **uncounted, not zero** —
+  neither promotable nor under-evidenced. `check-lineage` reports those as their
+  own finite backlog rather than letting them fall silently out of the audit.
+
+  `update-second-brain` records the entries; `INDEX.md`'s `Repos` column becomes
+  `Evidence`, carrying the unit (`N repos`, `N applied`, `N seen`, `—`).
+
+  **Opt-in, and nothing to do if you don't want it.** The switch is your vault
+  declaring a `length(applications)` bar in `00-maps/promotion-candidates.md` —
+  the same file the numbers have always been read from. A vault that declares
+  none keeps every note on the repo bar, and its index and audit output are
+  byte-identical to v0.32.0's; verified by diffing both against the previous
+  engine on an un-migrated vault. That matters because `check-lineage` runs in
+  the `vault-ci` audit workflow and `build-vault-index --check` is a drift gate:
+  applying a new model silently would have made an existing vault's audit
+  *weaker* on upgrade, and reformatted a generated file nobody had edited.
+
+  New vaults from `init-vault.sh` are seeded with both bars. **An existing vault
+  has to opt in by hand** — `--adopt` adds only files that are missing, and
+  yours already has a `00-maps/promotion-candidates.md`, so it will not touch
+  it. Paste this beside the block already there:
+
+  ````markdown
+  ```dataview
+  TABLE maturity, length(applications) AS "applications", last-reviewed
+  FROM "practices"
+  WHERE applies-to = ""
+    AND ((maturity = "idea" AND length(applications) >= 2)
+      OR (maturity = "trialing" AND length(applications) >= 3))
+  SORT length(applications) DESC
+  ```
+  ````
+
+  The tooling keys on `length(applications) >= N` appearing next to a maturity,
+  so the numbers are yours to change; the existing repo block wants
+  `WHERE applies-to != ""` added so the two queries stop overlapping.
+
 ## [0.32.0] - 2026-08-16
 
 ### Added
@@ -2393,7 +2459,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.29.0...v0.30.0
