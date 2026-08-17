@@ -19,7 +19,7 @@ env:
   # Versioning section) — bump this deliberately, don't track a moving
   # branch here.
   ENGINE_REPO: dimeloper/second-brain-workflow
-  ENGINE_REF: v0.34.0
+  ENGINE_REF: v0.35.0
 
 jobs:
   audit:
