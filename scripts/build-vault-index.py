@@ -29,7 +29,21 @@ from lib.frontmatter import parse_frontmatter  # noqa: E402
 from lib.promotion import application_bars  # noqa: E402
 
 GENERATED_BY = "scripts/build-vault-index.py"
-RULE_MAX = 140
+
+# How much of each note's **Rule:** line a row carries.
+#
+# The row exists to answer one question — is this note worth opening — and the
+# reader already has the slug, the tags and the maturity to go on. What the
+# excerpt adds is the imperative verb and its object, which is roughly the first
+# 80 characters; past that it is paying by the byte for a sentence the reader
+# will get in full the moment they open the note.
+#
+# 140 made the excerpt column 55% of a 57KB file, read on every skill
+# invocation. Measured across this vault at 228 notes: 140 -> 59KB, 100 -> 50KB,
+# 80 -> 46KB, 70 -> 43KB. 70 was rejected on the rows rather than the number —
+# it cuts "never identify them by the artifact a healthy subject produces" to
+# "never identify them by the", which is no longer a claim you can judge.
+RULE_MAX = 80
 MATURITY_ORDER = {"enforced": 0, "trialing": 1, "idea": 2}
 
 

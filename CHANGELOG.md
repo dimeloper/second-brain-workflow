@@ -17,6 +17,26 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Major
+- **Run `make vault-index` once and commit the result. The index's Rule column
+  is shorter.** Each row now carries 80 characters of a note's `**Rule:**` line
+  rather than 140. Nothing is lost — the row exists to answer whether a note is
+  worth opening, and the reader already has the slug, tags and maturity; past
+  the imperative verb and its object it was paying by the byte for a sentence
+  the reader gets in full on opening the note.
+
+  The action is required because `build-vault-index.py --check` compares against
+  what the current engine would generate, so `make vault-index-check` (and any
+  CI wired to it) reports the whole index as stale until it is regenerated once.
+  Nothing else changes, and a vault left alone keeps working.
+
+  Measured on a 228-note vault: 59KB to 46KB, a 22% cut, with the excerpt column
+  dropping from 55% of the file to 39%. That file is read on every
+  `obsidian-knowledge-base` invocation. 70 characters was measured too and
+  rejected on the rows rather than the number — it cuts "never identify them by
+  the artifact a healthy subject produces" down to "never identify them by the",
+  which is no longer a claim anyone can judge.
+
 ## [0.35.0] - 2026-08-17
 
 ### Added
