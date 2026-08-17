@@ -897,11 +897,22 @@ version it came from, and a plain `.sbw-version` file is written at the target
 repo's root alongside the rendered output — nothing else in the target carried
 this before, so this is the one new file `render.py` writes outside
 `.cursor/rules`, `.claude/rules`, `AGENTS.md` and `CLAUDE.md`. Like any other
-rendered file, `--check` reports a stale `.sbw-version` as drift — visible as
-"this repo hasn't re-rendered since the engine moved on." Unlike every other
-rendered file, it can't carry the usual provenance comment (it's a bare version
-string, not markdown), so it's the one file `render.py` always overwrites rather
-than checking for a hand-written override — don't hand-edit it.
+rendered file, `--check` **reports** a lagging `.sbw-version` — "this repo hasn't
+re-rendered since the engine moved on" — but does **not** count it as drift and
+does not exit non-zero for it. The file holds a bare engine version, so it
+differs after every release, including releases that changed nothing this repo
+renders; treating that as drift meant every cut marked every onboarded repo on
+the machine as behind, and "behind" is the word that sends you to re-render and
+commit a one-line change in ten repos. The question `--check` answers is whether
+this repo's agents load the rules as they stand, and identical content answers
+yes whatever the stamp says. The stamp is provenance: it catches up on the next
+render that has a reason of its own, and a real format change moves the content
+too, so nothing is lost by letting it lag. Content drift still exits 1.
+
+Unlike every other rendered file, it can't carry the usual provenance comment
+(it's a bare version string, not markdown), so it's the one file `render.py`
+always overwrites rather than checking for a hand-written override — don't
+hand-edit it.
 
 To pin a clone to the newest release instead of tracking `main`:
 

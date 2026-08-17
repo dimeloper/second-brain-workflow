@@ -513,12 +513,17 @@ out_has "up to date: $(real "${REPO_DRIFT}")" "and clears the drift it was print
 # The checkout is at v0.9.1 by now, so this preview targets the version it is
 # already on: no switch is pending, and the plain count is the true wording.
 #
-# repo-ok is the one drifting here, and that is the point made concretely — it
-# was rendered at 0.9.0 and the switch stamped 0.9.1 into everything, which is
-# exactly what the qualified wording above warns a reader to expect.
-out_has "1 of 2 checkable repo(s) need re-rendering, with the commands above." \
-  "with no switch pending, the count is stated plainly"
-out_lacks "at least 1 of 2" "not hedged as a lower bound, which it no longer is"
+# repo-ok was rendered at v0.9.0 and is *not* drifting, which is the change a
+# version switch used to hide. Its rendered content is identical — the
+# provenance header is excluded from comparison already — so the only
+# difference the switch introduced is the `.sbw-version` stamp, and a stamp is
+# not a reason to re-render ten repos. Both counts are asserted rather than
+# just the number, since "0 of 2" is only meaningful beside a repo set that is
+# genuinely non-empty.
+out_has "all 2 checkable repo(s) are up to date" \
+  "a version switch alone leaves no repo needing a re-render"
+out_lacks "need re-rendering" "so nothing is reported as behind"
+out_lacks "at least" "and nothing is hedged as a lower bound"
 
 # And the clean-plus-nothing-pending cell of the same matrix: every repo current,
 # no switch to invalidate it, so the summary carries no qualification at all.

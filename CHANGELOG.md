@@ -17,6 +17,28 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **A lagging `.sbw-version` is reported, not counted as drift.** `render.py
+  --check` used to treat the version stamp like any other rendered file, so it
+  failed whenever the engine had moved on. But that file holds a bare engine
+  version: it differs after *every* release, including the ones that changed
+  nothing a given repo renders. Cutting v0.32.0 marked all ten onboarded repos
+  on the author's machine as behind; v0.33.0 did it again the same day. Ten
+  one-line commits per release, for a stamp.
+
+  The question `--check` exists to answer is whether a repo's agents load the
+  rules as they stand. Identical content answers yes, whatever the stamp says.
+  So a lagging stamp now prints `stamp behind: .sbw-version` and exits 0, and
+  the stamp is rewritten by the next render that has a reason of its own. A
+  real format change moves the rendered content, which still exits 1, so
+  nothing that mattered stops being caught.
+
+  **This makes `--check` pass in one case where it used to fail**, which is
+  worth knowing if you gate CI on it: a repo whose rendered content is current
+  but whose stamp predates your engine is now green. `repos-check` and
+  `upgrade`'s step 7 branch on the same exit code and inherit the same
+  behaviour — which is the point, since those are where the churn was felt.
+
 ## [0.33.1] - 2026-08-17
 
 ### Fixed

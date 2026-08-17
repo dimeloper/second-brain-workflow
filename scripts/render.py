@@ -593,7 +593,7 @@ def main():
         print(f"Rules:  {RULES_SRC.parent} @ {content_sha}")
     print(f"Target: {repo}  [{mode}] -> {', '.join(targets)}")
 
-    drift = changed = 0
+    drift = changed = stamp_behind = 0
 
     for rel, content in sorted(rendered.items()):
         dest = repo / rel
@@ -643,8 +643,24 @@ def main():
     version_dest = repo / version_name
     if not version_dest.exists() or version_dest.read_text(encoding="utf-8") != version_content:
         if mode == "check":
-            print(f"  DRIFT: {version_name}")
-            drift = 1
+            # Deliberately NOT drift. This file holds a bare engine version, so
+            # it differs after every release — including the ones that changed
+            # nothing about what this repo renders. Counting it as drift meant
+            # cutting a release marked every onboarded repo on the machine as
+            # behind, and "behind" is the word that sends someone to re-render
+            # and commit a one-line change in ten repos. Twice in one day here.
+            #
+            # The question `--check` exists to answer is whether this repo's
+            # agents load the rules as they stand. Identical content answers
+            # yes, whatever the stamp says. The stamp is provenance, it catches
+            # up on the next render that has a reason of its own, and a real
+            # format change moves the content too — so nothing is lost by
+            # letting it lag.
+            # No claim about content on this line — it is printed before the
+            # rule files have all been compared, and the summary below is where
+            # "current" is either true or replaced by "Drift detected".
+            print(f"  stamp behind: {version_name}")
+            stamp_behind = 1
         elif mode == "dry-run":
             print(f"  would write: {version_name}")
         else:
@@ -718,6 +734,12 @@ def main():
         if drift:
             print("Drift detected.")
             return 1
+        if stamp_behind:
+            # Exit 0: repos-check and upgrade both branch on this code, and both
+            # ask "is this repo behind the rules as they stand". It is not.
+            print("Clean — no drift. The version stamp lags a newer engine and")
+            print("will be rewritten by the next render that has its own reason.")
+            return 0
         print("Clean — no drift.")
     elif mode == "dry-run":
         print("Dry run — nothing written.")
