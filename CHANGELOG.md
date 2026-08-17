@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-08-17
+
 ### Major
 - **Run `make vault-index` once and commit the result. The index's Rule column
   is shorter.** Each row now carries 80 characters of a note's `**Rule:**` line
@@ -2560,7 +2562,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.35.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.36.0...HEAD
+[0.36.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.34.0...v0.35.0
 [0.34.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.1...v0.34.0
 [0.33.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.0...v0.33.1
