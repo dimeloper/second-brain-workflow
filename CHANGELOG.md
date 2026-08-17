@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-08-17
+
 ### Changed
 - **A lagging `.sbw-version` is reported, not counted as drift.** `render.py
   --check` used to treat the version stamp like any other rendered file, so it
@@ -2503,7 +2505,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.34.0...HEAD
+[0.34.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.1...v0.34.0
 [0.33.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.33.0...v0.33.1
 [0.33.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.31.0...v0.32.0
