@@ -17,6 +17,21 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`update-second-brain` reads the date off the clock.** The skill said "today's
+  note is `<vault>/<YYYY-MM-DD>.md`" without saying where that date comes from, so
+  an agent used the session's start — and a session that runs past midnight then
+  files a second day's work under the first day's note. That happened here: a
+  session running since 2026-08-16 put a day and a half of work into
+  `2026-08-17.md`, the user caught it, no check did, and the repair meant splitting
+  a note after the fact against commit timestamps.
+
+  Step 3 now opens with `date +%F` and says explicitly that a session crossing
+  midnight splits across two notes. It also records that moving work into the day
+  it happened is a *factual correction*, not the retrofitting the same step
+  forbids — otherwise the rule against rewriting past notes reads as a rule
+  against fixing them.
+
 ## [0.38.0] - 2026-08-17
 
 ### Added

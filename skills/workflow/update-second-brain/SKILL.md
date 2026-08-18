@@ -73,6 +73,29 @@ new writes match house style exactly.
 
 ## Step 3 — Update today's daily note (write immediately)
 
+**Read the date off the clock, every time you are about to write:**
+
+```bash
+date +%F
+```
+
+Never from the session's start, from a system prompt, from the newest file in the
+vault, or from a note you already opened earlier in this same session. Those are
+all the same assumption wearing different clothes, and the assumption is that a
+session ends on the day it began.
+
+A long session crosses midnight, and when it does **the work splits across two
+notes** — each day's note holds that day's work. Do not keep appending to the
+note you opened yesterday because it is the one already in context. When you
+cross over, open the new note and put a line at the top of each pointing at the
+other, so the thread is still readable in order.
+
+This is not hypothetical. On 2026-08-18 a session that had run since the 16th
+filed a day and a half of work under `2026-08-17.md`; the user caught it, no
+check did, and the fix meant splitting a note after the fact against commit
+timestamps. `date +%F` costs nothing and is the only thing here that cannot be
+wrong.
+
 Today's note is `<vault>/<YYYY-MM-DD>.md`. The daily note is the documented
 **exception** to propose-then-approve — write it without asking. Create it from
 `_templates/daily-note.md` if missing.
@@ -81,9 +104,10 @@ Sections: `## Built`, `## Follow-ups`, `## Practices followed`, `## Drift / gaps
 `## Vault candidates`, `## Vault writes (approved)`, `## Vault writes (declined)`.
 Omit empty sections.
 
-- **One header per section per day.** Append bullets under the existing header;
-  never add a second `## Built`. A labelled `## Built (label)` block is allowed
-  only for a genuinely distinct work stream.
+- **One header per section per day**, and *per day* is load-bearing: a second
+  day's work is a second note, never a second `## Built` in the first. Within a
+  day, append bullets under the existing header. A labelled `## Built (label)`
+  block is allowed only for a genuinely distinct work stream.
 - `## Follow-ups` records what is left open — `- [ ]` pending, `- [x]` done. See
   the repo tag below; this is the only section another skill reads back.
 - `## Practices followed` links existing notes as `[[wikilink]]` with a short
@@ -127,6 +151,13 @@ Rules:
 - Tag only items you are **adding**. Never retrofit tags onto existing items
   while writing today's note — that is a rewrite of a past note's content
   disguised as a formatting fix.
+
+**What that rule does not forbid.** Moving work into the note for the day it
+actually happened is a factual correction, not a retrofit — the entry is wrong
+about *when*, and leaving it wrong to honour a rule about formatting would be
+the letter beating the point. Do it against evidence (commit timestamps), not
+memory; cross-reference both notes; and say in the commit message that it was a
+correction and what fixed the boundary.
 
 ## Step 4 — Propose practice-note changes (approval required)
 
