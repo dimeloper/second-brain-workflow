@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-08-17
+
 ### Added
 - **`make adopt` turns on the opt-in features and re-renders safely.** Two
   features ship off by default — the applications promotion bar and
@@ -2616,7 +2618,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.37.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.0...HEAD
+[0.38.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.36.0...v0.37.0
 [0.36.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.35.0...v0.36.0
 [0.35.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.34.0...v0.35.0
