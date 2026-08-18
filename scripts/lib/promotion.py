@@ -116,3 +116,33 @@ def _read_bars(vault, pattern, field):
             % (path, field, " and ".join(missing))
         )
     return found["idea"], found["trialing"]
+
+
+# A note takes the applications bar only when it is genuinely a process rule.
+#
+# `applies-to: ""` alone cannot say that, because it is overloaded: it means
+# both "this is a process rule and always will be unscoped" and "nobody has
+# given this a glob yet". The vault's own practice-note template makes the
+# second the default for every new note — `applies-to: ""  # glob this maps to
+# when promoted` — so reading empty as "process" put 8 domain-specific notes at
+# trialing/enforced on the wrong bar, counting applications where repos are the
+# claim. 52 domain notes had no glob at all, so the mis-binning would have grown
+# with every note written.
+#
+# `domain` is the discriminator, and it was already in the data. A
+# domain-specific note without a glob is *not yet scoped*, not a process rule,
+# and stays on the repo bar — which is where it was before the two bars existed,
+# so nothing regresses for it.
+PROCESS_DOMAIN = "cross-cutting"
+
+
+def is_process_note(frontmatter):
+    """Is this note judged on `applications:` rather than on `repos:`?
+
+    Both `check-lineage.py` and `build-vault-index.py` ask this, and two answers
+    for one note would mean the index and the audit disagreeing about which bar
+    a note is even held to — the one thing that has to be stable across both.
+    """
+    if (frontmatter.get("applies-to") or "").strip():
+        return False
+    return (frontmatter.get("domain") or "").strip() == PROCESS_DOMAIN

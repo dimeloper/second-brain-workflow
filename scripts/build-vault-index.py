@@ -26,7 +26,7 @@ from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
-from lib.promotion import application_bars  # noqa: E402
+from lib.promotion import application_bars, is_process_note  # noqa: E402
 
 GENERATED_BY = "scripts/build-vault-index.py"
 
@@ -141,10 +141,9 @@ def collect(vault):
                 "applications": (
                     applications if isinstance(applications, list) else [applications]
                 ),
-                # "" and absent are the same claim — this note asserts nothing
-                # about holding outside where it was found — so both take the
-                # applications bar. Anything else is a scoped rule.
-                "process": not (fm.get("applies-to") or ""),
+                # Shared with check-lineage.py via lib/promotion, so the index
+                # and the audit cannot disagree about which bar a note is on.
+                "process": is_process_note(fm),
                 "tags": fm.get("tags") or [],
                 "rule": first_sentence(rule) if rule else "",
             }

@@ -97,7 +97,7 @@ from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
-from lib.promotion import application_bars  # noqa: E402
+from lib.promotion import application_bars, is_process_note  # noqa: E402
 
 ENGINE = Path(__file__).resolve().parent.parent
 
@@ -163,16 +163,11 @@ def load_notes(vault):
                 "applications": (
                     applications if isinstance(applications, list) else [applications]
                 ),
-                # A process note (`applies-to: ""`) claims only that it kept
-                # being right, never that it holds outside where it was found,
-                # so a repo count is not the bar it is judged against — see
-                # 00-maps/promotion-candidates.md. Counting it in repos anyway
-                # is what left 143 of this vault's 170 process notes at `idea`
-                # while the scoped notes promoted normally, and what the
-                # "provisional rules" exemptions were being hand-written
-                # around, seven times, each saying some version of "no repo
-                # count will mature this".
-                "process": not (fm.get("applies-to") or ""),
+                # Which bar this note is held to. `applies-to` alone cannot
+                # say — empty means both "process rule" and "not scoped yet" —
+                # so the answer lives in lib/promotion beside the bars it
+                # selects between, shared with build-vault-index.py.
+                "process": is_process_note(fm),
                 # A note can be `enforced` by the user's own standing
                 # preference rather than by clearing the repo-count bar —
                 # an established, self-documented exception in this vault's

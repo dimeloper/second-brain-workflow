@@ -62,6 +62,23 @@ MAP
 assert_contains "${VAULT}/practices/INDEX.md" '| 3 repos |' \
   "a scoped note is counted in repos"
 
+# A process note is `domain: cross-cutting` AND `applies-to: ""`. The fixture's
+# unscoped note is `domain: frontend`, which is *unscoped*, not process — so it
+# stays on the repo bar, and the sandbox copy is retyped here to exercise the
+# other branch. An empty `applies-to` alone was the old discriminator and was
+# overloaded: the practice-note template makes it every new note's default.
+edit_domain() {
+  python3 - "$1" <<'PYX'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+assert "domain: frontend" in s, "fixture no longer declares domain: frontend"
+open(p, "w").write(s.replace("domain: frontend", "domain: cross-cutting", 1))
+PYX
+}
+edit_domain "${VAULT}/practices/frontend/prefer-signals.md"
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+
 # The three states of a process note, walked in order on the sandbox copy —
 # tests/fixtures is left alone so the vault other suites read is unchanged.
 #

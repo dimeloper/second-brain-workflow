@@ -17,6 +17,30 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **A process note is `domain: cross-cutting` *and* `applies-to: ""`, not an
+  empty `applies-to` alone.** That field is overloaded: the practice-note
+  template makes `applies-to: ""` the default for every new note, so it means
+  "nobody has scoped this yet" at least as often as "process rule". Reading
+  empty as process put 8 domain-specific notes at trialing/enforced on the
+  applications bar — counting re-applications where cross-repo evidence is the
+  claim — and 52 domain notes had no glob at all, so the mis-binning would have
+  grown with every note written.
+
+  `domain` is the discriminator and was already in the data. A domain-specific
+  note without a glob stays on the repo bar, which is where it was before the
+  two bars existed, so nothing regresses for it; it wants a glob, not a rung.
+
+  The decision now lives in `lib/promotion.is_process_note`, shared by
+  `check-lineage.py` and `build-vault-index.py` — the index and the audit
+  disagreeing about which bar a note is even held to is the one thing that
+  cannot be allowed to drift.
+
+  Affects only vaults that opted into the applications bar. Update the two
+  Dataview blocks in `00-maps/promotion-candidates.md` to match
+  (`WHERE applies-to = "" AND domain = "cross-cutting"`, and its inverse
+  parenthesised) so Obsidian and the tooling keep reading the same rule.
+
 ## [0.36.0] - 2026-08-17
 
 ### Major

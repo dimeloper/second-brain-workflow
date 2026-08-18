@@ -755,6 +755,27 @@ pnote earned           trialing '""'          '["one"]'        '["one 2026-01-01
 pnote unmigrated       enforced '""'          '["one", "two"]' '[]'
 pnote scoped_thin      enforced '"**/*.ts"'   '["one"]'        '[]'
 
+# `applies-to: ""` is overloaded — it means "process rule" *and* "nobody scoped
+# this yet", and the practice-note template makes the second the default for
+# every new note. Reading empty as process put domain-specific notes on the
+# applications bar, counting re-applications where cross-repo evidence is the
+# claim. `domain` is the discriminator, and it was already in the data.
+cat > "${PV}/practices/cross-cutting/unscoped-frontend.md" <<'NOTE'
+---
+domain: frontend
+applies-to: ""
+maturity: trialing
+last-reviewed: 2026-08-01
+repos: ["one"]
+applications: ["one 2026-01-01", "one 2026-02-02", "one 2026-03-03"]
+---
+
+# unscoped-frontend
+
+**Rule:** placeholder.
+**Observed in:** fixture, 2026-08-01.
+NOTE
+
 out_bar="$("${CHECK}" --vault "${PV}" --rules-dir "${LRULES}" --as-of "${AS_OF}" 2>/dev/null)"
 
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -785,6 +806,22 @@ case "${out_bar}" in
   *"- unmigrated (enforced, 2 repo(s) seen, applications not recorded)"*)
     pass "naming it, with what it was seen in and what is missing" ;;
   *) fail "naming it, with what it was seen in and what is missing" "${out_bar}" ;;
+esac
+
+# A domain-specific note with no glob is *not yet scoped*, not a process rule.
+# Its three applications must not clear anything — it is judged on its one repo,
+# which is short of the trialing bar it already holds.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"unscoped-frontend: trialing -> enforced"*)
+    fail "an unscoped domain note is not promoted on applications" "${out_bar}" ;;
+  *) pass "an unscoped domain note is not promoted on applications" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_bar}" in
+  *"- unscoped-frontend (trialing, 1 of 2 repo(s))"*)
+    pass "it is judged on repos, like every other domain note" ;;
+  *) fail "it is judged on repos, like every other domain note" "${out_bar}" ;;
 esac
 
 # The scoped half is untouched: a real glob still means repos, still thin at 1.
