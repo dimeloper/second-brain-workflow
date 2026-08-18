@@ -1,4 +1,4 @@
-.PHONY: help lint require-shellcheck lint-shell lint-python test vault-index \
+.PHONY: help lint require-shellcheck lint-shell lint-python test vault-index adopt \
         vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain render repos-check guard doctor audit \
         init \
         verify-claude check release-check
@@ -35,6 +35,7 @@ help:
 	@echo "make practices-for REPO=... vault notes that govern a repo but were never applied"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
+	@echo "make adopt               preview turning on the opt-in features; YES=1 to act"
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make render REPO=...     render rules into one repo (also registers it)"
 	@echo "                         LOCAL=1 also excludes them from that repo's git"
@@ -187,6 +188,9 @@ practices-for:
 # wait between pushing main and pushing the tag is a command rather than a thing
 # to remember not to chain with &&. YES=1 publishes the GitHub Release in the
 # same act: leaving that to be remembered separately lost four of them.
+adopt:
+	@./scripts/adopt.sh $(if $(YES),--yes,) $(if $(VAULT),--vault $(VAULT),)
+
 release-check:
 	@./scripts/release-check.sh $(if $(YES),--yes,) $(if $(WAIT),--wait,) \
 	  $(if $(RELEASE_VERSION),--version $(RELEASE_VERSION),)

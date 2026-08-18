@@ -74,12 +74,17 @@ file this replaces.
 
 **Which bar depends on what the note claims.** A note with a real `applies-to`
 glob claims generality — that it holds outside the codebase that produced it —
-so it is counted in distinct `repos:`. A note with `applies-to: ""` is a process
-rule about how you work: it can only ever be re-encountered where you work, so
-counting repos would leave it at `idea` however often it proved itself. Those
-are counted in `applications:` instead, one entry per deliberate re-application,
+so it is counted in distinct `repos:`. A **process** note — `domain:
+cross-cutting` *and* `applies-to: ""` — is a rule about how you work: it can only
+ever be re-encountered where you work, so counting repos would leave it at `idea`
+however often it proved itself. Those are counted in `applications:` instead, one entry per deliberate re-application,
 `"<repo> <YYYY-MM-DD>"`, and the repo repeating is fine — that is the point.
 Same numbers on both, 2 then 3.
+
+Both conditions, because an empty `applies-to` alone is overloaded: the
+practice-note template makes it every new note's default, so it means "not
+scoped yet" as often as "process rule". A domain-specific note with no glob is
+unscoped, stays on the repo bar, and wants a glob rather than a rung.
 
 This is **opt-in**: a vault whose `00-maps/promotion-candidates.md` declares no
 `length(applications)` bar keeps every note on the repo bar, and its index and
@@ -957,6 +962,33 @@ echo "latest = $latest"                       # empty means no release yet
 [ -z "$latest" ] || git checkout "$latest"
 git submodule update --init --recursive
 ```
+
+### Turning on the opt-in features
+
+```bash
+make adopt              # preview every change, write nothing
+make adopt YES=1        # act
+```
+
+Two features ship off by default — the [applications promotion bar](#the-maturity-gradient)
+and [`SBW_RENDER_SCOPE=relevant`](#which-rules-reach-which-repos) — because turning
+either on changes what a vault's audit means or deletes rendered files from every
+onboarded repo. `adopt` is that sequence: it declares the applications bar in the
+vault's own promotion map (at the current shape, keyed on `domain` as well as
+`applies-to`), sets the render scope, regenerates the index if `v0.36.0` moved it,
+and re-renders every registered repo.
+
+**The re-render is why this is a program rather than a checklist.** A repo onboarded
+with `--local` keeps its rendered files out of the remote through a marked block in
+`.git/info/exclude`. Re-render it *without* `--local` and any rule added since
+onboarding is never added to that block — it surfaces in `git status` and is one
+`git commit -a` from being shared, with nothing to warn you. `adopt` reads the
+marker and re-renders each repo in the mode it was onboarded with.
+
+Idempotent, and a preview by default. It never commits, never pushes, never prunes
+the registry, and never creates a promotion map — a vault with none is refused, since
+that file is where a vault states its own bars and a generated default would be this
+engine deciding them.
 
 ### Upgrading a set-up machine
 

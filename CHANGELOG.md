@@ -17,6 +17,34 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`make adopt` turns on the opt-in features and re-renders safely.** Two
+  features ship off by default — the applications promotion bar and
+  `SBW_RENDER_SCOPE=relevant` — because turning either on changes what a vault's
+  audit means or deletes rendered files from every onboarded repo. Doing it by
+  hand is four steps across three files, one of which is pasting a Dataview
+  query whose operator precedence is easy to invert (`A OR B AND C` binds as
+  `A OR (B AND C)`, matching every scoped note whatever its repo count — a bug
+  that shipped into the author's own map and was caught on re-read).
+
+  **The re-render is why this is a program rather than a checklist entry.** A
+  repo onboarded with `--local` keeps its rendered files out of the remote
+  through a marked block in `.git/info/exclude`; re-rendered *without* `--local`,
+  any rule added since onboarding is never added to that block, so it surfaces in
+  `git status` and is one `git commit -a` from being shared — with nothing to
+  warn you. `adopt` reads the marker and re-renders each repo in the mode it was
+  onboarded with.
+
+  Preview by default (`YES=1` to act), idempotent, and it declares the bar at the
+  current v0.37.0 shape so a machine adopting from an older release does not
+  paste the superseded form. It never commits, never pushes, never prunes the
+  registry, and refuses a vault with no promotion map rather than generating one
+  — that file is where a vault states its own bars.
+
+### Fixed
+- `docs/REFERENCE.md`'s maturity-gradient section still described a process note
+  as any note with an empty `applies-to`, which v0.37.0 superseded.
+
 ## [0.37.0] - 2026-08-17
 
 ### Changed
