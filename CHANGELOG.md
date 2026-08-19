@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.38.2] - 2026-08-18
+
 ### Fixed
 - **`make adopt YES=1` no longer reports `Error 1` after succeeding.** The count
   it exits on means work *pending* in a preview and work *done* after `--yes`;
@@ -2652,7 +2654,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.2...HEAD
+[0.38.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.1...v0.38.2
 [0.38.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.0...v0.38.1
 [0.38.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.37.0...v0.38.0
 [0.37.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.36.0...v0.37.0
