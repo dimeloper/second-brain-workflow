@@ -106,7 +106,22 @@ SORT length(applications) DESC
 '''
 open(path, 'w').write(s)
 PY
-    echo "  wrote the block — review the repo block's parentheses before committing"
+    # Verify rather than ask. The repo block is rewritten by pattern, and a map
+    # worded differently from the one this expects would leave it unscoped — so
+    # both queries would then match the same notes, and the reader would be the
+    # one who found out. "Review the parentheses before committing" put that
+    # work on a person who has no reason to know what the right shape is.
+    if grep -qF 'WHERE (applies-to != "" OR domain != "cross-cutting")' "${MAP}"; then
+      echo "  wrote the applications block, and scoped the repo block to match"
+    else
+      echo "  WARN  wrote the applications block, but could not scope the repo block:"
+      echo "        its WHERE clause is not in the shape this knows how to rewrite."
+      echo "        Both queries now match the same notes. Add to the repo block:"
+      echo "          WHERE (applies-to != \"\" OR domain != \"cross-cutting\")"
+      echo "        as its first condition, with the existing maturity tests"
+      echo "        parenthesised under an AND — see 00-maps/promotion-candidates.md"
+      echo "        in the engine's own vault for the finished shape."
+    fi
   fi
 fi
 
@@ -170,10 +185,21 @@ echo "  - a --local repo should still show a clean 'git status'; if it does not,
 echo "    the render wrote something tracked and wants looking at."
 "${STANDARDS_DIR}/scripts/doctor.sh" --vault "${VAULT}" 2>&1 | grep -E '^  (ERROR|warn)' | sed 's/^/  /' || true
 echo
+# The count means two different things, and only one of them is a finding.
+#
+# In preview it is work *pending*, so a non-zero exit is right: a caller — a
+# person reading `make adopt`, or a script gating on it — is being told there is
+# something to do. After `--yes` the same number is work *done*, and exiting
+# non-zero on it turned a successful run into `make: *** [adopt] Error 1`,
+# reported on the machine it was written for, the morning it shipped.
+#
+# A tool that has just completed its job must say so with its exit code. What
+# still needs a human is in the report above and never blocks; a real failure
+# exits before reaching here.
 if act; then
   echo "Done. ${todo} change(s) made."
-else
-  echo "Preview only — ${todo} change(s) would be made. Re-run with --yes."
+  exit 0
 fi
+echo "Preview only — ${todo} change(s) would be made. Re-run with --yes."
 [ "${todo}" -eq 0 ] || exit 1
 exit 0

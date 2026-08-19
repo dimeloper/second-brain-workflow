@@ -17,6 +17,23 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`make adopt YES=1` no longer reports `Error 1` after succeeding.** The count
+  it exits on means work *pending* in a preview and work *done* after `--yes`;
+  exiting non-zero on the second turned a completed run into
+  `make: *** [adopt] Error 1`. Reported from a real machine the morning `adopt`
+  shipped, which is the shortest a check has ever taken to prove the point it was
+  written about — a report whose state reads as failure when nothing failed.
+
+  A preview with pending work still exits 1, since that is a caller being told
+  there is something to do.
+- **`adopt` verifies that it scoped the repo block, instead of asking you to.**
+  The block is rewritten by pattern, so a promotion map worded differently from
+  the expected shape was left unscoped and both queries then matched the same
+  notes. It said "review the repo block's parentheses before committing", which
+  put the check on the person least placed to know the right shape. It now
+  confirms the rewrite, or warns with the exact clause to add.
+
 ## [0.38.1] - 2026-08-18
 
 ### Fixed

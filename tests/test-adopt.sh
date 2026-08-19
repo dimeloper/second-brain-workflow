@@ -103,6 +103,53 @@ assert_exit 0 "${rc}" "a second --yes run has nothing to do"
 out_has_str "${out}" "already declared" "and says the bar is already there"
 out_has_str "${out}" "already relevant" "and the scope too"
 
+# --- a successful run exits 0 -----------------------------------------------
+# The count means work pending in a preview and work done after --yes. Exiting
+# non-zero on the second turned a successful `make adopt YES=1` into
+# `make: *** [adopt] Error 1` — reported from a real machine the morning it
+# shipped. A tool that has finished its job says so with its exit code.
+FRESH="${SANDBOX}/fresh-vault"
+mkdir -p "${FRESH}/00-maps" "${FRESH}/practices/cross-cutting"
+cp "${VAULT}/practices/cross-cutting/a-note.md" "${FRESH}/practices/cross-cutting/"
+cat > "${FRESH}/00-maps/promotion-candidates.md" <<'MAP'
+# Promotion candidates
+
+```dataview
+WHERE (maturity = "idea" AND length(repos) >= 2)
+   OR (maturity = "trialing" AND length(repos) >= 3)
+```
+MAP
+out="$("${ADOPT}" --vault "${FRESH}" --yes 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "a --yes run that made changes exits 0"
+out_has_str "${out}" "change(s) made" "and reports what it did"
+# ...and having done them, it verifies the rewrite instead of asking the reader.
+out_has_str "${out}" "scoped the repo block to match" \
+  "confirming the repo block was scoped, rather than asking you to check"
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -qF 'WHERE (applies-to != "" OR domain != "cross-cutting")' \
+     "${FRESH}/00-maps/promotion-candidates.md"; then
+  pass "and the repo block really is scoped"
+else
+  fail "and the repo block really is scoped" \
+    "$(cat "${FRESH}/00-maps/promotion-candidates.md")"
+fi
+
+# A map worded differently is warned about, not silently left overlapping.
+ODD="${SANDBOX}/odd-vault"
+mkdir -p "${ODD}/00-maps" "${ODD}/practices/cross-cutting"
+cp "${VAULT}/practices/cross-cutting/a-note.md" "${ODD}/practices/cross-cutting/"
+cat > "${ODD}/00-maps/promotion-candidates.md" <<'MAP'
+# Promotion candidates
+
+```dataview
+FROM "practices" WHERE length(repos) >= 2 AND maturity = "idea"
+```
+MAP
+out="$("${ADOPT}" --vault "${ODD}" --yes 2>&1)"
+out_has_str "${out}" "could not scope the repo block" \
+  "a map it cannot rewrite is reported, not left silently overlapping"
+
 # --- the mode each repo was onboarded with ----------------------------------
 SHARED="${SANDBOX}/shared-repo"
 LOCAL="${SANDBOX}/local-repo"
