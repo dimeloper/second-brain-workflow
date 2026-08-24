@@ -87,6 +87,7 @@ lint-shell:
 
 lint-python:
 	@python3 -m py_compile scripts/render.py scripts/build-vault-index.py scripts/check-lineage.py \
+	  scripts/append-daily-block.py \
 	  scripts/check-followups.py scripts/check-rules.py scripts/rule-budget.py scripts/lib/config.py \
 	  scripts/lib/frontmatter.py scripts/lib/registry.py scripts/lib/skill_manifest.py \
 	  scripts/lib/repo_match.py scripts/lib/promotion.py scripts/practices-for.py \

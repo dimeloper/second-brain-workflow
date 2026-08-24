@@ -205,6 +205,97 @@ git -C "${VAULT}" rm -q "practices/backend/enforced-note.md" >/dev/null 2>&1
 assert_exit 1 $? "blocks deleting an enforced note"
 git -C "${VAULT}" reset -q --hard HEAD
 
+# --- a daily note only ever grows -------------------------------------------
+# The lost-update case. Two sessions wrapping up at once both read today's
+# note, both write the whole file back, and the second write drops the first
+# one's block — with a clean tree afterwards and nothing else to notice it by.
+# Real, twice in one evening, on 2026-08-24.
+DAILY="${VAULT}/2026-08-24.md"
+cat > "${DAILY}" <<'EOF'
+# 2026-08-24
+
+## Built (echo-city-hotel: Open Graph share card)
+- Shipped `dede9b0`.
+- og:image is absolute now.
+
+## Follow-ups
+- [ ] Scrape the Facebook debugger #repo/echo-city-hotel
+EOF
+git -C "${VAULT}" add -A >/dev/null 2>&1
+git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "daily" >/dev/null 2>&1
+
+cat >> "${DAILY}" <<'EOF'
+
+## Drift / gaps
+- A 200 on the asset is not proof the share URL is crawlable.
+EOF
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "appending to a daily note passes"
+git -C "${VAULT}" reset -q --hard HEAD
+
+# A ticked box is the same item, not a lost one.
+sed 's/- \[ \] Scrape/- [x] Scrape/' "${DAILY}" > "${DAILY}.tmp" && mv "${DAILY}.tmp" "${DAILY}"
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "ticking a follow-up's checkbox passes"
+git -C "${VAULT}" reset -q --hard HEAD
+
+# An edited line keeps its opening clause. Matching on literal characters
+# failed exactly this case — the difference is at the full stop, 19 in.
+cat > "${DAILY}" <<'EOF'
+# 2026-08-24
+
+## Built (echo-city-hotel: Open Graph share card)
+- Shipped `dede9b0` to production.
+- og:image is absolute now.
+
+## Follow-ups
+- [ ] Scrape the Facebook debugger #repo/echo-city-hotel
+EOF
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "rewording a bullet passes"
+git -C "${VAULT}" reset -q --hard HEAD
+
+# The whole-file write from a stale read: one session's block replaced by
+# another's.
+cat > "${DAILY}" <<'EOF'
+# 2026-08-24
+
+## Built (housemaster-ingestion: Places cost)
+- PR #41 caps a run at 150 requests.
+EOF
+git -C "${VAULT}" add -A >/dev/null 2>&1
+out="$("${GUARD}" --vault "${VAULT}" --expect-id work 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "blocks a daily note whose earlier block was overwritten"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"vanished from 2026-08-24.md"*"Scrape the Facebook debugger"*)
+    pass "and names the lines that vanished" ;;
+  *) fail "and names the lines that vanished" "${out}" ;;
+esac
+
+# Both doors out, for the one deliberate case: moving work into the note for
+# the day it actually happened.
+"${GUARD}" --vault "${VAULT}" --expect-id work --allow-daily-rewrite >/dev/null 2>&1
+assert_exit 0 $? "--allow-daily-rewrite permits it"
+GUARD_ALLOW_DAILY_REWRITE=1 "${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "GUARD_ALLOW_DAILY_REWRITE=1 permits it too"
+
+# A practice note is edited in place constantly — frontmatter bumps, a
+# rewritten Rule, an applications entry. Holding those to append-only would
+# make this the check everyone routes around.
+git -C "${VAULT}" reset -q --hard HEAD
+sed 's/^maturity: idea/maturity: trialing/' "${VAULT}/practices/backend/a-practice.md" \
+  > "${VAULT}/practices/backend/a-practice.md.tmp" \
+  && mv "${VAULT}/practices/backend/a-practice.md.tmp" "${VAULT}/practices/backend/a-practice.md"
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "rewriting a line in a practice note is not held to append-only"
+git -C "${VAULT}" reset -q --hard HEAD
+
 # --- missing vault.json warns but does not block ----------------------------
 rm -f "${VAULT}/vault.json"
 git -C "${VAULT}" add -A >/dev/null 2>&1
@@ -310,6 +401,41 @@ case "${out}" in
 esac
 "${GUARD}" --vault "${RVAULT}" --expect-id work --rev "${C4}" >/dev/null 2>&1
 assert_exit 1 $? "--rev blocks the same single-commit deletion"
+
+# --- --range/--rev: a daily note whose content vanished ---------------------
+# The tier that a --no-verify past the local hook leaves to catch. CI has no
+# command line to pass --allow-daily-rewrite on, so the deliberate case is
+# expressed as a commit trailer instead — and a change meaning to use it needs
+# both, or the local run allows what CI then refuses.
+cat > "${RVAULT}/2026-08-24.md" <<'EOF'
+# 2026-08-24
+
+## Built (echo-city-hotel: Open Graph share card)
+- Shipped `dede9b0`.
+- og:image is absolute now.
+EOF
+C5="$(commit_in "daily note")"
+cat > "${RVAULT}/2026-08-24.md" <<'EOF'
+# 2026-08-24
+
+## Built (housemaster-ingestion: Places cost)
+- PR #41 caps a run at 150 requests.
+EOF
+C6="$(commit_in "clobber the daily note")"
+
+"${GUARD}" --vault "${RVAULT}" --expect-id work --range "${C5}..${C6}" >/dev/null 2>&1
+assert_exit 1 $? "--range blocks a clobbered daily note"
+"${GUARD}" --vault "${RVAULT}" --expect-id work --rev "${C6}" >/dev/null 2>&1
+assert_exit 1 $? "--rev blocks the same single commit"
+
+git -C "${RVAULT}" add -A >/dev/null 2>&1
+git -C "${RVAULT}" -c user.email=t@t -c user.name=t commit -q --allow-empty \
+  -m "docs: move a block to the day it happened
+
+Daily-rewrite: the echo block belonged on 2026-08-23" >/dev/null 2>&1
+C7="$(git -C "${RVAULT}" rev-parse HEAD)"
+"${GUARD}" --vault "${RVAULT}" --expect-id work --range "${C5}..${C7}" >/dev/null 2>&1
+assert_exit 0 $? "a Daily-rewrite: trailer in the range permits it"
 
 # --- --range/--rev: argument handling ---------------------------------------
 "${GUARD}" --vault "${RVAULT}" --range "${C0}" --rev "${C1}" >/dev/null 2>&1

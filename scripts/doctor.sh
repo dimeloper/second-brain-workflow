@@ -109,6 +109,49 @@ check_hook() {
   fi
 }
 
+# The CI tier is documented as the one a `--no-verify` can't skip, and it is the
+# only tier that runs a *pinned* engine rather than this working copy: the hook
+# and update-second-brain both exec the scripts right here, so they pick up an
+# engine change the moment it lands. The vault's workflows keep running whatever
+# tag they were copied with, and nothing looked.
+#
+# tests/test-release-consistency.sh keeps the templates in this repo in step
+# with VERSION. Nobody was keeping the vault's *copies* in step with anything —
+# a real vault was found pinned eight releases back, which meant its unskippable
+# tier was enforcing a guard that predated several of the checks its owner
+# believed were running. A stale pin fails no build and prints no warning; it
+# just quietly enforces less than you think.
+#
+# A warning, not an error: an older pin is a working setup, only an out-of-date
+# one, and a vault with no workflows at all has simply not adopted the CI tier.
+check_vault_ci() {
+  case "${VS_STATE}" in
+    missing|not-a-repo) return ;;
+  esac
+
+  local version found=0
+  version="v$(cat "${STANDARDS_DIR}/VERSION" 2>/dev/null || echo "")"
+  [ "${version}" != "v" ] || return
+
+  local wf ref name
+  for wf in "${VAULT}/.github/workflows/guard.yml" "${VAULT}/.github/workflows/audit.yml"; do
+    [ -f "${wf}" ] || continue
+    found=1
+    name="$(basename "${wf}")"
+    ref="$(sed -n 's/^[[:space:]]*ENGINE_REF:[[:space:]]*\([^[:space:]]*\).*/\1/p' "${wf}" | head -1)"
+    if [ -z "${ref}" ]; then
+      warn "${name} in the vault declares no ENGINE_REF — it cannot pin an engine to check with"
+    elif [ "${ref}" = "${version}" ]; then
+      ok "vault CI ${name} pins ${ref}, this engine's version"
+    else
+      warn "vault CI ${name} pins ${ref}, but this engine is ${version} — CI is enforcing an older guard than your machine is. Bump ENGINE_REF in ${wf}"
+    fi
+  done
+
+  [ "${found}" -eq 1 ] || ok "vault has no CI workflows — the push-time tier is not adopted here (see docs/vault-ci/)"
+  return 0
+}
+
 # A vault created before the author check existed has no identity block, so the
 # check silently doesn't apply — on the machine where a personal address reached
 # an employer repo, that is still true of the vault it happened in. Nothing else
@@ -702,6 +745,7 @@ EOF
 
 echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
+check_vault_ci
 check_author
 check_skills
 check_orphaned_skills

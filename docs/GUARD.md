@@ -61,8 +61,46 @@ SBW_EXPECTED_VAULT_ID=work
 It blocks a staged path outside the vault's allowed set, a `vault.json` id that
 isn't the one this machine expects, an `origin` that doesn't match the one
 recorded in `vault.json`, a commit author that isn't the identity `vault.json`
-declares, an implausibly large diff, deletion of an `enforced` note, conflict
-markers, and anything that looks like a credential.
+declares, an implausibly large diff, deletion of an `enforced` note, content
+vanishing from a daily note, conflict markers, and anything that looks like a
+credential.
+
+### Daily notes only ever grow
+
+Two agent sessions wrapping up at the same time both read today's note, both
+compose a block from the copy they read, and both write the whole file back. The
+second write drops the first session's block, the commit records the clobbered
+state, and `git status` then reports a clean tree — so nothing anywhere says a
+day's work has gone. It happened twice on one evening; one block was recovered
+only because a transcript was still open.
+
+So a commit that removes lines from a `YYYY-MM-DD.md` is refused. A removed line
+is fine if something took its place — the same line, the same line with its
+checkbox ticked, or a line still carrying its opening clause (a typo fix, a
+corrected SHA). What fails is content that simply stopped existing. Practice
+notes are exempt: they are edited in place constantly, and holding them to
+append-only would make this the check everyone routes around.
+
+The prevention lives in
+[`append-daily-block.py`](../scripts/append-daily-block.py), which `update-second-brain`
+writes through: it takes the hash of the note you read and refuses the write if
+the note moved in between. This check is the backstop for everything that
+doesn't go through it.
+
+One deliberate case removes lines legitimately — moving work into the note for
+the day it actually happened. It needs both doors, because the two enforcement
+tiers see different things:
+
+```bash
+./scripts/guard-vault-commit.sh --expect-id work --allow-daily-rewrite
+git commit -m "docs: move the block to the day it happened
+
+Daily-rewrite: filed a day late; boundary fixed against commit timestamps"
+```
+
+The flag answers the local run, which has no commit message yet; the trailer
+answers the CI run, which has no command line. Use one without the other and CI
+refuses what your machine allowed.
 
 ## Commit authorship
 

@@ -126,6 +126,34 @@ deliberately narrow — a commitment that fell out of that window is `make audit
 job instead (via `check-followups.py`), part of the [Review loop](#review-loop),
 not a skill.
 
+### Two sessions, one daily note
+
+The daily note is the only file in the vault that two agent sessions write at
+once, and a read-modify-write on it loses one of them: the second write drops the
+first session's block and leaves a clean tree behind. `update-second-brain`
+therefore never writes the note directly. It writes through:
+
+```bash
+STAMP="$(./scripts/append-daily-block.py --stamp --quiet)"
+./scripts/append-daily-block.py --expect "${STAMP}" --block block.md
+```
+
+which is compare-and-swap — the write is refused (exit 3) if the note moved
+between the stamp and the write, and the recovery is to re-stamp and re-run the
+same block file. The merge appends under existing headers and inserts missing
+ones in canonical order, so one day's note keeps one `## Follow-ups` however many
+sessions write to it, and the script re-checks that no line of the note it read
+went missing before it writes anything.
+
+The date comes off the clock inside the script rather than from the caller,
+which is what stops a session that began yesterday filing today's work under
+yesterday's note.
+
+The note is also committed the moment it is written, before practice notes are
+proposed — a capture waiting on approval is one another session can carry off.
+The commit guard's [daily-note check](GUARD.md#daily-notes-only-ever-grow) is the
+backstop for anything that writes the note some other way.
+
 ### Worked example
 
 The [README](../README.md#your-first-session) shows the daily note. Here is the

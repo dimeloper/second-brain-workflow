@@ -13,9 +13,11 @@ description: >-
 # Update second brain
 
 Turns "what I just did in this session" into vault updates, then publishes them.
-This is the **only** write path into the vault: capture → propose → promote →
-commit → push. You are usually invoked from a *different* repo (the one worked
-on); the vault is never the current working directory.
+This is the **only** write path into the vault: capture → **publish the capture**
+→ propose → promote → commit → push. The capture ships before the proposal on
+purpose — a daily note held back for approval is one another session can lose.
+You are usually invoked from a *different* repo (the one worked on); the vault is
+never the current working directory.
 
 `obsidian-knowledge-base` is the read side — consult it when you need vault
 practices *during* work. It does not write.
@@ -71,38 +73,55 @@ structure, counts and standing exceptions. Otherwise read the templates directly
 Either way, skim `_templates/practice-note.md` and two recent practice notes so
 new writes match house style exactly.
 
-## Step 3 — Update today's daily note (write immediately)
+## Step 3 — Write today's daily note (never a whole-file write)
 
-**Read the date off the clock, every time you are about to write:**
+The daily note is the documented **exception** to propose-then-approve — write it
+without asking. It is also the one file in the vault that two sessions write at
+the same time, so **never read it, compose a new whole file, and write that
+back.** That is a lost update: the second write drops the first session's block,
+the commit records the clobbered state, and `git status` then reports a clean
+tree — so the only thing that says a day's work disappeared is a transcript
+somebody still has open. It happened twice on 2026-08-24, the second time
+between two wrap-ups two minutes apart.
+
+Write through the appender instead, which is compare-and-swap: it takes the hash
+of what you read, and refuses the write if the note moved in between.
 
 ```bash
-date +%F
+STAMP="$(~/second-brain-workflow/scripts/append-daily-block.py --stamp --quiet)"
+# read the note if it exists, then compose your block into a file
+~/second-brain-workflow/scripts/append-daily-block.py --expect "${STAMP}" --block /tmp/block.md
 ```
 
-Never from the session's start, from a system prompt, from the newest file in the
-vault, or from a note you already opened earlier in this same session. Those are
-all the same assumption wearing different clothes, and the assumption is that a
-session ends on the day it began.
+The block file is **sections only** — no `# ` title, no prose above the first
+`## ` header. Each section's bullets are appended under that header if it exists
+and inserted in canonical order if it doesn't, so one day's note keeps one
+`## Follow-ups` however many sessions write to it.
+
+**Exit 3 means another session got there first.** Re-read the note, re-run
+`--stamp`, and re-run the same command with the same block file — the merge is
+section-aware, so your bullets land under the right headers whatever arrived
+first, and only prose that the other session's content actually changes needs
+rewriting. Do not route around it by writing the file yourself.
+
+**The date comes off the clock, and the appender reads it** — that is why the
+command above passes no `--date`. Never take the date from the session's start,
+from a system prompt, from the newest file in the vault, or from a note you
+opened earlier in this same session. Those are all the same assumption wearing
+different clothes, and the assumption is that a session ends on the day it began.
+On 2026-08-18 a session that had run since the 16th filed a day and a half of
+work under `2026-08-17.md`; the user caught it, no check did, and the fix meant
+splitting a note after the fact against commit timestamps.
 
 A long session crosses midnight, and when it does **the work splits across two
-notes** — each day's note holds that day's work. Do not keep appending to the
-note you opened yesterday because it is the one already in context. When you
-cross over, open the new note and put a line at the top of each pointing at the
-other, so the thread is still readable in order.
-
-This is not hypothetical. On 2026-08-18 a session that had run since the 16th
-filed a day and a half of work under `2026-08-17.md`; the user caught it, no
-check did, and the fix meant splitting a note after the fact against commit
-timestamps. `date +%F` costs nothing and is the only thing here that cannot be
-wrong.
-
-Today's note is `<vault>/<YYYY-MM-DD>.md`. The daily note is the documented
-**exception** to propose-then-approve — write it without asking. Create it from
-`_templates/daily-note.md` if missing.
+notes** — each day's note holds that day's work. Omitting `--date` handles that
+on its own; what it cannot do is cross-link. When you cross over, put a line at
+the top of each note pointing at the other, so the thread is still readable in
+order.
 
 Sections: `## Built`, `## Follow-ups`, `## Practices followed`, `## Drift / gaps`,
 `## Vault candidates`, `## Vault writes (approved)`, `## Vault writes (declined)`.
-Omit empty sections.
+Omit empty sections — leave them out of the block and they are never created.
 
 - **One header per section per day**, and *per day* is load-bearing: a second
   day's work is a second note, never a second `## Built` in the first. Within a
@@ -115,7 +134,7 @@ Omit empty sections.
 - `## Drift / gaps` records where reality diverged from a practice, or gaps with
   no note yet — raw material for new candidates.
 - `## Vault candidates` lists proposals; `(approved)` / `(declined)` record the
-  outcome after Step 4.
+  outcome after Step 5.
 
 ### Tag every follow-up with its repo
 
@@ -159,7 +178,47 @@ the letter beating the point. Do it against evidence (commit timestamps), not
 memory; cross-reference both notes; and say in the commit message that it was a
 correction and what fixed the boundary.
 
-## Step 4 — Propose practice-note changes (approval required)
+That is the one case where lines legitimately leave a daily note, and the commit
+guard refuses it by default. Do it in a commit of its own, with **both** doors
+open, or the local run allows what CI then refuses:
+
+```bash
+~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id <id> --allow-daily-rewrite
+git -C <vault> commit -m "docs: move the kit block to 2026-08-22, where it happened
+
+Daily-rewrite: block was filed a day late; boundary fixed against commit timestamps"
+```
+
+## Step 4 — Publish the daily note, before you ask about anything else
+
+Commit and push the daily note **now**, in its own commit, before proposing a
+single practice note. It is written; it is not yours to hold.
+
+A wrap-up that writes the note and then waits for approval can lose it outright:
+a later session committing the vault from a clean tree carries it off, or a
+concurrent one overwrites it. Saturday's `motion-site-kit` block was lost the
+first way and 2026-08-24's `echo-city-hotel` block the second. Committing here
+also gives the guard a committed baseline to diff the next write against, which
+is what makes the lost-update check in Step 7 able to see anything at all.
+
+```bash
+git -C <vault> add <YYYY-MM-DD>.md
+~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id <this machine's vault id>
+git -C <vault> commit -m "docs: capture the <repo> wrap-up in the daily note" -- <YYYY-MM-DD>.md
+git -C <vault> push
+```
+
+**The pathspec after `--` is what scopes the commit, not the `git add` above it.**
+A commit with no pathspec takes the whole index — including whatever a
+concurrent wrap-up staged a minute ago, which in this vault is a real second
+session, not a hypothetical one. `git show --stat` is the only thing that would
+have told you afterwards.
+
+Practice notes are a second commit, after approval. Two commits per wrap-up is
+the intended shape, not a defect: the capture is a fact and does not need
+approval, and the promotion is a proposal and does.
+
+## Step 5 — Propose practice-note changes (approval required)
 
 Derive candidates in three buckets. **Propose all of them in one message and wait
 for approval before writing any practice note.**
@@ -221,12 +280,19 @@ for approval before writing any practice note.**
 - If a candidate is declined, record it under `## Vault writes (declined)` with a
   one-line reason.
 
-## Step 5 — Apply approved writes
+## Step 6 — Apply approved writes
 
-Write only what was approved. Move each candidate to `## Vault writes (approved)`
-or `(declined)` in the daily note. Do not partially write a practice note.
+Write only what was approved. Do not partially write a practice note.
 
-## Step 6 — Commit
+The outcome goes into the daily note's `## Vault writes (approved)` /
+`(declined)` sections — through the appender again, with a fresh `--stamp`,
+exactly as in Step 3. The note has been committed and possibly written to by
+another session since; re-reading it is not optional here.
+
+## Step 7 — Commit the practice notes
+
+The daily note went out in Step 4. This commit is the approved practice notes,
+the regenerated index, and the daily note's `## Vault writes` sections.
 
 Run in parallel first: `git status`, `git diff`, `git log -5 --oneline` (for
 message style).
@@ -247,24 +313,32 @@ Then run the guard, which is the mechanical backstop:
 
 It refuses the commit if the staged diff leaves the vault's allowed paths, if
 `vault.json`'s id or remote doesn't match what this machine expects, if the diff
-is implausibly large, if an `enforced` note is being deleted, or if a credential
-or conflict marker made it in. **Do not work around it** — a failure means the
-write is aimed somewhere it shouldn't go. Fix the cause and re-run.
+is implausibly large, if an `enforced` note is being deleted, if lines have
+vanished from a daily note, or if a credential or conflict marker made it in.
+**Do not work around it** — a failure means the write is aimed somewhere it
+shouldn't go. Fix the cause and re-run.
+
+`N line(s) vanished from <date>.md` means a whole-file write landed on top of
+someone else's block. The fix is never `--no-verify` and never
+`--allow-daily-rewrite`: reset the note to `HEAD`, and re-apply your block with
+`append-daily-block.py` as in Step 3. `--allow-daily-rewrite` is for the one
+deliberate case in Step 3's day-boundary correction, and it needs the matching
+`Daily-rewrite:` trailer or CI refuses what you just allowed.
 
 Conventional Commits, focused on **why** (which session or feature), not a file
 list:
 
 ```bash
-git commit -m "$(cat <<'EOF'
-docs: publish practice notes from <session> wrap-up
-
-EOF
-)"
+git commit -m "docs: publish practice notes from <session> wrap-up" \
+  -- practices <YYYY-MM-DD>.md
 ```
+
+Same pathspec rule as Step 4: name what this commit carries, so a concurrent
+session's staged work cannot ride along.
 
 If there is nothing to publish, say so and stop — no empty commits.
 
-## Step 7 — Push
+## Step 8 — Push
 
 ```bash
 git push -u origin HEAD
@@ -273,12 +347,15 @@ git push -u origin HEAD
 Never `--force`, never a rewriting refspec. Never commit or push `second-brain-workflow`
 or the product repo as part of this skill.
 
-## Step 8 — Report
+## Step 9 — Report
 
-- Vault path, commit SHA + subject, remote
+- Vault path, remote, and **both** commit SHAs + subjects — the Step 4 capture
+  and the Step 7 practice notes
 - Daily-note bullets added
 - Notes created / updated / promoted, and any remaining promotion candidates
 - Anything left unstaged, and why
+- Whether a write was ever refused as stale, and what you re-read — a wrap-up
+  that raced another session is worth one line, not silence
 
 If the vault's structure or counts changed materially and you keep a memory file
 for it, update that too.

@@ -214,11 +214,24 @@ Fill done-criteria from the repo’s real scripts (`package.json` scripts, `Make
 
 ### 5. Vault / daily note
 
-Append a one-line Built bullet to today's daily note
-(`$SBW_VAULT/YYYY-MM-DD.md`) — e.g. “Onboarded `<repo>` into
-second-brain-workflow”. Daily notes need **no approval** (see
+Append a one-line Built bullet to today's daily note — e.g. “Onboarded `<repo>`
+into second-brain-workflow”. Daily notes need **no approval** (see
 `obsidian-knowledge-base`). Do not write `practices/**` during onboard unless
 the user asks (those still require proposal + approval).
+
+**Never write `$SBW_VAULT/YYYY-MM-DD.md` directly.** A wrap-up in another
+session may be composing that same note right now, and a whole-file write drops
+whatever it had already put there. Use the same compare-and-swap path
+`update-second-brain` uses:
+
+```bash
+printf '## Built\n- Onboarded `%s` into second-brain-workflow\n' "$repo" > /tmp/onboard-block.md
+STAMP="$(~/second-brain-workflow/scripts/append-daily-block.py --stamp --quiet)"
+~/second-brain-workflow/scripts/append-daily-block.py --expect "$STAMP" --block /tmp/onboard-block.md
+```
+
+Exit 3 means another session wrote first: re-run `--stamp` and re-run the
+append. Commit the note as soon as it is written rather than at the end.
 
 ### 6. Project-scoped MCP (required for product apps)
 

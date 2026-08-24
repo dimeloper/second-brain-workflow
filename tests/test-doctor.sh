@@ -122,6 +122,54 @@ case "${out}" in
   *) fail "names the foreign hook" "${out}" ;;
 esac
 
+# --- check_vault_ci(): the tier that runs a pinned engine, not this one -----
+# The hook and update-second-brain exec the scripts in this working copy, so an
+# engine change reaches them immediately. The vault's workflows keep running
+# whatever tag they were copied with — a real vault sat eight releases back,
+# enforcing a guard that predated checks its owner believed were running.
+VERSION_NOW="v$(cat "${ENGINE}/VERSION")"
+CIV="${SANDBOX}/ci-vault"
+"${INIT}" --path "${CIV}" --id work --remote "git@example.com:me/ci-brain.git" >/dev/null 2>&1
+
+out="$("${DOCTOR}" --vault "${CIV}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no CI workflows"*) pass "a vault without workflows is reported as not adopting the tier" ;;
+  *) fail "a vault without workflows is reported as not adopting the tier" "${out}" ;;
+esac
+
+mkdir -p "${CIV}/.github/workflows"
+printf 'env:\n  ENGINE_REF: %s\n' "${VERSION_NOW}" > "${CIV}/.github/workflows/guard.yml"
+out="$("${DOCTOR}" --vault "${CIV}" 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "a workflow pinned to this engine's version is no finding"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"guard.yml pins ${VERSION_NOW}"*) pass "and says which version it pins" ;;
+  *) fail "and says which version it pins" "${out}" ;;
+esac
+
+printf 'env:\n  ENGINE_REF: v0.1.0\n' > "${CIV}/.github/workflows/guard.yml"
+out="$("${DOCTOR}" --vault "${CIV}" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "a stale pin is a finding"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"pins v0.1.0"*"${VERSION_NOW}"*"enforcing an older guard"*)
+    pass "naming both versions and what it means" ;;
+  *) fail "naming both versions and what it means" "${out}" ;;
+esac
+
+printf 'env:\n  SOMETHING_ELSE: x\n' > "${CIV}/.github/workflows/audit.yml"
+printf 'env:\n  ENGINE_REF: %s\n' "${VERSION_NOW}" > "${CIV}/.github/workflows/guard.yml"
+out="$("${DOCTOR}" --vault "${CIV}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"audit.yml in the vault declares no ENGINE_REF"*)
+    pass "a workflow with no ENGINE_REF at all is a finding of its own" ;;
+  *) fail "a workflow with no ENGINE_REF at all is a finding of its own" "${out}" ;;
+esac
+
 # --- not a git repo at all yet ----------------------------------------------
 NOGIT="${SANDBOX}/nogit"
 mkdir -p "${NOGIT}"

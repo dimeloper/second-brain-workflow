@@ -19,6 +19,10 @@
 # changes nothing still records an author, so `git commit --allow-empty` is
 # checked rather than waved through — in both modes.
 #
+# --allow-daily-rewrite permits removing lines from a daily note, which is
+# otherwise refused as a lost update. Pair it with a `Daily-rewrite: <reason>`
+# commit trailer, which is how the CI copy of the check is told the same thing.
+#
 # The boundary between a personal and a work second brain is the *vault*, not
 # the rule set. Rules flow outward freely — your own conventions applied to an
 # employer's code is fine. The direction that must never happen is a practice
@@ -48,6 +52,25 @@ VAULT_ORIGIN="$(ds_origin_describe SBW_VAULT)"
 EXPECT_ID="${SBW_EXPECTED_VAULT_ID}"
 RANGE=""
 REV=""
+# The one deliberate reason to remove lines from a daily note: moving work into
+# the note for the day it actually happened. Off by default in both modes, and
+# expressed twice because the two modes look at different things — the flag (or
+# the env var) for a staged commit that has no message yet, and a
+# `Daily-rewrite:` commit trailer for the CI copy, which has no command line to
+# read. Use both on the same change, or CI refuses what the local run allowed.
+ALLOW_DAILY_REWRITE="${GUARD_ALLOW_DAILY_REWRITE:-0}"
+DAILY_REWRITE_TRAILER="Daily-rewrite:"
+# How much of a removed line has to survive for it to count as edited rather
+# than lost. Lines are compared on their letters and digits alone — punctuation
+# and spacing are exactly what an edit changes, and matching on the literal
+# characters failed the first real case tried against it ("Shipped `dede9b0`."
+# → "Shipped `dede9b0` to production." differs at the full stop, 19 characters
+# in). A clobbered block shares no opening at all with what replaced it.
+DAILY_MATCH_PREFIX=24
+# Below this many letters and digits a line has no distinguishing opening — "- x"
+# would prefix-match anything starting with an x — so a short line has to match
+# exactly or it counts as lost.
+DAILY_MATCH_FLOOR=8
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -59,7 +82,8 @@ while [ $# -gt 0 ]; do
     --expect-id) EXPECT_ID="${2:?--expect-id needs a value}"; shift 2 ;;
     --range) RANGE="${2:?--range needs a BASE..HEAD value}"; shift 2 ;;
     --rev) REV="${2:?--rev needs a value}"; shift 2 ;;
-    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --allow-daily-rewrite) ALLOW_DAILY_REWRITE=1; shift ;;
+    -h|--help) sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -107,12 +131,14 @@ if [ -n "${RANGE}" ] || [ -n "${REV}" ]; then
   diff_paths() { git -C "${VAULT}" diff "${BASE}" "${NEW}" --name-only "$@"; }
   diff_numstat() { git -C "${VAULT}" diff "${BASE}" "${NEW}" --numstat; }
   diff_body() { git -C "${VAULT}" diff "${BASE}" "${NEW}"; }
+  diff_one_path() { git -C "${VAULT}" diff "${BASE}" "${NEW}" -- "$1"; }
   nothing_msg="no changes in ${BASE}..${NEW} — no diff to check, but the recorded commit authors were."
 else
   PRE_REF="HEAD"
   diff_paths() { git -C "${VAULT}" diff --cached --name-only "$@"; }
   diff_numstat() { git -C "${VAULT}" diff --cached --numstat; }
   diff_body() { git -C "${VAULT}" diff --cached; }
+  diff_one_path() { git -C "${VAULT}" diff --cached -- "$1"; }
   nothing_msg="nothing staged — no diff to check, but the commit author was."
 fi
 
@@ -262,7 +288,97 @@ done <<EOF
 ${deleted}
 EOF
 
-# --- 6. conflict markers and secrets ----------------------------------------
+# --- 6. nothing vanishing from a daily note ---------------------------------
+# The lost-update check. Two agent sessions wrapping up at the same time both
+# read today's note, both compose a block from the copy they read, and both
+# write the whole file back; the second write drops the first session's block.
+# The commit then records the clobbered state and `git status` reports a clean
+# tree, so the only thing that ever said a day's work had disappeared was one
+# session's transcript, still open by luck. It happened twice on 2026-08-24.
+#
+# Daily notes only. A practice note is edited in place all the time — frontmatter
+# bumps, a rewritten Rule, an `applications:` entry — and asking it to be
+# append-only would make this the check everyone routes around. A daily note is
+# the one artifact in the vault that only ever grows.
+#
+# A removed line is fine if something took its place: the same line, the same
+# line with its checkbox ticked, or a line still carrying its first
+# DAILY_MATCH_PREFIX characters (a typo fix, a corrected SHA). What fails is
+# content that simply stopped existing.
+daily_rewrite_allowed="${ALLOW_DAILY_REWRITE}"
+if [ "${daily_rewrite_allowed}" != "1" ] && { [ -n "${RANGE}" ] || [ -n "${REV}" ]; }; then
+  # Here-string, not a pipe into `grep -q` — see the note above the credential
+  # scan. The range's net diff is what every check here reads, so a trailer on
+  # any commit in it excuses the range; per-commit attribution is not something
+  # a net diff can offer.
+  trailers="$(git -C "${VAULT}" log --format='%B' "${BASE}..${NEW}" 2>/dev/null || true)"
+  if grep -q "^${DAILY_REWRITE_TRAILER}" <<< "${trailers}"; then
+    daily_rewrite_allowed=1
+    echo "guard: '${DAILY_REWRITE_TRAILER}' trailer in this range — daily-note removals allowed." >&2
+  fi
+fi
+
+if [ "${daily_rewrite_allowed}" != "1" ]; then
+  while IFS= read -r f; do
+    [ -n "${f}" ] || continue
+    case "${f}" in
+      [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md) ;;
+      *) continue ;;
+    esac
+    vanished="$(diff_one_path "${f}" | awk -v pfxlen="${DAILY_MATCH_PREFIX}" \
+                                           -v floor="${DAILY_MATCH_FLOOR}" '
+      # A ticked box is the same item, not a lost one — so the checkbox goes
+      # before the key is taken, or "[x]" contributes an x to it.
+      function key(s,   t) {
+        sub(/^-[ \t]*\[[ xX]\][ \t]*/, "- ", s)
+        t = tolower(s)
+        gsub(/[^a-z0-9]/, "", t)
+        return t
+      }
+      # Only inside a hunk. The `--- a/x` / `+++ b/x` headers are not content,
+      # and a real line reading "-- x" arrives as "--- x", so matching on the
+      # dashes alone would drop exactly the lines this check exists to see.
+      /^@@/ { hunk = 1; next }
+      !hunk { next }
+      /^\+/ { k = key(substr($0, 2)); if (k != "") { na++; addk[na] = k } next }
+      /^-/  { k = key(substr($0, 2)); if (k != "") { nd++; delk[nd] = k; delline[nd] = substr($0, 2) } next }
+      END {
+        for (i = 1; i <= nd; i++) {
+          d = delk[i]
+          n = length(d) < pfxlen ? length(d) : pfxlen
+          matched = 0
+          # Each added line answers for at most one removed line. Without that,
+          # a single surviving bullet would excuse every line of a block that
+          # happened to start the same way.
+          for (j = 1; j <= na && !matched; j++) {
+            if (used[j]) continue
+            if (d == addk[j]) { used[j] = 1; matched = 1 }
+            else if (length(d) >= floor && substr(addk[j], 1, n) == substr(d, 1, n)) { used[j] = 1; matched = 1 }
+          }
+          if (!matched) print delline[i]
+        }
+      }
+    ')"
+    [ -n "${vanished}" ] || continue
+    n_gone="$(printf '%s\n' "${vanished}" | grep -c . || true)"
+    sample="$(printf '%s\n' "${vanished}" | sed -n '1,5p' | sed 's/^/       - /')"
+    fail "${n_gone} line(s) vanished from ${f} — this is what a lost update looks like.
+${sample}
+       A daily note only ever grows. Two sessions wrapping up at once both read
+       it, both write the whole file back, and the second write drops the first
+       one's block — leaving a clean tree and no other signal.
+       Re-read the note and re-apply your block with
+       scripts/append-daily-block.py, which refuses a stale write instead of
+       overwriting one. If the removal is deliberate — moving work into the note
+       for the day it actually happened — re-run with --allow-daily-rewrite AND
+       put a '${DAILY_REWRITE_TRAILER} <reason>' trailer in the commit message, so
+       the CI copy of this check agrees with the local one."
+  done <<EOF
+${staged}
+EOF
+fi
+
+# --- 7. conflict markers and secrets ----------------------------------------
 #
 # Here-strings, not `printf ... | grep -q`. That pipeline failed *open*: `grep
 # -q` exits the moment it matches, `printf` is then killed by SIGPIPE, and
