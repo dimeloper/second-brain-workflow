@@ -17,6 +17,65 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-08-25
+
+### Added
+- **`scripts/append-daily-block.py` — the write path into a daily note.** Two
+  sessions wrapping up at the same time both read today's note, both compose a
+  block from the copy they read, and both write the whole file back; the second
+  write drops the first one's block, the commit records the clobbered state, and
+  `git status` then reports a clean tree. Nothing anywhere said a day's work had
+  gone. It happened twice on 2026-08-24, and one block survived only because a
+  transcript was still open.
+
+  The script is compare-and-swap instead of read-modify-write: `--stamp` gives
+  you the hash of the note you read, `--expect` hands it back, and a note that
+  moved in between is refused (exit 3) rather than overwritten. Recovery is
+  re-stamping and re-running the same block file — the merge appends under
+  existing headers and inserts missing ones in canonical order, so one day keeps
+  one `## Follow-ups` however many sessions write to it. It also verifies its own
+  rewrite (no line of the note it read may go missing), takes a short lock so two
+  writers can't both pass the hash check, writes atomically, and reads the date
+  off the clock itself rather than trusting a caller that may have started
+  yesterday.
+
+- **`append-daily-block.py --link YYYY-MM-DD`** cross-links a note to another
+  day's, above the first header, for a session that ran past midnight. Found by
+  crossing midnight mid-wrap-up on the night the appender shipped: a block is
+  sections only, so the one line the convention needs at the top was the one
+  line the tool could not write. Idempotent, and the wording follows the dates
+  (`Continues` / `Continued in`).
+- **`make doctor` compares the vault's CI `ENGINE_REF` against `VERSION`.** The
+  pre-commit hook and `update-second-brain` exec the scripts in the working
+  copy, so an engine change reaches them at once; a vault's workflows keep
+  running whatever tag they were copied with. A real vault was found pinned
+  eight releases back — its unskippable tier enforcing a guard that predated
+  several of the checks its owner believed were running. A stale pin fails no
+  build and prints no warning, so nothing said so.
+
+### Changed
+- **The commit guard refuses a daily note that lost content.** A removed line is
+  fine if something replaced it — the same line, the same line with its checkbox
+  ticked, or a line still carrying its opening clause after a typo fix. Content
+  that simply stopped existing is refused, naming the lines. Practice notes are
+  exempt: they are rewritten in place constantly, and holding them to append-only
+  would make this the check everyone routes around.
+
+  The one deliberate case — moving work into the note for the day it actually
+  happened — needs `--allow-daily-rewrite` **and** a `Daily-rewrite: <reason>`
+  commit trailer. The flag answers the local run, which has no commit message
+  yet; the trailer answers the CI run, which has no command line.
+- **`update-second-brain` publishes the daily note before proposing anything.**
+  The capture is a fact and doesn't need approval; the promotion is a proposal
+  and does. Holding both until the end is what let a wrap-up's daily note vanish
+  when a later session committed the vault from a clean tree. Two commits per
+  wrap-up is now the intended shape.
+- **Both of `update-second-brain`'s commits name a pathspec.** `git add <file>
+  && git commit` takes the whole index, including whatever a concurrent wrap-up
+  staged a minute earlier — and in this vault that is a real second session, not
+  a hypothetical one. This replaces a planned vault-wide lock script: the
+  narrower fix covers the same race.
+
 ## [0.38.2] - 2026-08-18
 
 ### Fixed
@@ -2654,7 +2713,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.39.0...HEAD
+[0.39.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.2...v0.39.0
 [0.38.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.1...v0.38.2
 [0.38.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.0...v0.38.1
 [0.38.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.37.0...v0.38.0
