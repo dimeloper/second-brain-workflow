@@ -17,6 +17,17 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Changed
+- **`project-candidates.py` bars an initiative at 7 days, not 14.** The bar
+  shipped at a fortnight and was wrong on the first real vault it saw: it
+  excluded an initiative running 8 notes over 7 days that carried 17 of that
+  vault's 37 open follow-up threads, a contested point with two live options, a
+  superseded plan and a stopgap — every shape the project-note template exists
+  for. It admitted five repos that were merely long-lived instead. Duration was
+  standing in for depth, and it is not a good proxy: an initiative that takes
+  over a week of consecutive days is exactly the one whose state no longer fits
+  in any single note. `--min-span` is unchanged, so the old bar is one flag away.
+
 ## [0.40.0] - 2026-08-31
 
 ### Added
