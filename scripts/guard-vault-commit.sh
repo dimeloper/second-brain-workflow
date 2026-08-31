@@ -247,10 +247,19 @@ fi
 # copied in once by a human, not written by update-second-brain), not
 # capture content — but it's still vault-repo content only this allowlist
 # protects, so it belongs here rather than working around the guard.
+#
+# projects/*: per-initiative context documents — the current state of a
+# multi-week piece of work that spans dozens of daily notes and has produced no
+# practice note. Not a daily note (those are dated and only ever grow; this one
+# is revised in place, because a sentence that was true three weeks ago has to
+# be corrected rather than appended to), and not a practice note (no reusable
+# rule, no maturity, no promotion path). Kept out of the allowlist, the one
+# artefact most worth carrying across sessions was the one the tooling refused
+# to carry: permanently untracked, invisible to any other machine.
 while IFS= read -r f; do
   [ -n "${f}" ] || continue
   case "${f}" in
-    practices/*|bases/*|00-maps/*|_templates/*) ;;
+    practices/*|bases/*|00-maps/*|_templates/*|projects/*) ;;
     vault.json|.gitignore) ;;
     .obsidian/*) ;;
     .github/workflows/*.yml|.github/workflows/*.yaml) ;;

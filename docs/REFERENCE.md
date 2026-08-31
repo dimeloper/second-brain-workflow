@@ -101,7 +101,8 @@ computed against a guessed bar names specific notes as ready when they are not.
 ## The vault
 
 Long-form practice notes live in your vault (`practices/**`) —
-`~/vaults/second-brain` by default, overridable via `SBW_VAULT`.
+`~/vaults/second-brain` by default, overridable via `SBW_VAULT`. Per-initiative
+context documents live beside them in [`projects/**`](#project-notes).
 
 Agents start from the generated index `practices/INDEX.md` — one file listing
 every note with its maturity, repo count, tags and a one-line rule — and open
@@ -118,13 +119,102 @@ Three skills own the vault, and the read/write split is deliberate:
 |-------|------|
 | `obsidian-knowledge-base` | **read only** — find applicable notes, score work against them |
 | `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
-| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first |
+| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first, plus anything closed without being finished |
 
 Say **update second brain** at the end of a session to capture and publish it,
 or **check my tasks** any morning to see what's still open. "Recent" is
 deliberately narrow — a commitment that fell out of that window is `make audit`'s
 job instead (via `check-followups.py`), part of the [Review loop](#review-loop),
 not a skill.
+
+### Project notes
+
+A fifth kind of vault content, alongside daily notes, practice notes, `00-maps/`
+and `bases/`: `projects/<initiative>.md`, one document per long-running piece of
+work. It is what you would hand a fresh session so it does not re-derive six
+weeks of daily notes — who is involved, what was decided when, which options are
+still live, which claims were verified and which are second-hand, and what is
+open.
+
+It is deliberately neither of the two things it looks like:
+
+| | Daily note | Practice note | Project note |
+|---|---|---|---|
+| Shape | dated, append-only | a reusable rule | one initiative's current state |
+| Edited | never rewritten | revised constantly | **revised in place** |
+| Promotes | no | `idea` → `trialing` → `enforced` | **never** |
+| Agent may write | freely | only after approval | freely; **deletions proposed** |
+
+A daily note cannot hold this, because the document has to be *corrected* when a
+plan is superseded and a daily note only ever grows — splitting one initiative
+across twenty dated notes is the problem it exists to solve. A practice note
+cannot hold it either: initiative context is specifically not reusable, has no
+maturity bar, and must never promote. `00-maps/` is indices over other notes,
+not standalone documents.
+
+The write semantics sit between the two, and the vault says so in its own
+`practices/cross-cutting/propose-then-approve-vault-writes.md`: add and revise
+freely, because a wrong line in a record is cheap and self-correcting — but
+**propose deletions**, because unlike a daily note this one is rewritten, and an
+agent revising it can silently drop a fact rather than merely add a wrong one.
+Adding is recoverable by reading; a removal leaves nothing to read.
+
+`_templates/project-note.md` carries the sections that keep recurring — TL;DR,
+cast, timeline, contested points, open questions, artifacts and links — and a
+per-claim `[verified]` / `[second-hand]` marker, because a document assembled
+partly from what somebody said is only safe to trust if it says which half that
+was. `build-vault-index.py` writes `projects/INDEX.md` alongside the practices
+index, and only once the directory holds a note: a vault with none regenerates
+to exactly the bytes it had before, so no adopter's `--check` goes red for a
+change they did not make.
+
+**Existing vaults keep working unchanged.** `make upgrade` never writes a vault,
+so an upgrade leaves `projects/` absent and the commit guard simply permitting a
+path nothing has created. The directory and its template arrive when you ask for
+them:
+
+```bash
+./scripts/init-vault.sh --path ~/vaults/work-brain --id work --adopt
+```
+
+There is also a backfill: `make project-candidates` reports which long-running
+initiatives the daily notes already evidence, and saying **backfill project
+docs** has `update-second-brain` draft one document per candidate, show each
+draft, and write only the ones approved, one at a time. Incomplete and guessed
+drafts are expected — a draft assembled from six weeks of notes is almost
+entirely `[second-hand]` and says so. Nothing is ever constructed silently, and
+nothing is promoted.
+
+### Follow-ups close with an outcome
+
+A `- [x]` records that an item left the list and nothing about how it left, and
+the ways it can leave lead to opposite actions when the question comes back a
+month later. "Done" is finished work you can cite. "Abandoned" is an open risk
+in somebody else's backlog with nobody watching — and once ticked, the two are
+indistinguishable.
+
+So a closed item carries an outcome, written the same way the repo tag is:
+
+```markdown
+- [x] Merge the barcode PR #outcome/done #repo/acme-app
+- [x] Rewrite the importer in Rust #outcome/dropped — the CSV path was fast enough
+- [x] Pin the old migration #outcome/superseded — the OAuth rewrite replaces it
+- [x] Rotate the CRM key #outcome/handed-off #owner/ops-team #repo/acme-backend
+```
+
+`update-second-brain` proposes the outcome whenever it would tick a box, and
+never guesses which of the four it was. `check-follow-ups` and
+`check-followups.py` read them: `done` and `superseded` leave the open list,
+while `dropped` and `handed-off` are reported in a block of their own — **Closed
+without being finished** — as unresolved risk or a named owner, rather than as
+work that happened. A `handed-off` with no `#owner/` says so on the line.
+
+A bare `- [x]` closes exactly as it always did. Every note written before the
+convention is full of them, and reopening those would re-raise years of finished
+work on the strength of a missing tag; once a window contains one outcome tag, a
+footer counts the ticks that carry none. The same outcome is written on a project
+doc when one of its open questions or contested points closes — that day's note
+is where it happened, and the project doc is where the next session looks.
 
 ### Two sessions, one daily note
 

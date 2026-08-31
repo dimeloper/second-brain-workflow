@@ -183,6 +183,11 @@ def _absorb(thread, record, as_of):
     # that said "blocked on the API key" on Monday is still blocked on Tuesday
     # even if Tuesday's rewrite dropped the word. Keep the first one seen.
     thread["flag"] = thread.get("flag") or record.get("flag")
+    # The outcome, by contrast, is the *newest* statement about the task and
+    # replaces whatever came before: an item raised on Monday and dropped on
+    # Wednesday is dropped, and Monday's silence is not evidence against that.
+    thread["outcome"] = record.get("outcome")
+    thread["owner"] = record.get("owner")
 
 
 def _match(threads, record):
@@ -236,12 +241,20 @@ def build(records, as_of, done=()):
         if closer is None:
             open_threads.append(thread)
         else:
-            thread["closed_by"] = closer
+            thread["closed_by"] = closer["date"]
+            thread["closed_outcome"] = closer.get("outcome")
             ticked.append(thread)
     return open_threads, ticked
 
 
 def _closed_by(thread, done):
+    """The ticked record that closes this thread, or None.
+
+    The record rather than its date, because *how* it closed is now part of the
+    answer — and only a closing tick reaches here: the caller keeps
+    `#outcome/dropped` and `#outcome/handed-off` items in the open stream, where
+    they thread normally and end up carrying their outcome forward.
+    """
     last = thread["dates"][-1]
     for record in sorted(done, key=lambda r: r["date"]):
         if record["date"] <= last:
@@ -249,7 +262,7 @@ def _closed_by(thread, done):
         if record.get("repo") != thread.get("repo"):
             continue
         if same_thread(thread["item"], record["item"]):
-            return record["date"]
+            return record
     return None
 
 

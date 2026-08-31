@@ -24,6 +24,14 @@ the total is unchanged, the counts say how many exist, and anything flagged
 `blocked` or `credential` is listed in full whatever repo it belongs to, because
 that kind of urgency has nothing to do with where you happen to be standing.
 
+A ticked item carrying `#outcome/dropped` or `#outcome/handed-off` is reported
+too, in a bucket of its own. "Done" and "abandoned" look identical once ticked
+and lead to opposite actions when the question comes back: one is finished work
+you can cite, the other is an open risk in somebody else's backlog with nobody
+watching. A bare `- [x]` closes exactly as it always did — the whole history of
+every vault is bare ticks, and reopening those would be the change nobody asked
+for.
+
 Usage:
   check-followups.py [--vault PATH] [--stale-days N | --recent [N]]
                      [--as-of YYYY-MM-DD] [--repo NAME | --no-repo-grouping]
@@ -42,11 +50,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.followup_threads import as_threads, build  # noqa: E402
-from lib.followups import annotate, current_repo, display  # noqa: E402
+from lib.followups import OUTCOME_UNRESOLVED, annotate  # noqa: E402
+from lib.followups import closes, current_repo, display  # noqa: E402
 from lib.followups import done_followups, flag_for  # noqa: E402
-from lib.followups import group_for_repo  # noqa: E402
+from lib.followups import group_for_repo, outcome_for  # noqa: E402
 from lib.followups import note_context_repo, open_followups  # noqa: E402
-from lib.followups import repo_file_index, vault_repos  # noqa: E402
+from lib.followups import repo_file_index, unmarked_ticks, vault_repos  # noqa: E402
 from lib.landed import CLOSED, LANDED, UNCHECKED, evaluate, refs  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
@@ -85,13 +94,22 @@ RECENT_SEARCH_CAP_DAYS = 90
 
 
 def collect(notes, as_of, known_repos):
-    """(open items, ticked items) across `notes`, both as records.
+    """(unresolved items, closing ticks, tick counts) across `notes`.
 
-    The ticked ones are never reported. They are collected because an item
+    The closing ticks are never reported. They are collected because an item
     ticked off in a later note closes the same task still sitting unchecked in an
     older one — see lib/followup_threads.build.
+
+    A tick carrying `#outcome/dropped` or `#outcome/handed-off` is not one of
+    them. It is an accurate statement that nobody is working on the item and an
+    equally accurate statement that the work did not happen — an accepted risk,
+    or somebody else's backlog with a name against it. Those go into the first
+    list, thread like any open item, and carry their outcome to the report.
+    A bare `- [x]`, which is what every note written before the convention
+    contains, closes exactly as it always did.
     """
     out, done = [], []
+    ticks = {"marked": 0, "unmarked": 0}
     for note_date, path in notes:
         text = path.read_text(encoding="utf-8")
         # Resolved once per note, not once per item — every item in a note
@@ -99,12 +117,18 @@ def collect(notes, as_of, known_repos):
         context = note_context_repo(text, known_repos) if known_repos else None
 
         def record(item, note_date=note_date, context=context):
+            outcome, owner = outcome_for(item)
             return {"date": note_date, "age": (as_of - note_date).days,
-                    "item": item, "context": context, "flag": flag_for(item)}
+                    "item": item, "context": context, "flag": flag_for(item),
+                    "outcome": outcome, "owner": owner}
 
         out.extend(record(item) for item in open_followups(text))
-        done.extend(record(item) for item in done_followups(text))
-    return out, done
+        for item in done_followups(text):
+            (done if closes(item) else out).append(record(item))
+        unmarked = len(unmarked_ticks(text))
+        ticks["unmarked"] += unmarked
+        ticks["marked"] += len(done_followups(text)) - unmarked
+    return out, done, ticks
 
 
 def audit(vault, stale_days, as_of, known_repos=frozenset()):
@@ -124,7 +148,7 @@ def recent(vault, count, as_of, known_repos=frozenset()):
     been sitting — but it never decides membership, which is the whole difference
     from audit() above.
 
-    Returns (items, ticked, notes_used). Search stops at RECENT_SEARCH_CAP_DAYS so a vault
+    Returns (items, ticked, ticks, notes_used). Search stops at RECENT_SEARCH_CAP_DAYS so a vault
     whose notes thin out reports what it found instead of walking its whole
     history; the caller says so rather than implying the window was full.
     """
@@ -132,15 +156,31 @@ def recent(vault, count, as_of, known_repos=frozenset()):
               if 0 <= (as_of - d).days <= RECENT_SEARCH_CAP_DAYS]
     picked = sorted(within, key=lambda pair: pair[0], reverse=True)[:count]
     picked.sort(key=lambda pair: pair[0])
-    stale, done = collect(picked, as_of, known_repos)
-    return stale, done, [d for d, _ in picked]
+    stale, done, ticks = collect(picked, as_of, known_repos)
+    return stale, done, ticks, [d for d, _ in picked]
+
+
+def outcome_mark(s):
+    """What the tick actually said, when it said something other than "done".
+
+    Rendered in words rather than echoed as the raw `#outcome/` tag, and only
+    for the outcomes that leave work behind — a `done` or `superseded` item is
+    not in this report at all, so labelling one would be labelling nothing.
+    """
+    outcome = s.get("outcome")
+    if outcome not in OUTCOME_UNRESOLVED:
+        return ""
+    if outcome == "handed-off":
+        owner = s.get("owner")
+        return f"[handed off → {owner}] " if owner else "[handed off, no owner recorded] "
+    return f"[{outcome}] "
 
 
 def line_for(s):
     # The flag is a marker in place, never a second listing of the same item —
     # the contract is that every item appears exactly once, and a "blockers
     # first" section that then re-lists them under their repo breaks it.
-    mark = f"[{s['flag']}] " if s.get("flag") else ""
+    mark = outcome_mark(s) + (f"[{s['flag']}] " if s.get("flag") else "")
     return f"  - {s['date'].isoformat()} ({s['age']} days open): {mark}{display(s['item'])}"
 
 
@@ -211,6 +251,40 @@ def lift_done(groups):
     # is how everything else in this report is ordered.
     done.sort(key=lambda pair: pair[0]["date"])
     return done, tuple(rest)
+
+
+def unresolved(thread):
+    """Ticked, and not finished — an accepted risk or somebody else's backlog."""
+    return thread.get("outcome") in OUTCOME_UNRESOLVED
+
+
+def lift_unresolved(groups):
+    """Pull the dropped and handed-off threads out into a bucket of their own.
+
+    They are not open work and they are not finished work, and putting them in
+    either list misreports them: mixed into the open items they read as things
+    still being carried, and hidden with the ticks they read as done. The whole
+    point of recording the outcome is that those two lead to opposite actions.
+    """
+    out, rest = [], []
+    for bucket in groups:
+        kept = []
+        for thread, note in bucket:
+            (out if unresolved(thread) else kept).append((thread, note))
+        rest.append(kept)
+    out.sort(key=lambda pair: pair[0]["date"])
+    return out, tuple(rest)
+
+
+def unresolved_block(threads):
+    """The "nobody is working on this, and it isn't done" section."""
+    if not threads:
+        return []
+    lines = ["", f"Closed without being finished ({counted(threads)}) — "
+                 "dropped, or somebody else's now"]
+    for thread, note in threads:
+        lines.extend(lines_for(thread, note, show_repo=True))
+    return lines
 
 
 GH_MISSING_SUFFIX = "gh not installed"
@@ -323,7 +397,8 @@ def done_block(done):
     return lines
 
 
-def brief_report(stale, vault, header, repo, basis, groups, done=(), footers=()):
+def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
+                 footers=()):
     """This repo in full; every other repo as a count. Nothing dropped.
 
     The asymmetry is the point: run from a repo, the items you can act on now are
@@ -340,6 +415,10 @@ def brief_report(stale, vault, header, repo, basis, groups, done=(), footers=())
                  "Nothing is filtered — run without --brief for every item.")
 
     lines.extend(done_block(done))
+    # Above the count-collapsed groups for the same reason a blocker is: what a
+    # dropped or handed-off item needs is a decision, and it is the one kind of
+    # item nobody will go looking for, since it no longer reads as open.
+    lines.extend(unresolved_block(unres))
 
     promoted = [(s, note) for s, note in (elsewhere + unknown) if s.get("flag")]
     if promoted:
@@ -380,7 +459,7 @@ def total_phrase(threads):
 
 
 def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
-           window=None, brief=False, done=(), footers=()):
+           window=None, brief=False, done=(), unres=(), footers=()):
     """The audit as text. Oldest first, and grouped by repo when we know one.
 
     The count line comes before any grouping and counts everything, so the
@@ -412,12 +491,13 @@ def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
 
     if brief:
         return brief_report(stale, vault, lines[-1], repo, basis, groups, done,
-                            footers)
+                            unres, footers)
 
     mine, elsewhere, unknown = groups
     lines.append(f"Grouped by repo. This repo is `{repo}` (from {basis}); "
                  "every item above is listed below exactly once.")
     lines.extend(done_block(done))
+    lines.extend(unresolved_block(unres))
     for title, bucket, show_repo in (
         (f"This repo — {repo} ({counted(mine)})", mine, False),
         (f"Other repos ({counted(elsewhere)})", elsewhere, True),
@@ -503,10 +583,10 @@ def main():
 
     window = None
     if args.recent is not None:
-        items, ticked, dates = recent(vault, args.recent, as_of, known)
+        items, ticked, ticks, dates = recent(vault, args.recent, as_of, known)
         window = (args.recent, dates)
     else:
-        items, ticked = audit(vault, args.stale_days, as_of, known)
+        items, ticked, ticks = audit(vault, args.stale_days, as_of, known)
 
     # Attribution happens here rather than inside the grouping, because
     # threading needs each item's repo before there is anything to group.
@@ -538,11 +618,24 @@ def main():
     # No repo to compare against means nothing could land in "this repo", and
     # three headings over one populated bucket is worse than no headings at all.
     # Fall back to the flat list and say why.
-    done = ()
+    # Only reported once the vault has started recording outcomes at all.
+    # Every note written before the convention is full of bare ticks, and a
+    # count of those on every run is a number nobody can act on — it would read
+    # as a backlog when it is just history.
+    if ticks["marked"] and ticks["unmarked"]:
+        footers.extend(["", f"{ticks['unmarked']} ticked item(s) in this window "
+                            "carry no #outcome/ tag — `- [x]` alone does not say "
+                            "whether the work was done, dropped, superseded or "
+                            "handed off."])
+
+    done, unres = (), ()
     if repo:
         groups = group_for_repo(stale, repo, known, repo_files,
                                 text=lambda s: s["item"],
                                 context=lambda s: s["context"])
+        # Before lift_done: an item its author recorded as dropped is dropped,
+        # whatever a PR probe says about the ref it happens to name.
+        unres, groups = lift_unresolved(groups)
         done, groups = lift_done(groups)
     elif stale and not args.no_repo_grouping:
         print(f"note: not grouping by repo — {basis}.", file=sys.stderr)
@@ -551,7 +644,7 @@ def main():
                   "showing every item.", file=sys.stderr)
 
     print(report(stale, vault, args.stale_days, repo, basis, groups, window,
-                 brief=args.brief and groups is not None, done=done,
+                 brief=args.brief and groups is not None, done=done, unres=unres,
                  footers=footers))
     return 0
 

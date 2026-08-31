@@ -164,7 +164,7 @@ The daily note it writes:
 
 ## Follow-ups
 - [ ] Add a test that fails without the timeout, per PR feedback #repo/payments-service
-- [x] Bumped the client's retry count to match #repo/payments-service
+- [x] Bumped the client's retry count to match #outcome/done #repo/payments-service
 
 ## Practices followed
 - bound-every-outbound-call-with-a-timeout
@@ -182,9 +182,12 @@ Next morning, in any repo:
 
 `check-follow-ups` reports the one open item above — under **this repo** when
 run from `payments-service`, under **other repos** anywhere else, and never
-hidden either way. It walks back to the last daily notes that actually exist
-rather than a fixed number of calendar days, so a weekend, a holiday or a
-vacation gap does not swallow anything.
+hidden either way. A closed item records *how* it closed, not just that it did:
+`#outcome/done` leaves the list, `#outcome/dropped` and `#outcome/handed-off`
+stay visible, because "finished" and "abandoned" look identical once ticked and
+lead to opposite actions when the question comes back. It walks back to the last
+daily notes that actually exist rather than a fixed number of calendar days, so a
+weekend, a holiday or a vacation gap does not swallow anything.
 
 That is the whole loop. Say **onboard repo** in a project to wire rules into it,
 and keep going. Practice notes accumulate from what you actually did — do not

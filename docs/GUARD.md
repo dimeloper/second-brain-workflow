@@ -16,8 +16,8 @@ One vault per machine, each with its own `vault.json` (`id`, `remote`):
 ```
 
 It scaffolds `practices/{app,backend,frontend,cross-cutting}`, `_templates/`,
-`00-maps/`, `bases/`, a `.gitignore` and `vault.json`, runs `git init`, and
-generates an empty index. It seeds no *domain* practice notes — those are earned
+`00-maps/`, `bases/`, `projects/`, a `.gitignore` and `vault.json`, runs
+`git init`, and generates an empty index. It seeds no *domain* practice notes — those are earned
 from real work — but does write the four cross-cutting notes describing how the
 vault itself operates, because `update-second-brain` reads them at runtime.
 Re-running is safe; `--adopt` lets it fill gaps in an existing vault — and,
@@ -58,8 +58,10 @@ or, so it doesn't need the flag every time, set once per machine in
 SBW_EXPECTED_VAULT_ID=work
 ```
 
-It blocks a staged path outside the vault's allowed set, a `vault.json` id that
-isn't the one this machine expects, an `origin` that doesn't match the one
+The allowed set is `practices/`, `projects/`, `_templates/`, `00-maps/`,
+`bases/`, `.obsidian/`, `.github/workflows/*.yml`, `vault.json`, `.gitignore`,
+and `YYYY-MM-DD.md` at the root. It blocks a staged path outside that set, a
+`vault.json` id that isn't the one this machine expects, an `origin` that doesn't match the one
 recorded in `vault.json`, a commit author that isn't the identity `vault.json`
 declares, an implausibly large diff, deletion of an `enforced` note, content
 vanishing from a daily note, conflict markers, and anything that looks like a
@@ -74,7 +76,13 @@ state, and `git status` then reports a clean tree — so nothing anywhere says a
 day's work has gone. It happened twice on one evening; one block was recovered
 only because a transcript was still open.
 
-So a commit that removes lines from a `YYYY-MM-DD.md` is refused. A removed line
+So a commit that removes lines from a `YYYY-MM-DD.md` is refused. Only from
+those: a project doc under `projects/` is revised in place by design — a
+sentence that was true three weeks ago has to be corrected rather than appended
+to — so holding it append-only would be refusing its normal use. What protects a
+project doc from a silent deletion is a rule about who may propose one, not a
+check on the diff: `update-second-brain` adds and revises freely there and
+proposes every removal. A removed line
 is fine if something took its place — the same line, the same line with its
 checkbox ticked, or a line still carrying its opening clause (a typo fix, a
 corrected SHA). What fails is content that simply stopped existing. Practice

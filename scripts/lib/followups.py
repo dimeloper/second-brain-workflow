@@ -33,13 +33,64 @@ FOLLOWUP_DONE_RE = re.compile(r'^-\s\[x\]\s+(.*)$', re.IGNORECASE)
 # for anything hand-typed into Obsidian); this is the exact signal.
 REPO_TAG_RE = re.compile(r'(?:^|\s)#repo/([A-Za-z0-9._-]+)')
 
+# What a tick actually meant. `- [x]` on its own records that an item left the
+# list and nothing about how — and "done" and "abandoned" look identical once
+# ticked while leading to opposite actions when the question comes back. One is
+# finished work you can cite; the other is an open risk sitting in somebody
+# else's backlog with nobody watching it.
+#
+# Same shape as `#repo/` deliberately: one namespace, written by the side that
+# knows, read by the side that reports.
+#
+#   - [x] Merge the barcode PR #outcome/done #repo/acme-app
+#   - [x] Rewrite the importer in Rust #outcome/dropped — the CSV path was fast enough
+#   - [x] Rotate the CRM key #outcome/handed-off #owner/ops-team
+OUTCOME_TAG_RE = re.compile(r'(?:^|\s)#outcome/([a-z][a-z-]*)')
+OWNER_TAG_RE = re.compile(r'(?:^|\s)#owner/([A-Za-z0-9._-]+)')
+
+# Closing outcomes: the item is finished as far as this list is concerned.
+# `superseded` closes because the thing that replaced it is its own item — the
+# question was answered, by a different answer than the one that was proposed.
+OUTCOME_CLOSING = frozenset({"done", "superseded"})
+# Non-closing outcomes: the tick is accurate (nobody is working on it) and the
+# work is not finished. `dropped` is a decision to accept a risk; `handed-off`
+# is that risk with a name against it. Both stay visible, because the reason
+# they were ticked is exactly the reason they stop being looked at.
+OUTCOME_UNRESOLVED = frozenset({"dropped", "handed-off"})
+OUTCOMES = OUTCOME_CLOSING | OUTCOME_UNRESOLVED
+
+
+def outcome_for(item):
+    """(outcome, owner) for a ticked item — either may be None.
+
+    An unrecognised `#outcome/<word>` is returned as-is rather than dropped: the
+    vocabulary is this engine's, the notes are the user's, and silently reading
+    an outcome nobody here anticipated as "no outcome" would report a considered
+    decision as an unmarked tick.
+    """
+    m = OUTCOME_TAG_RE.search(item)
+    owner = OWNER_TAG_RE.search(item)
+    return (m.group(1) if m else None, owner.group(1) if owner else None)
+
+
+def closes(item):
+    """Does ticking this item take it off the open list?
+
+    True for an unmarked `- [x]`, which is what every note written before this
+    convention contains — a report that reopened those would be re-raising years
+    of finished work on the strength of a missing tag.
+    """
+    outcome, _ = outcome_for(item)
+    return outcome not in OUTCOME_UNRESOLVED
+
+
 # A bare repo name mentioned in prose, in any of the forms these items actually
 # use: backticked, bare, or as a path segment (`~/vaults/second-brain`). Bounded
 # on both sides by word characters and `-` only — that is what keeps
 # `housemaster-backend` from matching a repo named `backend`, and
 # `second-brain-workflow` from matching one named `second-brain`, while still
 # matching a name that happens to follow a `/`.
-def _mention_re(repo):
+def mention_re(repo):
     return re.compile(r'(?<![\w-])' + re.escape(repo) + r'(?![\w-])')
 
 
@@ -73,13 +124,21 @@ _FLAG_RES = tuple((name, tuple(re.compile(p, re.IGNORECASE) for p in pats))
 
 
 def display(item):
-    """The item as a reader wants it: without the `#repo/` machinery.
+    """The item as a reader wants it: without the tag machinery.
 
-    The tag exists to be matched on, and once it has been, echoing it back on
+    A tag exists to be matched on, and once it has been, echoing it back on
     every line is noise — worse on the current repo's own list, where it repeats
-    identically all the way down.
+    identically all the way down. `#outcome/` and `#owner/` go for the same
+    reason: the report renders what they mean on the line, in words.
     """
-    return REPO_TAG_RE.sub("", item).rstrip()
+    out = REPO_TAG_RE.sub("", item)
+    stripped = OWNER_TAG_RE.sub("", OUTCOME_TAG_RE.sub("", out))
+    if stripped != out:
+        # Removing a trailing tag can leave the dash that introduced it hanging
+        # ("… #outcome/dropped —"). Only ever cleaned up when a tag actually
+        # went, so an item that genuinely ends in a dash keeps it.
+        out = stripped.rstrip().rstrip("—-")
+    return out.rstrip()
 
 
 def flag_for(item):
@@ -156,8 +215,23 @@ def done_followups(text):
     read so that an item ticked off in *today's* note can close the same task
     left unchecked in an older one, which is otherwise reported as open forever
     — the older wording is never gone back and edited, and shouldn't have to be.
+
+    Every tick, whatever it says. Callers split them with closes() above: a
+    `#outcome/dropped` or `#outcome/handed-off` tick is a real statement about
+    the item and not a claim that the work happened.
     """
     return _collect(text, FOLLOWUP_DONE_RE)
+
+
+def unmarked_ticks(text):
+    """`- [x]` items carrying no `#outcome/` tag at all.
+
+    Counted, never listed. The point is not to nag about history — every note
+    written before the convention is full of these — but to say, once a vault has
+    started recording outcomes, how much of the window still cannot answer "was
+    that finished, or abandoned?".
+    """
+    return [item for item in done_followups(text) if not OUTCOME_TAG_RE.search(item)]
 
 
 REPO_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
@@ -240,7 +314,7 @@ def note_context_repo(text, known_repos):
         if in_built:
             built.append(line)
     blob = "\n".join(built)
-    hits = {r for r in known_repos if _mention_re(r).search(blob)}
+    hits = {r for r in known_repos if mention_re(r).search(blob)}
     return hits.pop() if len(hits) == 1 else None
 
 
@@ -302,7 +376,7 @@ def attribute(item, known_repos, current=None, repo_files=None, context=None):
     if m:
         return m.group(1), "#repo tag"
 
-    hits = sorted(r for r in known_repos if _mention_re(r).search(item))
+    hits = sorted(r for r in known_repos if mention_re(r).search(item))
     if len(hits) == 1:
         return hits[0], "repo named in the item"
     if len(hits) > 1:

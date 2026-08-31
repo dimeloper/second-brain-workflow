@@ -114,6 +114,31 @@ assert_exit 1 $? "blocks a staged path outside the allowed set"
 git -C "${VAULT}" rm -q --cached "somewhere/file.md" >/dev/null 2>&1
 rm -rf "${VAULT}/somewhere"
 
+# --- projects/*: allowed (per-initiative context docs) ---------------------
+# The one artefact most worth carrying across sessions was the one the guard
+# refused to carry: a project doc at projects/<initiative>.md stayed permanently
+# untracked, invisible to every other machine. Left staged for the same reason
+# the workflow file below is.
+mkdir -p "${VAULT}/projects"
+printf -- '---\nkind: project\nstatus: active\n---\n\n# An initiative\n\n## TL;DR\n- where it is now\n' \
+  > "${VAULT}/projects/an-initiative.md"
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "allows a projects/ context document"
+
+# Revised in place, not append-only. The daily-note check must not reach it: a
+# project doc exists precisely so a superseded sentence can be corrected rather
+# than appended to, and holding it append-only would refuse its normal use.
+git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "projects" \
+  -- projects >/dev/null 2>&1
+printf -- '---\nkind: project\nstatus: active\n---\n\n# An initiative\n\n## TL;DR\n- somewhere else entirely\n' \
+  > "${VAULT}/projects/an-initiative.md"
+git -C "${VAULT}" add projects >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "a project doc may lose a line — it is revised, not appended to"
+git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "revise" \
+  -- projects >/dev/null 2>&1
+
 # --- .github/workflows/*.yml: allowed (docs/vault-ci templates) ------------
 # Left staged, not committed here — the next block's "notes" commit already
 # finalizes whatever's staged at that point, and committing early would eat

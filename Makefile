@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index adopt \
-        vault-index-check sync-skills fetch-skills skills-for practices-for uninstall upgrade explain render repos-check guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for practices-for project-candidates uninstall upgrade explain render repos-check guard doctor audit \
         init \
         verify-claude check release-check
 
@@ -33,6 +33,7 @@ help:
 	@echo "make fetch-skills        preview fetching declared skill sources; YES=1 to act"
 	@echo "make skills-for REPO=... which skills apply to a repo, adopted and candidate"
 	@echo "make practices-for REPO=... vault notes that govern a repo but were never applied"
+	@echo "make project-candidates  which long-running initiatives the daily notes evidence"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make adopt               preview turning on the opt-in features; YES=1 to act"
@@ -92,6 +93,7 @@ lint-python:
 	  scripts/lib/frontmatter.py scripts/lib/registry.py scripts/lib/skill_manifest.py \
 	  scripts/lib/repo_match.py scripts/lib/promotion.py scripts/practices-for.py \
 	  scripts/lib/followups.py scripts/lib/followup_threads.py scripts/lib/landed.py \
+	  scripts/project-candidates.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -181,6 +183,15 @@ skills-for:
 practices-for:
 	@if [ -z "$(REPO)" ]; then echo "usage: make practices-for REPO=/path/to/repo" >&2; exit 2; fi
 	@./scripts/practices-for.py --repo "$(REPO)" --vault "$(VAULT)"
+
+# Which long-running initiatives the daily notes already evidence, and which of
+# those have no project doc. Read-only, and deliberately not a writer: drafting
+# one is update-second-brain's backfill mode, which shows every draft and writes
+# only what is approved. Not part of `make audit` — a missing project doc is a
+# thing you might want, not drift.
+project-candidates:
+	@./scripts/project-candidates.py --vault "$(VAULT)" \
+	  $(if $(NOTES),--notes $(NOTES),) $(if $(ALL),--all,)
 
 # The gate the release practice was missing. Deliberately NOT part of `make
 # check`: this one reads the network and asks about a specific commit, and it is

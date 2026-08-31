@@ -161,6 +161,68 @@ EOF
 "${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
 assert_contains "${VAULT}/practices/INDEX.md" 'new-note' "picks up a new note"
 
+# --- projects/INDEX.md ------------------------------------------------------
+# The compatibility guarantee first, again: a vault that has never written a
+# project doc must regenerate to exactly the bytes it had before this engine
+# knew about them, or every adopter's next --check goes red for a change they
+# did not make. An empty projects/ directory is that state too, not a stale one.
+mkdir -p "${VAULT}/projects"
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+assert_no_file "${VAULT}/projects/INDEX.md" \
+  "an empty projects/ gets no index — nothing to index is not staleness"
+"${INDEX}" --vault "${VAULT}" --check >/dev/null 2>&1
+assert_exit 0 $? "...and --check is not made red by its absence"
+
+cat > "${VAULT}/projects/vendor-migration.md" <<'EOF'
+---
+kind: project
+status: active
+started: 2026-01-04
+last-reviewed: 2026-03-02
+repos: ["alpha-service", "beta-app"]
+tags: [migration]
+---
+
+# Vendor migration
+
+<!-- an explanatory comment the template ships, which is not content -->
+
+## TL;DR
+
+- The vendor deprecates the v1 API in June [verified]
+
+## Timeline
+
+- 2026-01-04 — started [verified]
+EOF
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+assert_file "${VAULT}/projects/INDEX.md" "one project doc produces an index"
+assert_contains "${VAULT}/projects/INDEX.md" 'vendor-migration' "lists the initiative"
+assert_contains "${VAULT}/projects/INDEX.md" 'active' "carries its status"
+assert_contains "${VAULT}/projects/INDEX.md" 'The vendor deprecates' \
+  "summarises the TL;DR, not the template's comment"
+assert_contains "${VAULT}/projects/INDEX.md" 'alpha-service, beta-app' "names the repos"
+
+# A project doc is not a practice note, and the two indexes must not bleed: a
+# row in the practices index would put an initiative one careless read away from
+# being cited as a rule.
+assert_not_contains "${VAULT}/practices/INDEX.md" 'vendor-migration' \
+  "a project doc never appears in the practices index"
+assert_not_contains "${VAULT}/projects/INDEX.md" '| Maturity |' \
+  "and the projects index has no maturity column — nothing here promotes"
+
+cp "${VAULT}/projects/INDEX.md" "${SANDBOX}/projects-first.md"
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+diff -q "${SANDBOX}/projects-first.md" "${VAULT}/projects/INDEX.md" >/dev/null 2>&1
+assert_exit 0 $? "two runs produce an identical projects index"
+
+"${INDEX}" --vault "${VAULT}" --check >/dev/null 2>&1
+assert_exit 0 $? "--check passes when the projects index is current"
+echo "| tampered |" >> "${VAULT}/projects/INDEX.md"
+"${INDEX}" --vault "${VAULT}" --check >/dev/null 2>&1
+assert_exit 1 $? "--check exits 1 when the projects index is stale"
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+
 # Config resolution, and a missing vault fails with a message not a traceback.
 printf 'SBW_VAULT=%s\n' "${VAULT}" > "${SANDBOX}/config"
 SBW_CONFIG_FILE="${SANDBOX}/config" "${INDEX}" --check >/dev/null 2>&1

@@ -13,7 +13,7 @@ echo "init-vault.sh"
 assert_exit 0 $? "creates a vault"
 
 for d in practices/app practices/backend practices/frontend practices/cross-cutting \
-         _templates 00-maps bases; do
+         _templates 00-maps bases projects; do
   TESTS_RUN=$((TESTS_RUN + 1))
   if [ -d "${V}/${d}" ]; then pass "created ${d}/"; else fail "created ${d}/"; fi
 done
@@ -44,6 +44,37 @@ else
   fail "the daily template describes the optional ## Resume here block" \
     "$(cat "${V}/_templates/daily-note.md")"
 fi
+assert_file "${V}/_templates/project-note.md"       "writes the project template"
+
+# projects/ is scaffolded empty. Git does not track an empty directory, so
+# without a .gitkeep a fresh clone arrives without it and the first project doc
+# lands somewhere nobody could see was intended.
+assert_file "${V}/projects/.gitkeep"               "projects/ survives a clone"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -z "$(find "${V}/projects" -name '*.md' -print -quit)" ]; then
+  pass "projects/ starts empty — a project doc is earned, not scaffolded"
+else
+  fail "projects/ starts empty — a project doc is earned, not scaffolded"
+fi
+
+# A project doc is neither a practice note nor a daily note, and the template is
+# the only place a reader learns which. Both halves matter: the claim marker is
+# what keeps a second-hand assertion from reading as verified, and the outcome
+# tag is what keeps a closed question from reading as an answered one.
+for want in 'TL;DR' 'Cast' 'Timeline' 'Contested points' 'Open questions' \
+            'Artifacts and links' 'second-hand' 'verified' '#outcome/'; do
+  assert_contains "${V}/_templates/project-note.md" "${want}" \
+    "the project template carries ${want}"
+done
+assert_contains "${V}/_templates/project-note.md" 'never promotes' \
+  "...and says plainly that it never promotes"
+
+# The daily template is where an item typed straight into Obsidian learns the
+# convention. A bare `- [x]` cannot say whether work was finished or abandoned,
+# and those lead to opposite actions when the question comes back.
+assert_contains "${V}/_templates/daily-note.md" '#outcome/' \
+  "the daily template documents the follow-up outcome tag"
+
 assert_file "${V}/00-maps/promotion-candidates.md" "writes the promotion query"
 assert_file "${V}/practices/INDEX.md"              "generates the index"
 assert_contains "${V}/vault.json" '"id": "work"'   "records the vault id"
