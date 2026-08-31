@@ -17,6 +17,36 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`status: standing`, for work that never reaches an end.** Routine dependency
+  upkeep, a quarterly audit, an on-call rotation: it recurs, it is never "done",
+  and it can be neither dropped nor handed off. Previously such a duty read
+  `active` forever and `last-reviewed` became the only field carrying
+  information — while being exactly the "state spans several notes, no single
+  note answers where this is now" case that earns a document. A `standing`
+  project or feature takes no `outcome:` and is never asked for one.
+
+  Chosen over a third `kind:` because it reuses every reader, template and
+  index path already in place; a `kind: duty` would have needed its own of each
+  to express one field's worth of difference.
+
+### Fixed
+- **A `.md` directly inside a project directory is named instead of ignored.**
+  `projects/<project>/` holds `_project.md`, `features/` and `context/`. A file
+  at that level — a misplaced feature, or somebody reaching for the unsupported
+  `projects/<repo>/<initiative>.md` shape — was read by neither the index nor
+  `project-for`, and the silence was indistinguishable from an empty directory.
+  Exactly the quiet asymmetry `lib/projects` exists to prevent, through a
+  different door.
+
+- **`projects/` with documents but without its templates now warns.** That state
+  is reachable by doing nothing unusual — create the directory by hand, write a
+  doc into it — and was invisible, because both readers key off `repos:`
+  frontmatter rather than layout. A wrap-up would then draft from two templates
+  that are not there, read the vault as flat, and entrench the un-adopted layout
+  when the real answer was `init-vault.sh --adopt`. `update-second-brain` checks
+  it before drafting too, rather than relying on the warning having been read.
+
 ## [0.46.1] - 2026-08-31
 
 ### Fixed

@@ -177,6 +177,21 @@ feature has not changed the project, and the correct number of edits to
 
 Neither is either of the two things it looks like:
 
+**A project directory holds `_project.md`, `features/` and `context/` — and
+nothing else.** A `.md` sitting directly inside it is read by neither the index
+nor `project-for`, so `projects/<repo>/<initiative>.md` — a shape people reach
+for, since one repo often carries several unrelated initiatives — is silently
+invisible. The index now names any such file rather than letting it look like an
+empty directory. **Repo-first grouping is not supported**: a project is named
+for the initiative because one initiative spans several repos, and the
+association in the other direction is what `repos:` frontmatter records.
+
+**`status: standing` is for work that never ends.** Routine dependency upkeep, a
+quarterly audit, an on-call rotation — it recurs, it is never done, and it takes
+no `outcome:` because it can be neither dropped nor handed off. Without it such
+a duty reads `active` forever and `last-reviewed` is the only field carrying
+information.
+
 | | Daily note | Practice note | Project / feature |
 |---|---|---|---|
 | Shape | dated, append-only | a reusable rule | one initiative, or one slice of it |

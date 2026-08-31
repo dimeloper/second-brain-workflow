@@ -322,6 +322,100 @@ case "${out}" in
   *) fail "a closed feature with no outcome is warned about" "${out}" ;;
 esac
 
+# --- a .md directly inside a project directory is read by nothing -----------
+# Either a misplaced feature or somebody reaching for the unsupported
+# projects/<repo>/<initiative>.md shape. The file is invisible to the index and
+# to project-for, and that silence is indistinguishable from an empty
+# directory — so it has to be named.
+mkdir -p "${VAULT}/projects/strayed/features"
+printf -- '---\nkind: project\nstatus: active\nlast-reviewed: 2026-03-11\n---\n\n# Strayed\n\n## TL;DR\n- overview\n' \
+  > "${VAULT}/projects/strayed/_project.md"
+printf -- '---\nkind: feature\nstatus: active\nlast-reviewed: 2026-03-11\n---\n\n# Misplaced\n\n## State\n- here\n' \
+  > "${VAULT}/projects/strayed/api-migration.md"
+out="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"strayed/api-migration.md"*"not read"*)
+    pass "a .md directly inside a project directory is named as unread" ;;
+  *) fail "a stray .md inside a project directory is named" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"move it into features/"*) pass "and the warning says where it should go" ;;
+  *) fail "the stray warning says where it should go" "${out}" ;;
+esac
+# _project.md is the overview, not a stray.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"strayed/_project.md"*"not read"*)
+    fail "_project.md is never reported as a stray" "${out}" ;;
+  *) pass "_project.md is never reported as a stray" ;;
+esac
+rm -rf "${VAULT}/projects/strayed"
+
+# --- status: standing, for work that never reaches an end -------------------
+# Routine upkeep recurs and never closes. Without it such a duty reads active
+# forever and last-reviewed is the only field carrying information.
+mkdir -p "${VAULT}/projects/upkeep/features"
+printf -- '---\nkind: project\nstatus: standing\nlast-reviewed: 2026-03-11\n---\n\n# Upkeep\n\n## TL;DR\n- recurs, never done\n' \
+  > "${VAULT}/projects/upkeep/_project.md"
+printf -- '---\nkind: feature\nstatus: standing\nlast-reviewed: 2026-03-11\n---\n\n# Rotation\n\n## State\n- every few weeks\n' \
+  > "${VAULT}/projects/upkeep/features/rotation.md"
+out="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"unknown status: standing"*) fail "standing is a known status" "${out}" ;;
+  *) pass "standing is a known status, on a project and on a feature" ;;
+esac
+# It never closes, so the closed-with-no-outcome check must not reach it.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *rotation*"closed with no outcome"*)
+    fail "a standing feature is not asked for an outcome" "${out}" ;;
+  *) pass "a standing feature is not asked for an outcome" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(cat "${VAULT}/projects/INDEX.md")" in
+  *standing*) pass "standing appears in the generated index" ;;
+  *) fail "standing appears in the generated index" "$(cat "${VAULT}/projects/INDEX.md")" ;;
+esac
+rm -rf "${VAULT}/projects/upkeep"
+
+# --- projects/ with documents but no templates ------------------------------
+# Reachable by doing nothing unusual, and invisible because both readers key
+# off frontmatter rather than layout. A wrap-up then drafts from templates that
+# are not there and reads the vault as flat, entrenching the un-adopted layout.
+# This fixture vault has never had _templates/, which is exactly the state.
+out="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"_templates"*"project.md, feature.md are missing"*)
+    pass "missing project templates are named while projects/ holds documents" ;;
+  *) fail "missing project templates are named" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"--adopt"*) pass "and the warning names the one command that fixes it" ;;
+  *) fail "the template warning names --adopt" "${out}" ;;
+esac
+# One template present and one absent must still report, in the singular.
+mkdir -p "${VAULT}/_templates"
+printf '# project template\n' > "${VAULT}/_templates/project.md"
+out_one="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_one}" in
+  *"feature.md is missing"*) pass "one missing template reports in the singular" ;;
+  *) fail "one missing template reports in the singular" "${out_one}" ;;
+esac
+# Both present: silence, or the warning is noise on every healthy vault.
+printf '# feature template\n' > "${VAULT}/_templates/feature.md"
+out_both="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_both}" in
+  *"_templates"*missing*) fail "no template warning when both are present" "${out_both}" ;;
+  *) pass "no template warning when both are present" ;;
+esac
+
 rm -rf "${VAULT}/projects/no-overview" "${VAULT}/projects/auth-rewrite"
 "${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
 TESTS_RUN=$((TESTS_RUN + 1))
