@@ -59,10 +59,9 @@ write release notes, not two to keep in sync by hand.
   scores a fourth list, **Project**: where the session leaves the initiative,
   cited to the feature file it belongs on.
 
-  Skills that need brand, audience, voice or product context — image generation,
-  ASO, copywriting — call `project-for` too rather than keeping their own copy.
-  The vault is the source, and a second copy inside a skill is a copy that goes
-  stale without anyone noticing.
+  Skills that need brand, audience, voice or product context call `project-for`
+  too rather than keeping their own copy. The vault is the source, and a second
+  copy inside a skill is a copy that goes stale without anyone noticing.
 - **One reader for what counts as a project.** `lib/projects.discover()` now
   owns the layout — which file is the overview, where the features sit, and that
   a flat `projects/<name>.md` is still a project — and both `build-vault-index.py`

@@ -293,10 +293,9 @@ failure and teach every caller to ignore it.
 The read-side skill runs this: `obsidian-knowledge-base` loads the project
 context before it reads a practice note, because a practice says how to write
 the code and the project says what the code is for and what has already been
-decided against. Skills that need brand, audience, voice or product context —
-image generation, ASO, copywriting — call it too rather than keeping their own
-copy. **The vault is the source**, and a second copy inside a skill is a copy
-that goes stale without anyone noticing.
+decided against. Skills that need brand, audience, voice or product context
+call it too rather than keeping their own copy. **The vault is the source**, and
+a second copy inside a skill is a copy that goes stale without anyone noticing.
 
 Project context is deliberately **not rendered** into `.cursor/rules` or
 `AGENTS.md`. That path is the hot path for reusable conventions on a

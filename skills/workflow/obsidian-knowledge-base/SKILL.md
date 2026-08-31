@@ -70,10 +70,9 @@ a practice here — if it looks reusable, that is a gap for
 `update-second-brain` to write up, not a rule to start applying elsewhere.
 
 **Other skills call this too.** A skill needing brand, audience, voice or
-product context for this repo — image generation, ASO, copywriting, and their
-kind — runs `project-for.py` rather than keeping its own copy of the context.
-The vault is the source; a second copy in a skill is a copy that goes stale
-without anyone noticing.
+product context for this repo runs `project-for.py` rather than keeping its own
+copy of the context. The vault is the source; a second copy in a skill is a copy
+that goes stale without anyone noticing.
 
 ## Then `practices/INDEX.md`, before any practice note
 
