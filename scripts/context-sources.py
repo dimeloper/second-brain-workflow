@@ -60,9 +60,16 @@ TIERS = (
         ("glob", "store/**/*.md"),
     )),
     ("shipped surface", "what the product is, as against what it claims", (
+        # Localisation, across the ecosystems this engine actually meets. Dart
+        # and the Apple toolchain do not use the JS shapes, and a survey that
+        # only knows JS reports a Flutter app as having no shipped surface.
         ("glob", "**/locales/*.json"),
         ("glob", "**/i18n/**/*.json"),
         ("glob", "**/messages/*.json"),
+        ("glob", "**/l10n/*.arb"),
+        ("glob", "**/*.lproj/*.strings"),
+        ("glob", "**/values*/strings.xml"),
+        ("glob", "**/locale/**/*.po"),
         ("glob", "app/**/_layout.tsx"),
         ("glob", "src/app/**/page.tsx"),
         ("glob", "**/paywall*.*"),
@@ -74,7 +81,13 @@ TIERS = (
         ("file", "app.config.js"),
         ("file", "app.json"),
         ("glob", "**/tokens.*"),
-        ("glob", "**/theme.*"),
+        # `theme.*` alone missed app_theme.dart and app_colors.dart, so a
+        # Flutter app with a complete light/dark palette reported an empty
+        # brand tier — and an empty tier tells the reader to record the answer
+        # as unestablished. A false empty is worse than no survey at all.
+        ("glob", "**/*theme*.*"),
+        ("glob", "**/*colors*.*"),
+        ("glob", "**/*palette*.*"),
         ("glob", "**/tailwind.config.*"),
         ("glob", "assets/*.png"),
         ("glob", "assets/*.svg"),
@@ -83,7 +96,8 @@ TIERS = (
 
 # Directories whose contents are never a product's own statement of itself.
 SKIP = {"node_modules", ".git", "dist", "build", ".next", ".expo", "vendor",
-        "Pods", ".venv", "venv", "__pycache__", "coverage", ".turbo"}
+        "Pods", ".venv", "venv", "__pycache__", "coverage", ".turbo",
+        ".dart_tool", "Carthage", "DerivedData", "target", "out"}
 
 MAX_PER_PATTERN = 12
 
