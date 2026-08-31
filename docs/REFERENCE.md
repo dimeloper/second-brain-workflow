@@ -113,13 +113,14 @@ make vault-index          # or: ./scripts/build-vault-index.py [--vault PATH]
 make vault-index-check    # fails if the index is stale
 ```
 
-Three skills own the vault, and the read/write split is deliberate:
+Four skills own the vault, and the read/write split is deliberate:
 
 | Skill | Role |
 |-------|------|
 | `obsidian-knowledge-base` | **read only** — load this repo's project context, find applicable notes, score work against them |
 | `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
 | `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first, plus anything closed without being finished |
+| `extract-product-context` | **read only** — draft a project's `context/` from a product repo's own files, tier by tier, rather than from memory or marketing copy |
 
 Say **update second brain** at the end of a session to capture and publish it,
 or **check my tasks** any morning to see what's still open. "Recent" is
@@ -779,7 +780,7 @@ VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-ski
 
 ### Bringing your own skills
 
-The engine ships five skills of its own and tracks one pinned upstream set. It
+The engine ships six skills of its own and tracks one pinned upstream set. It
 does **not** ship a roster of other people's skills, for the same reason
 [`rules/`](#one-rule-set-every-agent) ships empty: a curated selection of someone
 else's craft skills is an opinion, and the engine's job is the mechanism.
