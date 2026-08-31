@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-08-31
+
 ### Added
 - **`projects/` — a fifth kind of vault content, for long-running initiative
   context.** A per-initiative document: the current state of a multi-week piece
@@ -2800,7 +2802,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.39.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.40.0...HEAD
+[0.40.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.2...v0.39.0
 [0.38.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.1...v0.38.2
 [0.38.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.0...v0.38.1
