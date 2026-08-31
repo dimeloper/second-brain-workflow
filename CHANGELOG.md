@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.45.0] - 2026-08-31
+
 ### Added
 - **`extract-product-context` and `context-sources.py` — read the repo, not the
   marketing copy.** A product defines itself in its repo; everything else
@@ -3111,7 +3113,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.44.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.45.0...HEAD
+[0.45.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.44.0...v0.45.0
 [0.44.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.1...v0.44.0
 [0.43.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.0...v0.43.1
 [0.43.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.42.0...v0.43.0
