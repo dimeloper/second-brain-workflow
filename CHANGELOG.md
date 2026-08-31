@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.46.0] - 2026-08-31
+
 ### Added
 - **`project-for` prints a project's `context/`.** Closes #23. The directory
   could be written and not read: three files sat in one project's `context/`
@@ -3137,7 +3139,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.45.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.0...HEAD
+[0.46.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.44.0...v0.45.0
 [0.44.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.1...v0.44.0
 [0.43.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.0...v0.43.1
