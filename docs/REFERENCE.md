@@ -137,11 +137,21 @@ and `bases/`. A project is a **directory**:
 projects/
   vendor-migration/
     _project.md                     the stable overview
+    context/                        what does not change per session
+      audience.md
+      voice.md
     features/
       csv-importer.md               one slice of work
       auth-cutover.md
   INDEX.md                          generated
 ```
+
+`context/` is optional and holds whatever topics a product needs — the filename
+set is not fixed. It is surfaced by `project-for` and deliberately **not** by
+`projects/INDEX.md`, which is one row per project and one per feature; context
+is neither. Draft it with the [`extract-product-context`](#skills) skill, which
+reads the product repo's own files rather than inferring from notes or store
+copy.
 
 `_project.md` is what you would hand a fresh session so it does not re-derive six
 weeks of daily notes: what the initiative is, who is involved, what constrains
@@ -276,6 +286,15 @@ two cases are not folded together:
 - only a **feature** names it — one slice of another initiative touches this
   repo, so that slice is printed and its siblings are not, with a line saying
   the view is partial
+
+Between the two it prints a **`CONTEXT`** block, when the project has a
+`context/` directory: audience, voice, brand — what does not change per session.
+**Paths only.** The overview is printed whole because it is short and stable;
+context is neither, and a reader knows better than the tool which of the files
+they need. Whatever `.md` files are in there are listed, so a
+`context/pricing.md` appears without a code change, and a project with no
+`context/` prints nothing at all rather than a "none found" line that would
+teach a reader to skim past the block on the projects that do have one.
 
 A feature's decision log, contested points and open questions stay in the file.
 That is the expensive half and the half a session usually does not need;

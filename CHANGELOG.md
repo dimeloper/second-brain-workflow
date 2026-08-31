@@ -17,6 +17,30 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`project-for` prints a project's `context/`.** Closes #23. The directory
+  could be written and not read: three files sat in one project's `context/`
+  and the read path printed none of them — the same write-without-a-reader
+  shape as #15, one level deeper. `lib/projects.discover()` gained a `context`
+  key, and `project-for.py` prints a `CONTEXT` block between the overview and
+  the features.
+
+  **Paths, not contents.** The overview is printed whole because it is short and
+  stable; context is neither — one `audience.md` here is 150 lines — and
+  printing it would bury the overview under exactly the thing the two-file split
+  exists to stop burying it. The reader also knows better than the tool which
+  file they need.
+
+  **Whatever files are there.** No hardcoded `audience|voice|brand` set, so a
+  `context/pricing.md` appears without a code change. **Absent `context/` prints
+  nothing** rather than "none found", which on every run would teach a reader to
+  skim past the block on the projects that do have one.
+
+  `features/` and `context/` are read through one `md_files()` helper, so
+  `context/` cannot grow a subtly different idea of what counts as a file in it.
+  `projects/INDEX.md` is unchanged: it is one row per project and one per
+  feature, and context is neither.
+
 ## [0.45.0] - 2026-08-31
 
 ### Added
