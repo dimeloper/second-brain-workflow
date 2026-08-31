@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-08-31
+
 ### Added
 - **`projects/` has a read path.** `./scripts/project-for.py --repo PATH` (or
   `make project-for REPO=...`) prints what the vault already knows about a
@@ -2970,7 +2972,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.41.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.42.0...HEAD
+[0.42.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.2...v0.39.0
