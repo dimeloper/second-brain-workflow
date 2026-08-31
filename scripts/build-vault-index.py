@@ -9,7 +9,9 @@ produces a byte-identical file, so a no-op run is a zero-line diff.
 `projects/` gets an index of its own on exactly the same terms, and only once
 it holds a note: a vault that has never written a project doc must regenerate
 to the bytes it had before this engine knew about them, or every adopter's next
-`--check` goes red for a change they did not make.
+`--check` goes red for a change they did not make. That rule holds one layer
+further in — a vault whose projects are all flat `projects/<name>.md` files
+regenerates to the bytes it had before this engine knew about feature files.
 
 Usage:
   build-vault-index.py [--vault PATH] [--check]
@@ -255,19 +257,33 @@ def render(notes, two_bars=True):
 # things — a practice note carries a maturity and a promotion bar, and a project
 # doc has neither and never will. Mixing them into one table would be the first
 # step towards a project doc being read as a rule.
+#
+# A project is a DIRECTORY, and this reads two levels:
+#
+#   projects/<project>/_project.md            the stable overview
+#   projects/<project>/features/<feature>.md  one file per slice of work
+#   projects/<project>.md                     the flat shape, still read
+#
+# One file per project put the overview and the latest work in the same
+# document, and every wrap-up appended the latest slice over the overview a
+# fresh session actually reads. The flat form stays supported: it is somebody's
+# committed vault content, and an engine upgrade that stopped indexing it would
+# be this tool deciding to lose a document.
 PROJECT_STATUS_ORDER = {"active": 0, "paused": 1, "closed": 2}
+PROJECT_FILE = "_project.md"
+FEATURES_DIR = "features"
 
 
-def extract_tldr(text, limit=RULE_MAX):
-    """The first bullet or line under `## TL;DR`, for the index row.
+def extract_tldr(text, limit=RULE_MAX, headings=("## tl;dr",)):
+    """The first bullet or line under one of `headings`, for the index row.
 
     Same job as a practice note's **Rule:** excerpt — enough to decide whether
     to open the document, not a summary of it. Comment blocks are skipped: the
-    template ships explanatory HTML comments and they are not content.
+    templates ship explanatory HTML comments and they are not content.
     """
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if line.strip().lower() != "## tl;dr":
+        if line.strip().lower() not in headings:
             continue
         in_comment = False
         for follow in lines[i + 1:]:
@@ -288,56 +304,128 @@ def extract_tldr(text, limit=RULE_MAX):
     return ""
 
 
+def first_h1(text):
+    for line in text.splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return ""
+
+
+def read_doc(path, rel, problems, summary_headings, required=("status", "last-reviewed")):
+    """The fields both a project file and a feature file carry.
+
+    One reader for both, because the two are validated on the same things and a
+    second copy is how one of them quietly stops checking `last-reviewed` — the
+    only field that says whether a row still describes the present.
+    """
+    text = path.read_text(encoding="utf-8")
+    fm, warnings = parse_frontmatter(text)
+    if fm is None:
+        problems.append((rel, warnings[0]))
+        fm = {}
+    else:
+        for w in warnings:
+            problems.append((rel, w))
+
+    status = fm.get("status") or "?"
+    if status not in PROJECT_STATUS_ORDER and status != "?":
+        problems.append((rel, f"unknown status: {status}"))
+    for field in required:
+        if not fm.get(field):
+            problems.append((rel, f"missing {field}"))
+
+    title = first_h1(text)
+    if not title:
+        problems.append((rel, "no H1 title"))
+    summary = extract_tldr(text, headings=summary_headings)
+    if not summary:
+        problems.append((rel, f"no {summary_headings[0].replace('## ', '')} line"))
+
+    repos = fm.get("repos") or []
+    return {
+        "title": title or path.stem,
+        "status": status,
+        "reviewed": fm.get("last-reviewed") or "—",
+        "outcome": fm.get("outcome") or "",
+        "repos": repos if isinstance(repos, list) else [repos],
+        "summary": first_sentence(summary) if summary else "",
+    }
+
+
+def collect_features(project_dir, project_slug, problems):
+    """The feature files under one project directory, sorted by status then slug."""
+    features_dir = project_dir / FEATURES_DIR
+    if not features_dir.is_dir():
+        return []
+    out = []
+    for path in sorted(features_dir.glob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        rel = f"{project_slug}/{FEATURES_DIR}/{path.name}"
+        doc = read_doc(path, rel, problems, ("## state",))
+        # A closed feature with no outcome is the same gap a bare `- [x]` leaves
+        # on a follow-up: it says the work left the list and nothing about how.
+        if doc["status"] == "closed" and not doc["outcome"]:
+            problems.append((rel, "closed with no outcome:"))
+        doc["slug"] = path.stem
+        doc["link"] = f"{project_slug}/{FEATURES_DIR}/{path.stem}"
+        out.append(doc)
+    out.sort(key=lambda f: (PROJECT_STATUS_ORDER.get(f["status"], 9), f["slug"]))
+    return out
+
+
 def collect_projects(vault):
-    """(notes, problems), or (None, []) when the vault has no projects/ at all."""
+    """(projects, problems), or (None, []) when the vault has no projects/ at all."""
     projects = vault / "projects"
     if not projects.is_dir():
         return None, []
 
     notes, problems = [], []
-    for path in sorted(projects.rglob("*.md")):
-        if path.name == "INDEX.md":
+    for entry in sorted(projects.iterdir()):
+        if entry.is_dir():
+            project_file = entry / PROJECT_FILE
+            if not project_file.is_file():
+                # Named, not skipped. A directory of features with no overview is
+                # a half-written project, and dropping it from the index would
+                # hide the features too.
+                problems.append((entry.name, f"no {PROJECT_FILE}"))
+                doc = {"title": entry.name, "status": "?", "reviewed": "—",
+                       "outcome": "", "repos": [], "summary": ""}
+            else:
+                doc = read_doc(project_file, f"{entry.name}/{PROJECT_FILE}",
+                               problems, ("## tl;dr",))
+            doc["slug"] = entry.name
+            doc["link"] = f"{entry.name}/{PROJECT_FILE[:-3]}"
+            doc["features"] = collect_features(entry, entry.name, problems)
+            notes.append(doc)
             continue
-        rel = path.relative_to(projects)
-        text = path.read_text(encoding="utf-8")
-        fm, warnings = parse_frontmatter(text)
-        if fm is None:
-            problems.append((str(rel), warnings[0]))
-            fm = {}
-        else:
-            for w in warnings:
-                problems.append((str(rel), w))
-
-        status = fm.get("status") or "?"
-        if status not in PROJECT_STATUS_ORDER and status != "?":
-            problems.append((str(rel), f"unknown status: {status}"))
-        for required in ("status", "last-reviewed"):
-            if not fm.get(required):
-                problems.append((str(rel), f"missing {required}"))
-
-        title = ""
-        for line in text.splitlines():
-            if line.startswith("# "):
-                title = line[2:].strip()
-                break
-        if not title:
-            problems.append((str(rel), "no H1 title"))
-        tldr = extract_tldr(text)
-        if not tldr:
-            problems.append((str(rel), "no ## TL;DR line"))
-
-        repos = fm.get("repos") or []
-        notes.append(
-            {
-                "slug": path.stem,
-                "title": title or path.stem,
-                "status": status,
-                "reviewed": fm.get("last-reviewed") or "—",
-                "repos": repos if isinstance(repos, list) else [repos],
-                "tldr": first_sentence(tldr) if tldr else "",
-            }
-        )
+        if entry.suffix != ".md" or entry.name == "INDEX.md":
+            continue
+        # The flat shape. Still read, still indexed, still linked by bare slug —
+        # somebody's committed vault content does not stop being indexed because
+        # a newer layout exists.
+        doc = read_doc(entry, entry.name, problems, ("## tl;dr",))
+        doc["slug"] = entry.stem
+        doc["link"] = entry.stem
+        doc["features"] = []
+        notes.append(doc)
     return notes, problems
+
+
+def project_cell(note):
+    """A wikilink that resolves to one file.
+
+    `[[_project]]` would be ambiguous the moment a vault has two projects, since
+    Obsidian resolves a bare wikilink by filename. So a directory project is
+    linked by path with the project name as the alias, and a flat doc keeps the
+    bare slug it has always had.
+
+    The alias pipe is escaped: this lands in a markdown table cell, where a bare
+    `|` starts the next column and would silently break the row.
+    """
+    if note["link"] == note["slug"]:
+        return f"[[{cell(note['slug'])}]]"
+    return "[[" + cell(note["link"]) + r"\|" + cell(note["slug"]) + "]]"
 
 
 def render_projects(notes):
@@ -348,32 +436,74 @@ def render_projects(notes):
         f"{counts[st]} {st}"
         for st in sorted(counts, key=lambda k: PROJECT_STATUS_ORDER.get(k, 9))
     )
-    out = [
+    features = [(n, f) for n in notes for f in n["features"]]
+    # A vault whose projects are all flat files regenerates to exactly the bytes
+    # it had before this engine knew about feature files — same reasoning as the
+    # two-bar column in the practices index, and the same reason an empty
+    # projects/ gets no index at all.
+    head = [
         "# Projects index",
         "",
         f"> Generated by `{GENERATED_BY}` — do not edit by hand.",
-        f"> {len(notes)} initiatives · {summary}",
+        f"> {len(notes)} initiatives · {summary}"
+        + (f" · {len(features)} features" if features else ""),
         "",
         "One row per long-running initiative. These are context documents, not",
         "practices: they are revised in place, they carry no maturity, and none of",
         "them promotes. `Reviewed` is the note's own `last-reviewed` field — the",
         "date somebody last checked it against reality, which is the only thing",
         "that says whether a row still describes the present.",
+    ]
+    if features:
+        head += [
+            "",
+            "A project is a directory: `_project.md` is the stable overview a fresh",
+            "session reads first, and each feature below it is one slice of work,",
+            "revised as that slice moves. The overview is what the features table",
+            "does not repeat — open a feature for where its own work stands.",
+        ]
+    out = head + [
         "",
         "| Project | Status | Reviewed | Repos | TL;DR |",
         "|---|---|---|---|---|",
     ]
-    for n in sorted(notes, key=lambda n: (PROJECT_STATUS_ORDER.get(n["status"], 9),
-                                          n["slug"])):
+    ordered = sorted(notes, key=lambda n: (PROJECT_STATUS_ORDER.get(n["status"], 9),
+                                           n["slug"]))
+    for n in ordered:
         out.append(
-            "| [[{slug}]] | {status} | {reviewed} | {repos} | {tldr} |".format(
-                slug=cell(n["slug"]),
+            "| {project} | {status} | {reviewed} | {repos} | {tldr} |".format(
+                project=project_cell(n),
                 status=cell(n["status"]),
                 reviewed=cell(n["reviewed"]),
                 repos=cell(", ".join(n["repos"])),
-                tldr=cell(n["tldr"]),
+                tldr=cell(n["summary"]),
             )
         )
+
+    if features:
+        out += [
+            "",
+            "## Features",
+            "",
+            "| Project | Feature | Status | Reviewed | State |",
+            "|---|---|---|---|---|",
+        ]
+        # Grouped by project in the same order as the table above, so a reader
+        # scanning down finds each project's features together.
+        for n in ordered:
+            for f in n["features"]:
+                status = f["status"]
+                if f["outcome"]:
+                    status = f"{status} · {f['outcome']}"
+                out.append(
+                    "| {project} | {feature} | {status} | {reviewed} | {state} |".format(
+                        project=cell(n["slug"]),
+                        feature="[[" + cell(f["link"]) + r"\|" + cell(f["slug"]) + "]]",
+                        status=cell(status),
+                        reviewed=cell(f["reviewed"]),
+                        state=cell(f["summary"]),
+                    )
+                )
     return "\n".join(out).rstrip("\n") + "\n"
 
 

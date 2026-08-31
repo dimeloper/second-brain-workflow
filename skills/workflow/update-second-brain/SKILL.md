@@ -29,15 +29,26 @@ practices *during* work. It does not write.
 - Vault: `$SBW_VAULT` if set, else `~/vaults/second-brain`
 - Practices: `practices/{frontend,backend,app,cross-cutting}/`
 - Daily notes: vault root, `YYYY-MM-DD.md` (local date)
-- Projects: `projects/<initiative>.md` — one document per long-running
-  initiative, revised in place
-- Templates: `_templates/{practice-note,daily-note,project-note}.md`
+- Projects: `projects/<project>/` — one **directory** per long-running
+  initiative, revised in place:
+  - `_project.md` — the stable overview: what it is, who, constraints,
+    direction, open questions about the project itself
+  - `features/<feature>.md` — one file per slice of work: current state,
+    dated decisions, open questions, and an outcome when it closes
+- Templates: `_templates/{practice-note,daily-note,project,feature}.md`
 - Maps: `00-maps/{review-queue,promotion-candidates}.md`
 
 A vault with no `projects/` directory has not adopted them; `make upgrade` never
 writes a vault, so it arrives by running `init-vault.sh --adopt`. Skip every
 project step below in a vault that does not have one, and say so once — do not
 create the directory to have somewhere to write.
+
+**A flat `projects/<name>.md` is still valid and still indexed.** Some vaults
+have them from before a project was a directory. Read and revise them in place
+as they are; do not move one into a directory as a side effect of a wrap-up —
+that is a restructuring, and it belongs in its own approved change (the reference
+has the one-time move). A vault with a `_templates/project-note.md` and no
+`_templates/project.md` predates the split: follow the shape that vault has.
 
 **The vault is the source of truth for its own rules.** Before writing anything,
 read the meta-practice notes under `practices/cross-cutting/` and follow them
@@ -235,63 +246,86 @@ Daily-rewrite: block was filed a day late; boundary fixed against commit timesta
 
 Skip this entirely if the vault has no `projects/` directory.
 
-A project doc (`projects/<initiative>.md`) is the current state of one
-long-running piece of work: who is involved, what was decided when, which
-options are still live, what is open. It is what you would hand a fresh session
-so it does not re-derive six weeks of daily notes. It is **not** a practice note
-— no maturity, no `applies-to`, no promotion path, ever — and it is **not** a
-daily note: it is revised in place, because a sentence that was true three weeks
-ago has to be *corrected*, not appended to.
+A project is a **directory**, and the two halves are revised on different
+triggers. Getting this wrong is what the split exists to stop: when one file held
+both, every wrap-up appended the session's latest work to it, and the overview a
+fresh session actually reads got buried and then overwritten.
 
-**If the session materially changed an initiative's state, revise its doc.**
-Appending to the daily note is not enough and never was: the note records that
-the direction changed, and the document a future session actually reads goes on
-describing the superseded plan as current. That is the failure this step exists
-for.
+| | `_project.md` | `features/<feature>.md` |
+|---|---|---|
+| Holds | what the initiative *is* — TL;DR, cast, constraints, direction, questions about the project | one slice of work — its state, dated decisions, its own questions, its outcome |
+| Revised when | the **project** changed | the **work** moved |
+| How often | a handful of times over months | most sessions that touch the slice |
 
-Materially changed means at least one of:
+**So: if the session moved a feature, revise that feature's file. Revise
+`_project.md` only when the project itself changed.**
 
-- a decision was made, reversed, or overtaken
-- a contested point closed, or a new one opened
-- an open question was answered — or dropped, superseded, or handed off
-- the cast changed: someone joined, left, or moved position
-- a claim previously marked `[second-hand]` got verified, or turned out false
+### 4a. The feature the session moved
 
-Then, in the doc:
+Find the file under `projects/<project>/features/` that covers the slice worked
+on. If the work is a slice that has no file yet and clears the bar — its state
+spans several daily notes, and no single note answers "where is this now" — draft
+one from `_templates/feature.md`, write it, and say you did. Work that fits
+in one daily note stays in that note.
 
-1. **Correct what is now wrong**, in place. Do not leave a superseded plan
-   standing next to its replacement with no indication which one is current.
-2. **Add a dated `## Timeline` entry** for what changed, and what it changed
+Then, in the feature file:
+
+1. **Correct `## State` in place.** Do not leave a superseded plan standing next
+   to its replacement with no indication which one is current. This is the
+   sentence a fresh session reads first, so it has to be true today.
+2. **Add a dated `## Decisions` entry** for what was decided, and what it changed
    *from*. The "from" is the half that is impossible to reconstruct later.
 3. **Mark every claim you add** `[verified]` (you read it in the repo, the PR,
    the migration, the log) or `[second-hand]` (someone said it, a doc asserted
-   it, you remember it). Unmarked reads as verified, and that is the one way
-   this document lies to the next session.
+   it, you remember it). Unmarked reads as verified, and that is the one way this
+   document lies to the next session.
 4. **Close open questions and contested points with an outcome**, in exactly the
    form the daily note uses — `#outcome/done`, `#outcome/dropped`,
-   `#outcome/superseded`, `#outcome/handed-off` plus `#owner/<name>`. When an
-   item closes, it closes *here* as well as in that day's note. The day's note
-   is where it happened; this is where the next session looks.
-5. **Bump `last-reviewed`** to today. It is the only field that says whether the
-   document still describes the present.
+   `#outcome/superseded`, `#outcome/handed-off` plus `#owner/<name>`. When a
+   question closes, it closes *here* as well as in that day's note. The day's
+   note is where it happened; this is where the next session looks.
+5. **When the feature itself closes**, set `status: closed`, set the `outcome:`
+   frontmatter field to `done | dropped | superseded | handed-off`, and write
+   `## Outcome` — what actually happened, in a sentence. A closed feature with no
+   outcome is the same gap a bare `- [x]` leaves on a follow-up: it says the work
+   left the list and nothing about how.
+6. **Bump `last-reviewed`** to today.
+
+### 4b. `_project.md`, only if the project itself changed
+
+Materially changed means at least one of:
+
+- the direction changed, was reversed, or was overtaken
+- a constraint appeared, moved, or went away (a deadline, a platform, a contract)
+- the cast changed: someone joined, left, or moved position
+- the audience or scope of the initiative changed
+- a project-level question was answered, dropped, superseded, or handed off
+- a project-level claim marked `[second-hand]` got verified, or turned out false
+
+Then correct the relevant section in place, close any project-level question with
+its outcome, and bump `last-reviewed`. **A session that shipped a feature has not
+changed the project** — leave `_project.md` alone and say so in the report. It is
+not a changelog, and the correct number of edits to it in most wrap-ups is zero.
+
+### 4c. Both halves
 
 **Write freely; propose deletions.** Adding and correcting need no approval —
 this is a record, and a wrong line is cheap and self-correcting, like a daily
 note's. Removing is different: an agent revising a document can silently drop a
 fact rather than merely add a wrong one, and there is nothing left to read
-afterwards. So when a revision would *remove* a claim, a timeline entry, or a
+afterwards. So when a revision would *remove* a claim, a decision entry, or a
 cast row, name the lines and why in the proposal message of Step 6, and leave
 them in place until they are approved.
 
-A new project doc is a write like any other here — draft it from
-`_templates/project-note.md`, write it, say you did. Do not create one for a
-piece of work that fits in a daily note; the bar is that its state spans notes
-and no single note answers "where is this now".
+A new project is a directory plus one file: `projects/<project>/_project.md`
+drafted from `_templates/project.md`, with `features/` filled in as slices
+earn files. Do not create one for a piece of work that fits in a daily note; the
+bar is that its state spans notes and no single note answers "where is this now".
 
-**Nothing here promotes.** A project doc is not a candidate for `practices/`,
-and no amount of re-application makes it one. If something in it does turn out
-to be a reusable rule, that is a separate practice note, proposed the normal way
-in Step 6 with its own provenance.
+**Nothing here promotes.** Neither file is a candidate for `practices/`, and no
+amount of re-application makes one. If something in them does turn out to be a
+reusable rule, that is a separate practice note, proposed the normal way in
+Step 6 with its own provenance.
 
 ## Step 5 — Publish the capture, before you ask about anything else
 
@@ -392,12 +426,14 @@ through.
   yet" is correct, not a gap. Do not back-fill it with invented evidence.
 - If a candidate is declined, record it under `## Vault writes (declined)` with a
   one-line reason.
-- A project doc never appears in these buckets as a promotion candidate. It has
-  no maturity to raise and nothing in it is a reusable rule; the only project-doc
-  item that belongs in this message is a proposed deletion.
+- Neither a `_project.md` nor a feature file ever appears in these buckets as a
+  promotion candidate. Neither has a maturity to raise and nothing in either is a
+  reusable rule; the only project-side item that belongs in this message is a
+  proposed deletion.
 
-**Project-doc deletions**, if any, as their own list: the file, the exact lines
-that would go, and why each one stopped being true. A deletion approved here is
+**Project-doc deletions**, if any, as their own list: the file — naming which
+half, `_project.md` or a feature — the exact lines that would go, and why each
+one stopped being true. A deletion approved here is
 applied in Step 7 with the rest; one that is declined stays in the document, and
 the disagreement is worth a line in `## Drift / gaps`.
 
@@ -474,8 +510,10 @@ or the product repo as part of this skill.
 - Vault path, remote, and **both** commit SHAs + subjects — the Step 5 capture
   and the Step 8 practice notes
 - Daily-note bullets added
-- Project docs revised, and in one line each what changed about the initiative's
-  state — a doc touched without saying why reads as a formatting pass
+- Project docs revised, split the way they are written: which **feature** files
+  moved and what changed about each slice, and whether `_project.md` was touched
+  at all. One line each — a doc touched without saying why reads as a formatting
+  pass, and `_project.md` left alone is the normal, correct outcome worth stating
 - Notes created / updated / promoted, and any remaining promotion candidates
 - Anything left unstaged, and why
 - Whether a write was ever refused as stale, and what you re-read — a wrap-up
@@ -490,9 +528,12 @@ for it, update that too.
 project docs*, *write up the initiatives in my notes*, or asks for the same
 thing in their own words. An upgrade does not trigger it, a wrap-up does not
 trigger it, and a vault that just gained a `projects/` directory does not
-trigger it. Silent construction of project docs is forbidden — the whole value
-of these documents is that a reader can trust what is in them, and a directory
-that filled itself overnight from six weeks of notes has no such claim.
+trigger it. **An engine upgrade never triggers it**, including the one that made
+a project a directory: nothing about a new layout is a reason to construct
+documents nobody asked for. Silent construction of project docs is forbidden —
+the whole value of these documents is that a reader can trust what is in them,
+and a directory that filled itself overnight from six weeks of notes has no such
+claim.
 
 ### 1. Find the candidates
 
@@ -507,40 +548,69 @@ unit it can count is the repo; the initiative is usually narrower, and telling
 those apart is the reader's job, not the script's. Say so when you present the
 list.
 
-### 2. Draft, one document per candidate
+### 2. Draft a folder per candidate — not one mega-doc
 
 Read the notes that actually mention each candidate — the ones the script named,
-not a sample — and draft from `_templates/project-note.md`. Fill only what the
-notes evidence:
+not a sample. Then draft, for each candidate:
 
-- `## TL;DR` — where this is *now*, in two or three sentences
-- `## Cast` — only people the notes actually name in a role. Do not infer.
-- `## Timeline` — dated entries, each from a note you read
-- `## Contested points` / `## Open questions` — including items still `- [ ]`
-- `## Artifacts and links` — PRs, commits, dashboards the notes cite
+```
+projects/<project>/
+  _project.md                    sparse: only what the notes evidence
+  features/<thread>.md           one file per recurring thread in the notes
+```
+
+**`_project.md` is deliberately sparse.** Fill `## TL;DR` (where the initiative
+is *now*, two or three sentences), `## Cast` (only people the notes name in a
+role — do not infer), `## Constraints` and `## Direction` where the notes state
+them, `## Open questions` for project-level items still `- [ ]`, and
+`## Artifacts and links`. Leave a section empty and say why rather than filling
+it by inference. Six weeks of dailies rarely evidence a project's constraints;
+they evidence its work.
+
+**One feature file per recurring thread**, not one document holding everything.
+A thread is a subject that keeps coming back across several notes — a migration,
+a rewrite, an integration, a bug that would not die. That is where the notes'
+substance actually goes: `## State` (where that thread stands now), `## Decisions`
+(dated, each from a note you read), `## Contested points` and `## Open questions`
+(including items still `- [ ]`), and `## Outcome` if the notes show the thread
+finished. A thread that appears in one note is not a feature file; it stayed in
+that note.
+
+Drafting one document per candidate instead is what produced the shape this
+replaces: a single file with a timeline of everything, which nobody can revise
+in place because every sentence in it belongs to a different piece of work.
 
 **Mark every claim** `[verified]` or `[second-hand]`. A backfill draft is almost
 entirely `[second-hand]`: it is assembled from what a note said at the time, not
-from anything re-checked today. Marking it that way is the honest state, and it
-is what makes the document safe to write at all.
+from anything re-checked today. **Every guessed line stays `[second-hand]`** —
+including one you are fairly sure of. Marking it that way is the honest state,
+and it is what makes the document safe to write at all.
 
 **Incomplete and guessed drafts are expected and fine.** A draft that says "the
 notes do not say who owns this" is more useful than one that quietly picks
-somebody. Say what you could not establish, in the document, in the section
-where it is missing. Do not fill a section by inference to make the shape look
+somebody. Say what you could not establish, in the document, in the section where
+it is missing. Do not fill a section by inference to make the shape look
 finished.
 
 ### 3. Show each draft; write only what is approved
 
-Show the drafts **one at a time**, in full, and take approval per document. Not a
-batch, not a summary with a "write them all?" at the end — the reader is
-approving a document they will later trust as a record, and a list of titles is
-not something anyone can approve meaningfully.
+Show the drafts **one folder at a time**, in full — the `_project.md` and every
+feature file for that candidate together, since the split between them is part of
+what is being approved. Not a batch across candidates, and not a summary with a
+"write them all?" at the end: the reader is approving documents they will later
+trust as a record, and a list of titles is not something anyone can approve
+meaningfully.
 
-- Approved → write it, then it commits with the normal capture in Step 5.
-- Declined → write nothing, and record it under `## Vault writes (declined)` in
-  today's note with the one-line reason.
-- Edited → apply the edit and re-show before writing.
+- Approved → write the whole folder, then it commits with the normal capture in
+  Step 5.
+- Declined → write nothing for that candidate, not even the directory, and record
+  it under `## Vault writes (declined)` in today's note with the one-line reason.
+- Edited → apply the edit and re-show before writing. "Split that feature in two"
+  and "that is one thread, not three" are the usual edits, and they are the point
+  of showing the folder rather than a file.
+
+Approval can also be partial: the overview approved and one feature file
+declined is a normal outcome. Write what was approved and nothing else.
 
 **Nothing here promotes, and nothing here becomes a practice note.** If a pattern
 shows up across three of the drafts, that is a note for `## Vault candidates`

@@ -148,6 +148,56 @@ case "${out}" in
   *) fail "matched through repos:, not only through the filename" "${out}" ;;
 esac
 
+# --- a project is a directory ----------------------------------------------
+# Coverage has to be read one and two levels down, not only at the top. A repo
+# named on a FEATURE file is a repo whose work is written up, and proposing a
+# second document for it would ask for something that already exists.
+rm -f "${VAULT}/projects/vendor-migration.md"
+mkdir -p "${VAULT}/projects/vendor-migration/features"
+cat > "${VAULT}/projects/vendor-migration/_project.md" <<'EOF'
+---
+kind: project
+status: active
+last-reviewed: 2026-01-23
+repos: []
+tags: []
+---
+
+# Vendor migration
+
+## TL;DR
+- in progress [verified]
+EOF
+cat > "${VAULT}/projects/vendor-migration/features/csv-importer.md" <<'EOF'
+---
+kind: feature
+status: active
+last-reviewed: 2026-01-23
+repos: ["alpha-service"]
+---
+
+# CSV importer
+
+## State
+- behind a flag [verified]
+EOF
+out="$("${CAND}" --vault "${VAULT}" --as-of 2026-01-26 2>&1)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"alpha-service: projects/vendor-migration/_project.md"*)
+    pass "a repo named only on a feature file counts as documented" ;;
+  *) fail "a repo named only on a feature file counts as documented" "${out}" ;;
+esac
+
+# The reported path is _project.md whichever file matched: that is the file a
+# reader opens to find out where the initiative stands.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Candidates with no project doc (1)"*) pass "...and drops out of the candidate list" ;;
+  *) fail "...and drops out of the candidate list" "${out}" ;;
+esac
+
 # --- the bar is an argument, not a constant ---------------------------------
 out="$("${CAND}" --vault "${VAULT}" --as-of 2026-01-26 --min-span 30 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
