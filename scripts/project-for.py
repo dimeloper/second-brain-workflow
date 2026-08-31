@@ -22,6 +22,14 @@ stays in the file, named by path. A feature's decision log is the expensive half
 and the half a session usually does not need; printing all of them would bury
 the overview under the thing the two-file split exists to stop burying it.
 
+Between the two sits `context/` — audience, voice, brand: what does not change
+per session — and it is printed as **paths only**. The overview is printed whole
+because it is short and stable; context is neither, and printing it would bury
+the overview under exactly the thing the two-file split exists to stop burying
+it. The reader also knows better than this tool which of the three files they
+need. Whatever `.md` files are there are listed, so a `context/pricing.md`
+appears without a code change.
+
 Matching is on the `repos:` frontmatter that `_project.md` and each feature file
 already carry, spelled the way `practices-for.py` spells a repo — the directory
 basename. Nothing is inferred from the stack: a project doc is about one named
@@ -154,6 +162,7 @@ def matching(vault, slug):
         out.append({
             "slug": project["slug"],
             "flat": project["flat"],
+            "context": project["context"],
             "overview": overview,
             "features": features if by_overview else named,
             "whole": by_overview,
@@ -193,6 +202,20 @@ def print_project(project, vault, today):
             print(f"  repos:    {', '.join(overview['repos'])}")
         print()
         print(overview["body"])
+
+    # Between the stable half and the work in flight, and printed as paths: see
+    # the module docstring. Silent when there is none — most projects have no
+    # context/, and a "none found" line on every run is noise that teaches a
+    # reader to skim past the block on the projects that do.
+    if project["context"]:
+        print("CONTEXT")
+        width = max(len(c.stem) for c in project["context"])
+        for path in project["context"]:
+            print(f"  {path.stem:<{width}}  {rel(path, vault)}")
+        print()
+        print("  Read these before writing anything public about the product.")
+        print("  Paths only — open the one you need rather than all three.")
+        print()
 
     if not project["whole"] and overview is not None:
         print(f"Only the feature(s) below name this repo — {PROJECT_FILE} names")
@@ -264,7 +287,11 @@ def main():
         return 0
 
     total_features = sum(len(p["features"]) for p in projects)
-    print(f"{len(projects)} project(s), {total_features} feature(s). The overview")
+    total_context = sum(len(p["context"]) for p in projects)
+    line = f"{len(projects)} project(s), {total_features} feature(s)"
+    if total_context:
+        line += f", {total_context} context file(s)"
+    print(line + ". The overview")
     print("is the stable half — read it first; the features are work in flight.")
     print()
     for project in projects:

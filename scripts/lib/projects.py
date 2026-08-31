@@ -21,6 +21,8 @@ Two shapes are read:
 
     projects/<project>/_project.md            the stable overview
     projects/<project>/features/<feature>.md  one slice of work
+    projects/<project>/context/<topic>.md     audience, voice, brand — what does
+                                              not change per session
     projects/<project>.md                     the flat shape, from before the split
 
 The flat one stays supported because it is somebody's committed vault content;
@@ -30,6 +32,7 @@ document.
 
 PROJECT_FILE = "_project.md"
 FEATURES_DIR = "features"
+CONTEXT_DIR = "context"
 
 
 def discover(vault):
@@ -42,6 +45,9 @@ def discover(vault):
                   holds features and no overview — a half-written project, which
                   is reported rather than skipped so its features stay visible
         features  Paths under features/, name-sorted; [] for a flat project
+        context   Paths under context/, name-sorted; [] when there is none.
+                  Whatever files are there — the set is not fixed, so a
+                  context/pricing.md needs no code change to be found
         flat      True for projects/<name>.md
 
     Stats the filesystem and reads nothing.
@@ -58,6 +64,7 @@ def discover(vault):
                 "slug": entry.name,
                 "overview": overview if overview.is_file() else None,
                 "features": feature_files(entry),
+                "context": md_files(entry / CONTEXT_DIR),
                 "flat": False,
             })
             continue
@@ -67,6 +74,7 @@ def discover(vault):
             "slug": entry.stem,
             "overview": entry,
             "features": [],
+            "context": [],
             "flat": True,
         })
     return out
@@ -74,7 +82,17 @@ def discover(vault):
 
 def feature_files(project_dir):
     """The feature files under one project directory, name-sorted."""
-    features = project_dir / FEATURES_DIR
-    if not features.is_dir():
+    return md_files(project_dir / FEATURES_DIR)
+
+
+def md_files(directory):
+    """Every .md in one directory, name-sorted, INDEX.md excluded.
+
+    Shared by features/ and context/ because the two are read on the same
+    terms — a flat directory of markdown, no fixed filename set. Keeping one
+    reader is what stops context/ growing a subtly different idea of what
+    counts as a file in it.
+    """
+    if not directory.is_dir():
         return []
-    return [p for p in sorted(features.glob("*.md")) if p.name != "INDEX.md"]
+    return [p for p in sorted(directory.glob("*.md")) if p.name != "INDEX.md"]

@@ -141,6 +141,62 @@ case "${out}" in
   *) fail "a closed feature carries its outcome beside the status" "${out}" ;;
 esac
 
+# --- context/ is surfaced, as paths, between overview and features ----------
+mkdir -p "${V}/projects/alpha/context"
+cat > "${V}/projects/alpha/context/audience.md" <<'EOF'
+# audience
+Who alpha is for. This body must never be printed.
+EOF
+cat > "${V}/projects/alpha/context/pricing.md" <<'EOF'
+# pricing
+An arbitrary topic — the filename set is not fixed.
+EOF
+out_ctx="$("${PF}" --repo "${REPO}" --vault "${V}" 2>&1)"
+assert_exit 0 $? "a project with context/ still reports cleanly"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_ctx}" in
+  *CONTEXT*audience*projects/alpha/context/audience.md*)
+    pass "context files are listed with their vault-relative paths" ;;
+  *) fail "context files are listed with their paths" "${out_ctx}" ;;
+esac
+# Not a hardcoded audience|voice|brand set: a new topic needs no code change.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_ctx}" in
+  *pricing*) pass "any .md under context/ appears, not a fixed filename set" ;;
+  *) fail "any .md under context/ appears" "${out_ctx}" ;;
+esac
+# Paths, not contents — the overview is short and stable, context is neither.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_ctx}" in
+  *"must never be printed"*) fail "context bodies are never printed" "${out_ctx}" ;;
+  *) pass "context bodies are never printed, only paths" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_ctx}" in
+  *"2 context file(s)"*) pass "the summary line counts them" ;;
+  *) fail "the summary line counts them" "${out_ctx}" ;;
+esac
+# Order is the point: stable half, then what does not change per session, then
+# the work in flight.
+ctx_at="$(printf '%s\n' "${out_ctx}" | grep -n "^CONTEXT" | head -1 | cut -d: -f1)"
+ov_at="$(printf '%s\n' "${out_ctx}" | grep -n "The stable half of alpha" | head -1 | cut -d: -f1)"
+feat_at="$(printf '%s\n' "${out_ctx}" | grep -n "FEATURE  first-slice" | head -1 | cut -d: -f1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -n "${ctx_at}" ] && [ "${ov_at}" -lt "${ctx_at}" ] && [ "${ctx_at}" -lt "${feat_at}" ]; then
+  pass "context sits between the overview and the features"
+else
+  fail "context sits between the overview and the features" \
+    "overview@${ov_at:-none} context@${ctx_at:-none} feature@${feat_at:-none}"
+fi
+# Silence, not "none found": most projects have no context/, and a line on
+# every run teaches a reader to skim past the block on the ones that do.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$("${PF}" --repo "${REPO}" --vault "${V}" 2>&1 | sed -n "/PROJECT  beta/,/^====/p")" in
+  *CONTEXT*) fail "a project with no context/ prints no block at all" "beta printed one" ;;
+  *) pass "a project with no context/ prints no block at all" ;;
+esac
+rm -rf "${V}/projects/alpha/context"
+
 # --- a feature-only match does not drag in the rest of the initiative --------
 # Printing every sibling would hand a session context for work in repos it is
 # not in, which is the failure mode a context tool can least afford.
