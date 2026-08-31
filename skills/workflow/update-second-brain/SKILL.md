@@ -36,6 +36,8 @@ practices *during* work. It does not write.
   - `features/<feature>.md` — one file per slice of work: current state,
     dated decisions, open questions, and an outcome when it closes
 - Templates: `_templates/{practice-note,daily-note,project,feature}.md`
+- Which project a repo belongs to: `scripts/project-for.py --repo <path>`
+  (read-only; matches on the `repos:` frontmatter, never on the directory name)
 - Maps: `00-maps/{review-queue,promotion-candidates}.md`
 
 A vault with no `projects/` directory has not adopted them; `make upgrade` never
@@ -262,11 +264,30 @@ fresh session actually reads got buried and then overwritten.
 
 ### 4a. The feature the session moved
 
-Find the file under `projects/<project>/features/` that covers the slice worked
-on. If the work is a slice that has no file yet and clears the bar — its state
-spans several daily notes, and no single note answers "where is this now" — draft
-one from `_templates/feature.md`, write it, and say you did. Work that fits
-in one daily note stays in that note.
+**Ask the vault which project this repo belongs to. Do not infer it from the
+directory name.**
+
+```bash
+~/second-brain-workflow/scripts/project-for.py --repo "$PWD"
+```
+
+Read-only, and it prints the overview plus every feature with its current
+state — so it answers "which project" and "which feature file" in one call.
+A repo with no project doc prints a clean "nothing here" and exits 0; that is
+the ordinary answer, and it means skip to Step 5.
+
+Guessing from the directory name is wrong often enough to matter, because **a
+project is named for the initiative and a repo is named for itself** — and one
+initiative routinely spans several repos, so most of them cannot match its name.
+A marketing site, a backend and a mobile client can all belong to one project
+whose name matches none of their directories. The `repos:` frontmatter is what
+decides it, and `project-for` is the thing that reads it.
+
+Then find the file under `projects/<project>/features/` that covers the slice
+worked on. If the work is a slice that has no file yet and clears the bar — its
+state spans several daily notes, and no single note answers "where is this now"
+— draft one from `_templates/feature.md`, write it, and say you did. Work that
+fits in one daily note stays in that note.
 
 Then, in the feature file:
 
