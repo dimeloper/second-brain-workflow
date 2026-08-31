@@ -211,6 +211,127 @@ assert_not_contains "${VAULT}/practices/INDEX.md" 'vendor-migration' \
 assert_not_contains "${VAULT}/projects/INDEX.md" '| Maturity |' \
   "and the projects index has no maturity column — nothing here promotes"
 
+# --- a project is a directory ----------------------------------------------
+# The flat doc above stays exactly where it is, and keeps being indexed: it is
+# somebody's committed vault content, and an engine upgrade that stopped reading
+# it would be this tool deciding to lose a document. The index built from it
+# alone must also stay byte-identical to what the previous engine produced —
+# same guarantee as the empty projects/ above, one layer in.
+cp "${VAULT}/projects/INDEX.md" "${SANDBOX}/projects-flat-only.md"
+
+mkdir -p "${VAULT}/projects/auth-rewrite/features"
+cat > "${VAULT}/projects/auth-rewrite/_project.md" <<'EOF'
+---
+kind: project
+status: active
+started: 2026-02-01
+last-reviewed: 2026-03-10
+repos: ["gamma-api"]
+tags: []
+---
+
+# Auth rewrite
+
+## TL;DR
+
+- Moving off the vendor SDK before the June cutoff [verified]
+
+## Constraints
+
+- The June cutoff is contractual [verified]
+EOF
+cat > "${VAULT}/projects/auth-rewrite/features/oidc-discovery.md" <<'EOF'
+---
+kind: feature
+status: active
+last-reviewed: 2026-03-10
+repos: ["gamma-api"]
+---
+
+# OIDC discovery
+
+## State
+
+- Waiting on the vendor's discovery endpoint [second-hand]
+EOF
+cat > "${VAULT}/projects/auth-rewrite/features/token-refresh.md" <<'EOF'
+---
+kind: feature
+status: closed
+last-reviewed: 2026-02-20
+outcome: done
+repos: ["gamma-api"]
+---
+
+# Token refresh
+
+## State
+
+- Shipped; the retry loop was the fix [verified]
+EOF
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+
+assert_contains "${VAULT}/projects/INDEX.md" 'auth-rewrite/_project' \
+  "a directory project is linked by path, not by a bare _project slug"
+assert_contains "${VAULT}/projects/INDEX.md" 'Moving off the vendor SDK' \
+  "and its TL;DR comes off _project.md"
+assert_contains "${VAULT}/projects/INDEX.md" '## Features' \
+  "features get their own section once a project has any"
+assert_contains "${VAULT}/projects/INDEX.md" 'auth-rewrite/features/oidc-discovery' \
+  "each feature is linked at its own path"
+assert_contains "${VAULT}/projects/INDEX.md" 'Waiting on the vendor' \
+  "with its ## State line, not the project's TL;DR"
+
+# The whole point of the split: the project row says what the thing is, and the
+# feature rows say where each slice stands. A closed feature carries its outcome,
+# because `closed` alone says the work left the list and nothing about how.
+assert_contains "${VAULT}/projects/INDEX.md" 'closed · done' \
+  "a closed feature carries its outcome beside the status"
+
+# The flat doc is still there, still a row.
+assert_contains "${VAULT}/projects/INDEX.md" '\[\[vendor-migration\]\]' \
+  "the flat projects/<name>.md doc keeps its bare wikilink and its row"
+
+# A pipe inside a table cell starts the next column, so the alias separator in a
+# path wikilink has to be escaped or every such row silently loses its columns.
+assert_contains "${VAULT}/projects/INDEX.md" 'auth-rewrite/_project\\|auth-rewrite' \
+  "and the alias pipe is escaped so the table row survives"
+
+# A directory with features and no _project.md is a half-written project. Named,
+# not skipped — dropping it would hide the features too.
+mkdir -p "${VAULT}/projects/no-overview/features"
+printf -- '---\nkind: feature\nstatus: active\nlast-reviewed: 2026-03-11\n---\n\n# Orphan\n\n## State\n- adrift\n' \
+  > "${VAULT}/projects/no-overview/features/orphan.md"
+out="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"no-overview"*"no _project.md"*) pass "a project directory with no _project.md is named" ;;
+  *) fail "a project directory with no _project.md is named" "${out}" ;;
+esac
+assert_contains "${VAULT}/projects/INDEX.md" 'no-overview/features/orphan' \
+  "and its features are still indexed rather than hidden with it"
+
+# A closed feature with no outcome is the same gap a bare `- [x]` leaves on a
+# follow-up: the work left the list, and nothing says how.
+printf -- '---\nkind: feature\nstatus: closed\nlast-reviewed: 2026-03-11\n---\n\n# Orphan\n\n## State\n- adrift\n' \
+  > "${VAULT}/projects/no-overview/features/orphan.md"
+out="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"closed with no outcome"*) pass "a closed feature with no outcome is warned about" ;;
+  *) fail "a closed feature with no outcome is warned about" "${out}" ;;
+esac
+
+rm -rf "${VAULT}/projects/no-overview" "${VAULT}/projects/auth-rewrite"
+"${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
+TESTS_RUN=$((TESTS_RUN + 1))
+if cmp -s "${SANDBOX}/projects-flat-only.md" "${VAULT}/projects/INDEX.md"; then
+  pass "a flat-only projects/ regenerates to the bytes it had before features existed"
+else
+  fail "a flat-only projects/ regenerates to the bytes it had before features existed" \
+    "$(diff "${SANDBOX}/projects-flat-only.md" "${VAULT}/projects/INDEX.md" || true)"
+fi
+
 cp "${VAULT}/projects/INDEX.md" "${SANDBOX}/projects-first.md"
 "${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
 diff -q "${SANDBOX}/projects-first.md" "${VAULT}/projects/INDEX.md" >/dev/null 2>&1

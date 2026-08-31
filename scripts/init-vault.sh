@@ -38,11 +38,24 @@
 # scaffolded. It does seed the four cross-cutting notes that describe how the
 # vault itself operates, because `update-second-brain` reads them at runtime.
 #
-# `projects/` is scaffolded empty, with its template. It is a fifth kind of
-# vault content — a per-initiative context document, revised in place — and it
-# arrives in an existing vault through `--adopt`, deliberately: `make upgrade`
-# never writes a vault, so an engine upgrade alone leaves the directory absent
-# and the guard's allowlist simply permitting a path nothing has created yet.
+# `projects/` is scaffolded empty, with its two templates — `_templates/project.md`
+# and `_templates/feature.md`, named for what they are rather than carrying the
+# `-note` suffix `practice-note.md` and `daily-note.md` still have. Those two
+# exist in every vault ever created here and renaming them would add a file
+# rather than replace one; the project pair is one release old, so it takes the
+# name that matches the paths it describes (`_project.md`, `features/`).
+# It is a fifth kind of
+# vault content — per-initiative context, revised in place — and it arrives in an
+# existing vault through `--adopt`, deliberately: `make upgrade` never writes a
+# vault, so an engine upgrade alone leaves the directory absent and the guard's
+# allowlist simply permitting a path nothing has created yet.
+#
+# A project is a DIRECTORY: projects/<project>/_project.md for the stable
+# overview, projects/<project>/features/<feature>.md one file per slice of work.
+# One file per project put both in the same document, and every wrap-up appended
+# the latest feature over the overview a fresh session actually reads. The flat
+# projects/<name>.md shape still works and is still indexed — see the reference's
+# Project notes section for the one-time move.
 set -euo pipefail
 
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -356,7 +369,7 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
 -
 EOF
 
-write_if_absent "${VAULT}/_templates/project-note.md" <<'EOF'
+write_if_absent "${VAULT}/_templates/project.md" <<'EOF'
 ---
 kind: project
 status: active          # active | paused | closed
@@ -369,20 +382,27 @@ tags: []
 
 # <Initiative name>
 
-<!-- An INITIATIVE RECORD, not a product brief. It answers "what is the state of
-     this thing" for a session that has never seen it — not "what should we
-     build". Everything here is specific to one piece of work: who is involved,
-     what was decided when, which options are still live, what is open.
+<!-- A PROJECT lives at projects/<project>/_project.md, and this is that file.
+     Its features live beside it, one file each, at
+     projects/<project>/features/<feature>.md — see _templates/feature.md.
 
-     It is revised in place. A sentence that stopped being true is corrected
-     here, not appended to — which is exactly why it cannot live in a daily
-     note, and why an agent editing it proposes deletions rather than making
-     them (see practices/cross-cutting/propose-then-approve-vault-writes).
+     THIS FILE IS THE STABLE HALF. What the project is, who is involved, what
+     constrains it, where it is heading, and what is open about the project
+     itself. It is revised when the *project* changes — the audience, the
+     constraints, the direction, the cast — which is a handful of times over
+     months, not every session.
+
+     It is NOT a feature changelog. When one file held both, every wrap-up
+     appended the latest slice of work and the overview a fresh session actually
+     reads got buried under it, then overwritten by the next one. That is the
+     whole reason a project is a directory: the latest work has its own file to
+     land in, and this one keeps saying what the thing is.
 
      It never promotes. A project doc is not a reusable rule and has no maturity
      bar; nothing in it is a candidate for practices/. If something here does
      turn out to be reusable, that is a separate practice note, proposed the
-     normal way. -->
+     normal way. And an agent editing it proposes deletions rather than making
+     them (see practices/cross-cutting/propose-then-approve-vault-writes). -->
 
 **Mark every claim.** `[verified]` — you read it yourself in the repo, the PR,
 the migration, the log, the config. `[second-hand]` — someone said it, a
@@ -399,9 +419,87 @@ as verified, and that is the one way this document lies to the next session.
 |---|---|---|
 |  |  |  |
 
-## Timeline
+## Constraints
 
-- YYYY-MM-DD — what changed, and what it changed *from* [verified]
+- <what cannot change: a deadline, a platform, a contract, a budget, a
+  compliance rule — and whether it is [verified] or [second-hand]>
+
+## Direction
+
+- <where this is heading, and what would change it. A direction that has been
+  superseded is CORRECTED here, not appended to.>
+
+## Open questions
+
+- [ ] <a question about the PROJECT — scope, ownership, whether to continue.
+      A question about one slice of work belongs on that feature's file.>
+      [second-hand]
+
+<!-- Closing one of these is the same act as closing a daily-note follow-up:
+     record the OUTCOME, not just the tick.
+
+       - [x] Is the Q3 deadline real? #outcome/dropped
+       - [x] Who owns the vendor relationship? #outcome/handed-off #owner/<name>
+
+     `- [x]` alone says the question stopped being asked. It does not say
+     whether it was answered, abandoned, replaced, or given to somebody else —
+     and those lead to opposite actions when it comes back. -->
+
+## Features
+
+<!-- Optional, and only worth writing when the directory has more files than a
+     reader can hold: a line per feature saying what it is for. The generated
+     projects/INDEX.md already lists them with their status, so do not maintain
+     a second copy of that here. -->
+
+## Artifacts and links
+
+- <PRs, migrations, dashboards, documents — with what each one is evidence of>
+EOF
+
+write_if_absent "${VAULT}/_templates/feature.md" <<'EOF'
+---
+kind: feature
+status: active          # active | paused | closed
+started:
+last-reviewed:
+outcome:                # done | dropped | superseded | handed-off — set when
+                        # status becomes closed, and never before
+owner:                  # only when the outcome is handed-off
+repos: []               # repos this slice of work touches
+tags: []
+---
+
+# <Feature name>
+
+<!-- ONE SLICE OF WORK inside a project, at
+     projects/<project>/features/<feature>.md. The living half: this is where a
+     session's work lands, and where the current state of this slice is
+     corrected as it moves.
+
+     The bar is the same as a project's, one level down: a piece of work whose
+     state spans several daily notes and where no single note answers "where is
+     this now". Work that fits in one daily note stays in that note.
+
+     Revised in place, like the project file. Add and correct freely; propose
+     deletions. It never promotes. -->
+
+**Mark every claim** `[verified]` / `[second-hand]`, as on the project file.
+Unmarked reads as verified.
+
+## State
+
+- <where this slice is right now, in two or three sentences. Superseded state is
+  corrected here, not left standing next to its replacement.>
+
+## Decisions
+
+- YYYY-MM-DD — what was decided, and what it changed *from* [verified]
+
+<!-- The "from" is the half that is impossible to reconstruct later, and it is
+     why this list is here rather than only in the dailies: a dated note records
+     that the direction changed, and the document a future session reads goes on
+     describing the superseded plan as current. -->
 
 ## Contested points
 
@@ -414,19 +512,23 @@ as verified, and that is the one way this document lies to the next session.
 
 - [ ] <question> [second-hand]
 
-<!-- Closing one of these is the same act as closing a daily-note follow-up:
-     record the OUTCOME, not just the tick.
+<!-- When one of these closes, the outcome is written HERE as well as in that
+     day's note. The day's note is where it happened; this is where the next
+     session looks.
 
        - [x] Does the importer need the CSV path? #outcome/dropped
-       - [x] Who owns the key rotation? #outcome/handed-off #owner/<name>
+       - [x] Who owns the key rotation? #outcome/handed-off #owner/<name> -->
 
-     `- [x]` alone says the question stopped being asked. It does not say
-     whether it was answered, abandoned, replaced, or given to somebody else —
-     and those lead to opposite actions when it comes back. -->
+## Outcome
+
+<!-- Empty until `status: closed`. Then: what actually happened, in a sentence,
+     and the `outcome:` field above set to match. A feature file that closes
+     without one says the work left the list and nothing about how — the same
+     gap a bare `- [x]` leaves on a follow-up. -->
 
 ## Artifacts and links
 
-- <PRs, migrations, dashboards, documents — with what each one is evidence of>
+- <PRs, migrations, dashboards — with what each one is evidence of>
 EOF
 
 write_if_absent "${VAULT}/00-maps/review-queue.md" <<'EOF'
@@ -583,6 +685,23 @@ fi
 
 "${STANDARDS_DIR}/scripts/build-vault-index.py" --vault "${VAULT}" >/dev/null
 note "generated practices/INDEX.md"
+
+# Every file above is write_if_absent, which is the invariant that makes --adopt
+# safe: this script adds what is missing and never rewrites content it did not
+# write. The project template moved from project-note.md to project.md, so a
+# vault created at v0.40.0 gets project.md added and keeps its project-note.md —
+# which is now a leftover, not a template anything reads. Named rather than
+# deleted: this script has never removed a file from a vault, and it is not
+# starting with one that might have been edited by hand.
+if [ -f "${VAULT}/_templates/project-note.md" ]; then
+  echo
+  echo "  note  _templates/project-note.md is superseded by _templates/project.md."
+  echo "        Nothing reads it any more. Delete it when you are ready — this"
+  echo "        script does not remove files from a vault."
+  echo "        Existing projects/<name>.md docs keep working and stay indexed;"
+  echo "        docs/REFERENCE.md#project-notes has the one-time move of a flat"
+  echo "        doc into projects/<name>/_project.md."
+fi
 
 echo
 if [ "${created}" -eq 0 ]; then

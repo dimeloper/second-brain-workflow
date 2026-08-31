@@ -256,6 +256,14 @@ fi
 # rule, no maturity, no promotion path). Kept out of the allowlist, the one
 # artefact most worth carrying across sessions was the one the tooling refused
 # to carry: permanently untracked, invisible to any other machine.
+#
+# The pattern is nested, and has to be: a project is a DIRECTORY —
+# projects/<project>/_project.md plus projects/<project>/features/<feature>.md —
+# and a flat projects/<name>.md is still valid content. `*` in a `case` pattern
+# spans `/`, so `projects/*` already admits every depth, the same way
+# `practices/*` admits practices/backend/note.md. Spelled out because it is not
+# obvious from the glob alone, and because a reader tightening this to
+# `projects/[!/]*` would silently make every feature file uncommittable.
 while IFS= read -r f; do
   [ -n "${f}" ] || continue
   case "${f}" in

@@ -44,7 +44,14 @@ else
   fail "the daily template describes the optional ## Resume here block" \
     "$(cat "${V}/_templates/daily-note.md")"
 fi
-assert_file "${V}/_templates/project-note.md"       "writes the project template"
+assert_file "${V}/_templates/project.md"            "writes the project template"
+assert_file "${V}/_templates/feature.md"            "writes the feature template"
+# Named for what they are, not with the `-note` suffix practice-note.md and
+# daily-note.md still carry: those exist in every vault ever created here, and
+# renaming a template write_if_absent will not overwrite adds a file rather than
+# replacing one. The project pair is one release old, so it takes the name that
+# matches the paths it describes.
+assert_no_file "${V}/_templates/project-note.md"    "and not under the old name"
 
 # projects/ is scaffolded empty. Git does not track an empty directory, so
 # without a .gitkeep a fresh clone arrives without it and the first project doc
@@ -61,13 +68,36 @@ fi
 # the only place a reader learns which. Both halves matter: the claim marker is
 # what keeps a second-hand assertion from reading as verified, and the outcome
 # tag is what keeps a closed question from reading as an answered one.
-for want in 'TL;DR' 'Cast' 'Timeline' 'Contested points' 'Open questions' \
+for want in 'TL;DR' 'Cast' 'Constraints' 'Direction' 'Open questions' \
             'Artifacts and links' 'second-hand' 'verified' '#outcome/'; do
-  assert_contains "${V}/_templates/project-note.md" "${want}" \
+  assert_contains "${V}/_templates/project.md" "${want}" \
     "the project template carries ${want}"
 done
-assert_contains "${V}/_templates/project-note.md" 'never promotes' \
+assert_contains "${V}/_templates/project.md" 'never promotes' \
   "...and says plainly that it never promotes"
+
+# The split is the whole point of a project being a directory. _project.md is the
+# STABLE half — what the thing is, who, constraints, direction — and the feature
+# files are the living half. One file held both, and every wrap-up appended the
+# latest slice of work over the overview a fresh session actually reads.
+assert_contains "${V}/_templates/project.md" '_project.md' \
+  "the project template names the path it belongs at"
+assert_contains "${V}/_templates/project.md" 'features/' \
+  "...and points at the feature files beside it"
+assert_not_contains "${V}/_templates/project.md" '^## Timeline' \
+  "and carries no feature changelog — that is what buried the overview"
+
+# The feature template is the living slice: current state, dated decisions, and
+# an outcome when it closes.
+for want in '## State' '## Decisions' '## Open questions' '## Outcome' \
+            'second-hand' '#outcome/'; do
+  assert_contains "${V}/_templates/feature.md" "${want}" \
+    "the feature template carries ${want}"
+done
+assert_contains "${V}/_templates/feature.md" 'features/' \
+  "...and names the path it belongs at"
+assert_contains "${V}/_templates/feature.md" 'never promotes' \
+  "...and says plainly that it never promotes either"
 
 # The daily template is where an item typed straight into Obsidian learns the
 # convention. A bare `- [x]` cannot say whether work was finished or abandoned,
@@ -143,6 +173,32 @@ echo "LOCAL EDIT" >> "${V}/practices/cross-cutting/propose-then-approve-vault-wr
 "${INIT}" --path "${V}" --id work --adopt >/dev/null 2>&1
 assert_contains "${V}/practices/cross-cutting/propose-then-approve-vault-writes.md" \
   "LOCAL EDIT" "does not overwrite an edited seeded rule"
+
+# --- the v0.40.0 vault: a leftover project-note.md ---------------------------
+# The one migration path an adopter actually walks. --adopt adds project.md and
+# feature.md, and the old file is NAMED rather than deleted or rewritten: this
+# script has never removed anything from a vault, and that one may have been
+# edited by hand.
+LEFTOVER="${SANDBOX}/leftover-vault"
+mkdir -p "${LEFTOVER}/_templates" "${LEFTOVER}/practices/cross-cutting" \
+         "${LEFTOVER}/projects" "${LEFTOVER}/00-maps"
+printf -- '---\nkind: project\n---\n\n# x\n\n## TL;DR\n- y\n\n## Timeline\n- HAND EDIT\n' \
+  > "${LEFTOVER}/_templates/project-note.md"
+printf '{\n  "id": "work",\n  "remote": "",\n  "schema_version": 1\n}\n' \
+  > "${LEFTOVER}/vault.json"
+git -C "${LEFTOVER}" init -q
+out="$("${INIT}" --path "${LEFTOVER}" --id work --adopt --no-hook --no-config 2>&1)"
+assert_file "${LEFTOVER}/_templates/project.md" "--adopt adds project.md to a v0.40.0 vault"
+assert_file "${LEFTOVER}/_templates/feature.md" "...and feature.md"
+assert_file "${LEFTOVER}/_templates/project-note.md" "...and does not delete the old one"
+assert_contains "${LEFTOVER}/_templates/project-note.md" 'HAND EDIT' \
+  "...nor rewrite it — it may have been edited by hand"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"superseded by _templates/project.md"*"does not remove files"*)
+    pass "...but names it as superseded, and says nothing removes it for you" ;;
+  *) fail "...but names it as superseded, and says nothing removes it for you" "${out}" ;;
+esac
 
 # --- adopt identity check -----------------------------------------------------
 # --adopt must not silently scaffold content into someone else's (or the

@@ -139,6 +139,31 @@ assert_exit 0 $? "a project doc may lose a line — it is revised, not appended 
 git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "revise" \
   -- projects >/dev/null 2>&1
 
+# A project is a directory, so the allowlist has to admit both levels below it.
+# `*` in a case pattern spans `/`, which is what makes one pattern enough — and
+# is exactly the kind of thing a later tightening to `projects/[!/]*` would
+# break silently, making every feature file uncommittable.
+mkdir -p "${VAULT}/projects/an-initiative/features"
+printf -- '---\nkind: project\nstatus: active\n---\n\n# An initiative\n\n## TL;DR\n- the stable half\n' \
+  > "${VAULT}/projects/an-initiative/_project.md"
+printf -- '---\nkind: feature\nstatus: active\n---\n\n# A slice\n\n## State\n- in progress\n' \
+  > "${VAULT}/projects/an-initiative/features/a-slice.md"
+git -C "${VAULT}" add -A >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "allows projects/<project>/_project.md and features/<feature>.md"
+git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "project dir" \
+  -- projects >/dev/null 2>&1
+
+# A feature file is revised in place too — it is the living half of the pair, so
+# the daily-note append-only check must not reach it either.
+printf -- '---\nkind: feature\nstatus: closed\noutcome: done\n---\n\n# A slice\n\n## State\n- shipped\n' \
+  > "${VAULT}/projects/an-initiative/features/a-slice.md"
+git -C "${VAULT}" add projects >/dev/null 2>&1
+"${GUARD}" --vault "${VAULT}" --expect-id work >/dev/null 2>&1
+assert_exit 0 $? "a feature file may lose a line — it is revised, not appended to"
+git -C "${VAULT}" -c user.email=t@t -c user.name=t commit -qm "close the slice" \
+  -- projects >/dev/null 2>&1
+
 # --- .github/workflows/*.yml: allowed (docs/vault-ci templates) ------------
 # Left staged, not committed here — the next block's "notes" commit already
 # finalizes whatever's staged at that point, and committing early would eat

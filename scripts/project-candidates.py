@@ -48,8 +48,7 @@ DEFAULT_NOTES = 20
 # The bar shipped at a fortnight and was wrong on the first real vault it saw.
 # It excluded an initiative running 8 notes over 7 days that carried 17 of the
 # vault's 37 open follow-up threads, a contested point with two live options, a
-# superseded plan and a stopgap — every shape the project-note template exists
-# for. Meanwhile it admitted five repos that were merely long-lived. Duration
+# superseded plan and a stopgap — every shape the project templates exist for. Meanwhile it admitted five repos that were merely long-lived. Duration
 # was standing in for depth and is not a good proxy for it: an initiative that
 # takes over a week of consecutive days is exactly the one whose state no
 # longer fits in any single note. Both stay arguments, because a vault written
@@ -77,28 +76,60 @@ def daily_notes(vault):
     return notes
 
 
-def documented(vault):
-    """Repos an existing project doc already claims — slug, and `repos:`.
+def doc_repos(path):
+    """The names one project or feature file claims: its slug, and its `repos:`.
 
     Both, because the two disagree in practice: a document named for the
     initiative rather than the repo is the normal case, and the frontmatter is
     where it says which repos it covers.
     """
+    fm, _ = parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
+    repos = (fm or {}).get("repos") or []
+    if isinstance(repos, str):
+        repos = [repos]
+    return {path.stem} | {r for r in repos if isinstance(r, str)}
+
+
+def documented(vault):
+    """{repo-or-slug: the doc that covers it}, relative to projects/.
+
+    A project is a directory — projects/<project>/_project.md, with one file per
+    feature under projects/<project>/features/ — and the feature files count as
+    coverage too: a repo named only on a feature file is a repo whose work is
+    written up, and proposing a second document for it would be this tool asking
+    for something that already exists one level down.
+
+    The flat projects/<name>.md shape is still read. It is somebody's committed
+    vault content, and a candidate list that stopped seeing it would propose a
+    duplicate of a document already in the vault.
+    """
     covered = {}
     projects = vault / "projects"
     if not projects.is_dir():
         return covered
-    for path in sorted(projects.glob("*.md")):
-        if path.name == "INDEX.md":
-            continue
-        fm, _ = parse_frontmatter(path.read_text(encoding="utf-8", errors="replace"))
-        names = {path.stem}
-        repos = (fm or {}).get("repos") or []
-        if isinstance(repos, str):
-            repos = [repos]
-        names.update(r for r in repos if isinstance(r, str))
+
+    def cover(names, rel):
         for name in names:
-            covered.setdefault(name, path.name)
+            covered.setdefault(name, rel)
+
+    for entry in sorted(projects.iterdir()):
+        if entry.is_dir():
+            project_file = entry / "_project.md"
+            # The reported doc is always _project.md, whichever file matched: it
+            # is what a reader opens to find out where the initiative stands.
+            rel = f"{entry.name}/_project.md"
+            names = {entry.name}
+            if project_file.is_file():
+                names |= doc_repos(project_file)
+            for feature in sorted((entry / "features").glob("*.md")):
+                if feature.name == "INDEX.md":
+                    continue
+                names |= doc_repos(feature)
+            cover(names, rel)
+            continue
+        if entry.suffix != ".md" or entry.name == "INDEX.md":
+            continue
+        cover(doc_repos(entry), entry.name)
     return covered
 
 
