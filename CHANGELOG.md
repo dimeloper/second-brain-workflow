@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-08-31
+
 ### Added
 - **`with-vault-lock.sh` — mutual exclusion for a vault's commit sequence.**
   `append-daily-block.py` made the daily *note* safe with compare-and-swap, and
@@ -3078,7 +3080,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.44.0...HEAD
+[0.44.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.1...v0.44.0
 [0.43.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.0...v0.43.1
 [0.43.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.41.0...v0.42.0
