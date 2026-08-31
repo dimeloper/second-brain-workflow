@@ -17,6 +17,37 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`with-vault-lock.sh` — mutual exclusion for a vault's commit sequence.**
+  `append-daily-block.py` made the daily *note* safe with compare-and-swap, and
+  the commit guard refuses a diff where lines vanished from one. Neither covered
+  **git**: two sessions share a vault's working tree *and its index*, so a
+  `git add <dir>` in one stages whatever the other has in flight, and a commit
+  without a pathspec takes it.
+
+  Not hypothetical. On 2026-08-31 a wrap-up ran `git add projects` and swept
+  another session's uncommitted project edits into its own index while that
+  session was still writing. Nothing refused it, and nothing should have: the
+  guard's contract is *this write is aimed somewhere it should not go*, and the
+  files were legitimate vault content — they were simply somebody else's. It was
+  caught by reading `git status` by hand, which is not a mechanism.
+
+  `update-second-brain` now runs both of its commit sequences (Steps 5 and 8)
+  under the lock. Exit **75** means another session holds it.
+
+  `mkdir`, not `flock`: `mkdir` is atomic on every POSIX filesystem and is in
+  every shell, while `flock(1)` is util-linux and ships on no macOS this engine
+  runs on. The lock lives in `<vault>/.git/`, so it can never be committed. A
+  lock whose recorded pid is gone is broken automatically and loudly; one
+  recorded on another host is never broken, because a pid means nothing across
+  machines. There is deliberately no maximum age — a legitimate push over a slow
+  link can take minutes, and a clock-based break would eventually cut one in
+  half.
+
+  **It is a mutex, not a permission system**, and it does not replace the
+  pathspec rule: the lock stops the race, the pathspec bounds the damage if a
+  session that skipped the lock creates one anyway.
+
 ## [0.43.1] - 2026-08-31
 
 ### Fixed

@@ -38,6 +38,9 @@ practices *during* work. It does not write.
 - Templates: `_templates/{practice-note,daily-note,project,feature}.md`
 - Which project a repo belongs to: `scripts/project-for.py --repo <path>`
   (read-only; matches on the `repos:` frontmatter, never on the directory name)
+- Serialising a vault commit against other sessions:
+  `scripts/with-vault-lock.sh -- <command>` (exit 75 means another session
+  holds it)
 - Maps: `00-maps/{review-queue,promotion-candidates}.md`
 
 A vault with no `projects/` directory has not adopted them; `make upgrade` never
@@ -361,13 +364,23 @@ way, and another the second, two days apart. Committing here
 also gives the guard a committed baseline to diff the next write against, which
 is what makes the lost-update check in Step 8 able to see anything at all.
 
+**Run the whole sequence under the vault lock.** Staging, guarding, committing
+and pushing are one critical section: two sessions share a vault's working tree
+*and its index*, so a `git add <dir>` here stages whatever another session has
+in flight, and a commit without a pathspec takes it.
+
 ```bash
-git -C <vault> add <YYYY-MM-DD>.md projects
-~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id <this machine's vault id>
-git -C <vault> commit -m "docs: capture the <repo> wrap-up in the daily note" \
-  -- <YYYY-MM-DD>.md projects
-git -C <vault> push
+~/second-brain-workflow/scripts/with-vault-lock.sh -- bash -c '
+  git -C "$VAULT" add "$NOTE" projects
+  ~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id "$VAULT_ID"
+  git -C "$VAULT" commit -m "docs: capture the wrap-up in the daily note" -- "$NOTE" projects
+  git -C "$VAULT" push
+'
 ```
+
+Exit **75** means another session holds the lock — wait and retry, do not work
+around it. The lock lives in `<vault>/.git/`, so it is never committed, and a
+crashed session's lock is broken automatically once its process is gone.
 
 Drop `projects` from both lines when the vault has none, or when nothing there
 changed — an unchanged path in a pathspec is harmless, a path that does not
@@ -505,15 +518,21 @@ deliberate case in Step 3's day-boundary correction, and it needs the matching
 `Daily-rewrite:` trailer or CI refuses what you just allowed.
 
 Conventional Commits, focused on **why** (which session or feature), not a file
-list:
+list — and under the lock, as in Step 5:
 
 ```bash
-git commit -m "docs: publish practice notes from <session> wrap-up" \
-  -- practices <YYYY-MM-DD>.md
+~/second-brain-workflow/scripts/with-vault-lock.sh -- bash -c '
+  git -C "$VAULT" add practices "$NOTE"
+  ~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id "$VAULT_ID"
+  git -C "$VAULT" commit -m "docs: publish practice notes from the wrap-up" -- practices "$NOTE"
+  git -C "$VAULT" push
+'
 ```
 
 Same pathspec rule as Step 5: name what this commit carries, so a concurrent
-session's staged work cannot ride along.
+session's staged work cannot ride along. **The lock and the pathspec are not
+redundant** — the lock stops the race, and the pathspec bounds the damage if a
+session that skipped the lock created one anyway.
 
 If there is nothing to publish, say so and stop — no empty commits.
 
