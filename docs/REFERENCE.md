@@ -130,17 +130,45 @@ not a skill.
 ### Project notes
 
 A fifth kind of vault content, alongside daily notes, practice notes, `00-maps/`
-and `bases/`: `projects/<initiative>.md`, one document per long-running piece of
-work. It is what you would hand a fresh session so it does not re-derive six
-weeks of daily notes — who is involved, what was decided when, which options are
-still live, which claims were verified and which are second-hand, and what is
-open.
+and `bases/`. A project is a **directory**:
 
-It is deliberately neither of the two things it looks like:
+```
+projects/
+  vendor-migration/
+    _project.md                     the stable overview
+    features/
+      csv-importer.md               one slice of work
+      auth-cutover.md
+  INDEX.md                          generated
+```
 
-| | Daily note | Practice note | Project note |
+`_project.md` is what you would hand a fresh session so it does not re-derive six
+weeks of daily notes: what the initiative is, who is involved, what constrains
+it, where it is heading, and what is open about the project itself. Each file
+under `features/` is one slice of work — its current state, the decisions that
+got it there and what they changed *from*, its own open questions, and an outcome
+when it closes.
+
+**Why two files and not one.** One file per project put the overview and the
+latest work in the same document, and that document is written by an agent at the
+end of every session. So every wrap-up appended the newest slice of work, the
+overview a fresh session actually reads got buried under it, and the next wrap-up
+overwrote whatever the last one had said. The two halves have different revision
+rates — a project's direction changes a handful of times over months, a feature's
+state changes most sessions — and a single document cannot hold both without the
+faster one burying the slower one.
+
+So `update-second-brain` revises the **feature** file when the session moved a
+feature, and touches `_project.md` only when the project itself changed: the
+audience, the constraints, the direction, the cast. A session that shipped a
+feature has not changed the project, and the correct number of edits to
+`_project.md` in most wrap-ups is zero.
+
+Neither is either of the two things it looks like:
+
+| | Daily note | Practice note | Project / feature |
 |---|---|---|---|
-| Shape | dated, append-only | a reusable rule | one initiative's current state |
+| Shape | dated, append-only | a reusable rule | one initiative, or one slice of it |
 | Edited | never rewritten | revised constantly | **revised in place** |
 | Promotes | no | `idea` → `trialing` → `enforced` | **never** |
 | Agent may write | freely | only after approval | freely; **deletions proposed** |
@@ -159,31 +187,69 @@ freely, because a wrong line in a record is cheap and self-correcting — but
 agent revising it can silently drop a fact rather than merely add a wrong one.
 Adding is recoverable by reading; a removal leaves nothing to read.
 
-`_templates/project-note.md` carries the sections that keep recurring — TL;DR,
-cast, timeline, contested points, open questions, artifacts and links — and a
-per-claim `[verified]` / `[second-hand]` marker, because a document assembled
-partly from what somebody said is only safe to trust if it says which half that
-was. `build-vault-index.py` writes `projects/INDEX.md` alongside the practices
-index, and only once the directory holds a note: a vault with none regenerates
-to exactly the bytes it had before, so no adopter's `--check` goes red for a
-change they did not make.
+`_templates/project.md` and `_templates/feature.md` carry the sections
+that keep recurring, and a per-claim `[verified]` / `[second-hand]` marker,
+because a document assembled partly from what somebody said is only safe to trust
+if it says which half that was. A closed feature also carries an `outcome:` —
+`done | dropped | superseded | handed-off` — for the same reason a closed
+follow-up does: `closed` alone says the work left the list and nothing about how.
+
+`build-vault-index.py` writes `projects/INDEX.md` alongside the practices index:
+one row per project, then a `## Features` table grouped by project. It appears
+only once the directory holds a note, and the features table only once a project
+has features — a vault with neither regenerates to exactly the bytes it had
+before, so no adopter's `--check` goes red for a change they did not make. The
+commit guard's allowlist is nested, so `projects/<project>/features/<feature>.md`
+is committable like anything else under `projects/`.
 
 **Existing vaults keep working unchanged.** `make upgrade` never writes a vault,
 so an upgrade leaves `projects/` absent and the commit guard simply permitting a
-path nothing has created. The directory and its template arrive when you ask for
+path nothing has created. The directory and its templates arrive when you ask for
 them:
 
 ```bash
 ./scripts/init-vault.sh --path ~/vaults/work-brain --id work --adopt
 ```
 
+A flat `projects/<name>.md` from before the split is **still valid and still
+indexed** — it keeps its row and its bare wikilink, and nothing rewrites it.
+The project template moved from `_templates/project-note.md` to
+`_templates/project.md`, named for what it is rather than carrying the `-note`
+suffix `practice-note.md` and `daily-note.md` still have — those exist in every
+vault ever created here, and `init-vault.sh` only writes a template that is
+absent, so renaming one would add a file rather than replace it. The project pair
+is one release old, so it takes the name matching the paths it describes.
+`--adopt` adds `project.md` and `feature.md` and names the leftover
+`project-note.md` rather than deleting it; nothing reads that file any more, and
+`init-vault.sh` has never removed anything from a vault.
+
+Moving a flat doc into a directory is a **one-time, opt-in** move you make
+yourself, in the vault, with `git mv` so the history follows:
+
+```bash
+cd ~/vaults/second-brain/projects
+for f in *.md; do
+  case "$f" in INDEX.md) continue ;; esac
+  name="${f%.md}"
+  mkdir -p "$name/features"
+  git mv "$f" "$name/_project.md"
+done
+~/second-brain-workflow/scripts/build-vault-index.py
+```
+
+That leaves one overview per project and no feature files. Splitting the work out
+of it is editorial and yours: move each slice into `features/<slice>.md`, or leave
+the whole thing in `_project.md` and let new work land in feature files from now
+on. Nothing does this for you, and no upgrade does it behind your back.
+
 There is also a backfill: `make project-candidates` reports which long-running
 initiatives the daily notes already evidence, and saying **backfill project
-docs** has `update-second-brain` draft one document per candidate, show each
-draft, and write only the ones approved, one at a time. Incomplete and guessed
-drafts are expected — a draft assembled from six weeks of notes is almost
-entirely `[second-hand]` and says so. Nothing is ever constructed silently, and
-nothing is promoted.
+docs** has `update-second-brain` draft a folder per candidate — a sparse
+`_project.md` plus one feature file per recurring thread in the notes — show each
+folder in full, and write only the ones approved, one candidate at a time.
+Incomplete and guessed drafts are expected: a draft assembled from six weeks of
+notes is almost entirely `[second-hand]` and says so. Nothing is ever constructed
+silently, and nothing is promoted.
 
 ### Follow-ups close with an outcome
 
@@ -393,6 +459,8 @@ something a check has to catch.
 ./scripts/render.py /path/to/repo --targets cursor     # one target
 ./scripts/render.py /path/to/repo --check              # exit 1 on drift; for CI
 ./scripts/render.py /path/to/repo --no-register        # a fixture, not an onboarding
+./scripts/render.py /path/to/repo --local              # keep the output out of its remote
+./scripts/render.py /path/to/repo --shared             # ...and the explicit way back
 ./scripts/render.py --explain                          # resolution per target
 ```
 
@@ -481,6 +549,50 @@ Worth knowing which way to lean. Committing them is often the healthier answer �
 the team sees what landed and objects to what does not fit, and you end up with
 shared conventions rather than private ones. `--local` is for the case where that
 conversation is not yours to start.
+
+#### The mode is recorded, so a re-render cannot switch it
+
+The registry records **how** each repo was rendered, next to the path:
+
+```
+/Users/me/dev/my-repo	mode=shared
+/Users/me/work/their-repo	mode=local
+```
+
+Without that, the only record of local mode was the marked block inside one
+clone's `.git/info/exclude`, and `adopt.sh` was the only thing that read it.
+`render.py`, `make render` and `repos-check.sh` did not — so the `fix:` command
+`make upgrade` prints, run verbatim, re-rendered a `--local` repo in shared mode.
+The old exclude block survived, but rules added since onboarding landed outside
+it and showed up as untracked files in a repo that deliberately hides them; in a
+repo where those paths are already tracked, or after a `git add -A`, that is
+personal conventions committed to a shared remote. Nothing warned.
+
+So the default for an already-onboarded repo is not "shared" — it is **preserve**:
+
+- `render.py <repo>` re-renders in the recorded mode and says which, every run.
+- `--shared` is the explicit way to move a `--local` repo back. It also removes
+  the exclusion block, because leaving it would keep hiding files the registry
+  now calls shared.
+- `--local` and `--shared` are mutually exclusive: "local and shared" is not a
+  state, so the parser refuses it rather than resolving it by precedence.
+- `--check` and `--dry-run` report the mode and record nothing, the same contract
+  `.sbw-version` and the registry path already have.
+
+Lines written before the field existed carry no mode. That is treated as
+*unknown*, not shared, and resolved once from the `.git/info/exclude` block
+`adopt.sh` already grepped for: block present → `local`, registered with no block
+→ `shared`. The answer is recorded on the first render that learns it. No
+migration, no user decision.
+
+A recorded value this engine does not understand **refuses** rather than picking
+one, the same fail-closed shape as the vault id — the mode decides who sees your
+conventions, so it is not a thing to guess at. An explicit `--local` or `--shared`
+is itself the answer and repairs the line.
+
+`make repos-check` and `make upgrade` print the mode beside each verdict
+(`[local]`, `[shared]`, `[unknown]`), so the `fix:` command they hand you says
+what it will do to that repo rather than leaving you to remember.
 
 ### Confirming a rule actually loads
 
@@ -851,13 +963,27 @@ Or manually:
 ### The repo registry
 
 A successful render appends the target's real path to
-`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repos` — one absolute path
-per line, deduped and sorted, blank lines and `#` comments ignored on read. It is
+`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/repos` — one entry per line,
+deduped and sorted, blank lines and `#` comments ignored on read. It is
 the only record of *where* this machine has rendered, and the reason "re-render
 every onboarded repo" is a list rather than a guess: `render.py` writes
 `.sbw-version` into the target and nothing on the machine, so before this the
 only way to find onboarded repos was a directory glob — and a glob that matches
 nothing is indistinguishable from a machine that has genuinely onboarded nothing.
+
+An entry is an absolute path, optionally followed by TAB-separated `key=value`
+fields — today only [`mode`](#the-mode-is-recorded-so-a-re-render-cannot-switch-it),
+which records whether the repo was rendered `local` or `shared`. Unknown fields
+are preserved on write, so a newer engine's key survives a render by an older
+one; a line with no fields at all is the shape every entry had before the mode
+was recorded, and it still reads as a registered repo.
+
+The compatibility runs one way. An engine from before the mode was recorded reads
+a whole line as a path, so after rolling back it reports every repo whose line
+carries a mode as "registered, but not there". Nothing is destroyed and no repo
+stops loading its rules; the fix is to strip the fields —
+`sed -i "" "s/\t.*//" ~/.config/second-brain-workflow/repos` — or to roll
+forward again, which recovers the mode from each clone's `.git/info/exclude`.
 
 `--check` and `--dry-run` never write it, the same contract `.sbw-version` has. A
 registry that can't be written (read-only home, unwritable config directory)

@@ -40,6 +40,8 @@ help:
 	@echo "make explain             show how each rule resolves per target"
 	@echo "make render REPO=...     render rules into one repo (also registers it)"
 	@echo "                         LOCAL=1 also excludes them from that repo's git"
+	@echo "                         SHARED=1 moves a LOCAL repo back; without either,"
+	@echo "                         a re-render keeps the mode the registry recorded"
 	@echo "make repos-check         which onboarded repos are behind; reports, never renders"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make init              explain this engine, detect the machine, preview a config"
@@ -108,9 +110,14 @@ explain:
 # Named by v0.20.0's Major entry, which `make upgrade` prints verbatim, so a
 # reader upgrading past it is handed this command as the required action. It did
 # not exist until then: every other reference was ./scripts/render.py <repo>.
+# LOCAL and SHARED both pass through; neither is required for a re-render, which
+# keeps whichever mode the registry recorded for that repo. Passing both is
+# refused by render.py's parser rather than resolved here — "local and shared" is
+# not a state, and a Makefile silently preferring one would be exactly the guess
+# the recorded mode exists to remove.
 render:
 	@if [ -z "$(REPO)" ]; then echo "usage: make render REPO=/path/to/repo" >&2; exit 2; fi
-	@./scripts/render.py "$(REPO)" $(if $(LOCAL),--local,)
+	@./scripts/render.py "$(REPO)" $(if $(LOCAL),--local,) $(if $(SHARED),--shared,)
 
 # The same question `make upgrade` asks in step 7, asked at the other moment it
 # matters: after editing a rule, when every rendered copy on the machine has

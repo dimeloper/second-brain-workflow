@@ -227,7 +227,10 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
 - **Rendering into a repo you do not own.** `--local` renders normally and adds
   exactly the files it wrote to that repo's `.git/info/exclude`, so the rules
   load in your sessions and the remote never sees them. It refuses if a path it
-  would write is already tracked, rather than half-keeping the promise. See
+  would write is already tracked, rather than half-keeping the promise. The mode
+  is recorded next to the repo, so a later re-render preserves it instead of
+  quietly sharing what you kept private — `--shared` is the explicit way back.
+  See
   [Rendering into a repo you do not own](docs/REFERENCE.md#rendering-into-a-repo-you-do-not-own).
 - **Bring your own skills.** The engine ships five of its own and no roster of
   other people's. Declare the ones you want in a `skills.json`, pinned by sha
