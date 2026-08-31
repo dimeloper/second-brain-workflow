@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.43.0] - 2026-08-31
+
 ### Added
 - **Vault notes are checked as markdown.** `make audit` now runs
   `check-markdown.py`, and `build-vault-index.py` reports the same finding as a
@@ -3012,7 +3014,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.42.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.0...HEAD
+[0.43.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.39.0...v0.40.0
