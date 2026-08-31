@@ -22,10 +22,11 @@
 # The re-render is the part that actually needs a program rather than a
 # checklist. A repo onboarded with --local keeps its rendered files out of the
 # remote via a marked block in .git/info/exclude, and re-rendering it *without*
-# --local silently starts committing those files into a repo they were
-# deliberately kept out of. Nothing warns you; the diff just looks like a normal
-# render. This reads the marker and re-renders each repo in the mode it was
-# onboarded with.
+# --local starts committing those files into a repo they were deliberately kept
+# out of. This re-renders each repo in the mode it was onboarded with, read from
+# the registry (falling back to that marker for a line written before the mode
+# was recorded) — and render.py now preserves the mode by itself, so this is no
+# longer the only command that gets it right.
 #
 # Deliberately NOT done here, in every case because the answer is a judgement:
 #   - committing or pushing anything, in any repo
@@ -159,8 +160,14 @@ while IFS= read -r repo; do
     echo "  skip  ${name}: not there — left in the registry on purpose"
     continue
   fi
+  # Through the lib, not a private grep: the mode question had two answers on
+  # this machine — this grep, and nothing at all everywhere else — and the whole
+  # point of recording it in the registry is that there is now one. Still passed
+  # explicitly rather than left to render.py's own preservation, because this
+  # script prints the mode it used per repo and a flag it did not pass is a
+  # column it cannot honestly fill.
   mode=()
-  if grep -qF 'second-brain-workflow: rendered locally' "${repo}/.git/info/exclude" 2>/dev/null; then
+  if [ "$(sbw_registry_mode_effective "${repo}")" = "local" ]; then
     mode=(--local)
   fi
   if act; then

@@ -82,8 +82,9 @@ assert_no_file "${REGISTRY}" "...and recording nothing"
 render "${REPO}" >/dev/null 2>&1
 assert_exit 0 $? "render succeeds"
 assert_file "${REGISTRY}" "a successful render creates the registry"
-assert_contains "${REGISTRY}" "^$(real "${REPO}")\$" "registry holds the target's realpath"
-assert_not_contains "${REGISTRY}" "^$(real "${PROBE}")\$" \
+# The path is the first tab-separated field; the mode follows it.
+assert_contains "${REGISTRY}" "^$(real "${REPO}")	" "registry holds the target's realpath"
+assert_not_contains "${REGISTRY}" "^$(real "${PROBE}")	" \
   "and the --no-register target is still absent once the file exists"
 
 # --- idempotent -------------------------------------------------------------

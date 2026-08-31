@@ -6,7 +6,7 @@ generated — never edit a rendered file in a target repo, edit the source here
 and re-render.
 
     render.py <target-repo> [--targets cursor,claude-code,agents]
-              [--check] [--dry-run] [--explain]
+              [--check] [--dry-run] [--explain] [--local | --shared]
 
 Targets
     cursor       .cursor/rules/*.mdc      derived `globs` + `alwaysApply`
@@ -34,7 +34,12 @@ target — see check_globs().
 
 A successful render also appends the target's real path to the machine's repo
 registry (see lib/registry.py) — the only thing this writes outside the target
-repo, and the only record of where the engine has rendered.
+repo, and the only record of where the engine has rendered. The render *mode*
+(`local` or `shared`) is recorded there too, and an already-onboarded repo is
+re-rendered in the mode it carries unless `--local` or `--shared` says otherwise:
+`render.py <repo>` with no flag used to silently re-render a `--local` repo in
+shared mode, which is how personal conventions end up committed to a shared
+remote.
 
 Stdlib only. Config: RENDER_TARGETS env var, or --targets. Rules location:
 SBW_RULES_DIR env/config var, or --rules-dir — defaults to
@@ -43,6 +48,7 @@ engine) needs no configuration at all.
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -50,7 +56,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
+from lib.registry import MODES as REGISTRY_MODES  # noqa: E402
+from lib.registry import mode_of as recorded_mode  # noqa: E402
+from lib.registry import read as registry_read  # noqa: E402
 from lib.registry import register as register_repo  # noqa: E402
+from lib.registry import registry_path as registry_file  # noqa: E402
 from lib.repo_match import repo_files, path_matches  # noqa: E402
 
 ENGINE = Path(__file__).resolve().parent.parent
@@ -387,6 +397,10 @@ def write_exclude(repo, rels):
     Rewritten whole each run rather than appended to, so re-rendering after a
     rule is added or a target changes cannot leave a stale half-list behind, and
     a second run is not a second copy.
+
+    An empty `rels` removes the block instead of writing an empty one — that is
+    `--shared` switching a repo back, and a header with nothing under it would
+    read to the next `exclude_block_present()` as a repo still in local mode.
     """
     gd = git_dir(repo)
     if gd is None:
@@ -407,10 +421,90 @@ def write_exclude(repo, rels):
             continue
         kept.append(line)
 
-    block = [EXCLUDE_HEADER] + sorted(set(rels)) + [EXCLUDE_FOOTER]
-    text = "\n".join([l for l in kept if l.strip() or kept.index(l) < len(kept) - 1] + block) + "\n"
+    block = [EXCLUDE_HEADER] + sorted(set(rels)) + [EXCLUDE_FOOTER] if rels else []
+    lines = [l for l in kept if l.strip() or kept.index(l) < len(kept) - 1] + block
+    text = ("\n".join(lines) + "\n") if lines else ""
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def exclude_block_present(repo):
+    """Does this clone already carry our .git/info/exclude block?
+
+    The fallback for a registry line written before the mode field existed. It
+    is inference rather than a declaration — grepping another repo's git
+    internals is a reasonable recovery, not a source of truth — which is exactly
+    why the answer is recorded on the first render that learns it.
+    """
+    gd = git_dir(repo)
+    if gd is None:
+        return False
+    try:
+        return EXCLUDE_HEADER in (gd / "info" / "exclude").read_text(
+            encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+
+
+def resolve_mode(repo, asked, reporting):
+    """Which mode this render uses: ("local"|"shared", note-for-the-reader).
+
+    `asked` is "local", "shared", or None when no flag was given. The default is
+    not "shared" — it is *preserve*. `render.py <repo>` on a repo onboarded with
+    --local re-rendered it in shared mode: the existing exclude block survived,
+    but rules added since onboarding landed outside it and showed up untracked,
+    and in a repo where those paths are tracked (or after a `git add -A`) that is
+    personal conventions committed to a shared remote. Nothing warned, and the
+    command that walked into it is the `fix:` line `make upgrade` prints.
+
+    Ambiguity refuses rather than guesses, the same shape as the vault id: a
+    recorded value this engine does not understand is not resolved to a default,
+    because the default decides who sees your conventions.
+    """
+    recorded = recorded_mode(repo)
+    if recorded is not None and recorded not in REGISTRY_MODES and not asked:
+        # Only when no flag was given: an explicit --local/--shared *is* the
+        # answer, and refusing then would leave no way to repair the line.
+        sys.exit(
+            f"The repo registry records mode={recorded!r} for {repo}, which this "
+            f"engine does not understand (known: {', '.join(REGISTRY_MODES)}).\n"
+            "Refusing rather than picking one: the mode decides whether this "
+            "repo's remote sees the rendered files.\n"
+            "Pass --local or --shared to state it, or fix the line in "
+            f"{registry_file()}."
+        )
+    if recorded not in REGISTRY_MODES:
+        recorded = None
+
+    registered = os.path.realpath(str(repo)) in registry_read()
+    inferred = source = None
+    if recorded is None:
+        if exclude_block_present(repo):
+            inferred, source = "local", "inferred from .git/info/exclude"
+        elif registered:
+            # Registered, no mode field, no exclude block: rendered before the
+            # field existed and not rendered locally. That is `shared`, and
+            # recording it is what makes the gap self-healing.
+            inferred = "shared"
+            source = "inferred: registered, with no local-exclusion block"
+    known = recorded or inferred
+    if recorded:
+        source = "recorded"
+
+    if asked:
+        if known and asked != known:
+            return asked, (f"Mode: {asked} — switching this repo from {known} "
+                           f"({source}), because --{asked} says so.")
+        return asked, f"Mode: {asked}"
+    if known:
+        if known == "local":
+            return known, (
+                "Mode: local (%s) — kept from how this repo was onboarded, so\n"
+                "        the rendered files stay out of its remote. --shared to change it."
+                % source)
+        return known, f"Mode: shared ({source})"
+    # Nothing to preserve: a first render, where the flags are the whole answer.
+    return "shared", "Mode: shared (first render here)" if not reporting else "Mode: shared"
 
 
 def would_write(repo, rel):
@@ -532,9 +626,15 @@ def main():
     ap.add_argument("--rules-dir", help="override SBW_RULES_DIR for this run")
     ap.add_argument("--check", action="store_true", help="exit 1 on drift, write nothing")
     ap.add_argument("--dry-run", action="store_true", help="print planned actions")
-    ap.add_argument("--local", action="store_true",
-                    help="also exclude the rendered files locally, so the repo's "
-                         "remote never sees them")
+    # Mutually exclusive: "local and shared" is not a state, so it is refused
+    # by the parser rather than resolved by precedence further down.
+    modes = ap.add_mutually_exclusive_group()
+    modes.add_argument("--local", action="store_true",
+                       help="also exclude the rendered files locally, so the repo's "
+                            "remote never sees them")
+    modes.add_argument("--shared", action="store_true",
+                       help="render normally, and stop excluding the files locally "
+                            "— the explicit way to move a --local repo back")
     ap.add_argument("--no-register", action="store_true",
                     help="render without recording the repo as onboarded "
                          "(throwaway fixtures, probes)")
@@ -612,12 +712,19 @@ def main():
     if not repo.is_dir():
         sys.exit(f"Target repo not found: {repo}")
 
-    if args.local:
-        if args.check or args.dry_run:
-            pass  # reporting modes write nothing, so there is nothing to exclude
-        elif git_dir(repo) is None:
-            sys.exit(f"--local needs a git work tree: {repo} is not one. There is "
-                     "nothing to keep out of a remote here.")
+    reporting = args.check or args.dry_run
+    asked = "local" if args.local else ("shared" if args.shared else None)
+    share_mode, mode_note = resolve_mode(repo, asked, reporting)
+    local = share_mode == "local"
+
+    if local and not reporting and git_dir(repo) is None:
+        # Refuses whether the mode was asked for or preserved. A repo recorded
+        # local that is no longer a work tree is precisely the ambiguous state
+        # this must not resolve by rendering it shared.
+        sys.exit(f"{'--local' if asked else 'local mode'} needs a git work tree: "
+                 f"{repo} is not one. There is nothing to keep out of a remote "
+                 "here." + ("" if asked else "\nThe registry records this repo as "
+                            "local. Pass --shared if that is no longer true."))
 
     rules, scope_note = scope_rules(rules, repo, scope)
     if scope_note:
@@ -631,7 +738,7 @@ def main():
         print("note: AGENTS.md here is hand-written, so the always-on rules stay "
               "as their own files under .claude/rules/ rather than being folded "
               "into it.", file=sys.stderr)
-    if args.local:
+    if local:
         planned = sorted(list(rendered) + list(HEADERLESS_OWNED))
         tracked = tracked_paths(repo, planned)
         already = [p for p in tracked if would_write(repo, p)]
@@ -639,12 +746,12 @@ def main():
         if skipped:
             # Named, not refused over: these stay exactly as the repo has them.
             print("note: git tracks these and the render leaves them alone, so "
-                  "--local has nothing to hide:", file=sys.stderr)
+                  "local mode has nothing to hide:", file=sys.stderr)
             for rel in skipped:
                 print(f"        {rel}", file=sys.stderr)
         if already:
             sys.exit(
-                "--local cannot keep its promise here: git already tracks\n"
+                "local mode cannot keep its promise here: git already tracks\n"
                 + "".join(f"  {p}\n" for p in already)
                 + ".git/info/exclude has no effect on a tracked path — it would show\n"
                   "up as an ordinary modification, one `git commit -a` from being\n"
@@ -658,6 +765,10 @@ def main():
     if split:
         print(f"Rules:  {RULES_SRC.parent} @ {content_sha}")
     print(f"Target: {repo}  [{mode}] -> {', '.join(targets)}")
+    # Said every run, whichever mode it is. Who sees your conventions is a
+    # decision worth restating rather than a default worth forgetting, and it is
+    # also the line that shows a preserved mode was preserved.
+    print(f"  {mode_note}")
 
     drift = changed = stamp_behind = 0
 
@@ -776,9 +887,13 @@ def main():
     # guess about what a directory means, in a file whose whole value is that
     # its entries were put there deliberately.
     if mode == "write" and not args.no_register:
-        register_repo(repo, warn=lambda m: print(f"warning: {m}", file=sys.stderr))
+        # The mode travels with the path. A line written before this field
+        # existed gains it here, from the exclude-block inference above — which
+        # is what makes the gap self-healing rather than a migration.
+        register_repo(repo, mode=share_mode,
+                      warn=lambda m: print(f"warning: {m}", file=sys.stderr))
 
-    if args.local and mode == "write":
+    if mode == "write" and local:
         # Only what this render owns. A hand-written file the writer skipped is
         # the repo's, and listing it here would be a no-op entry implying we are
         # hiding something we never wrote.
@@ -795,6 +910,16 @@ def main():
         print("These files exist here and this repo's remote will never see them.")
         print("Nothing about the exclusion is committed either — .git/info/exclude")
         print("is local to this clone, so a fresh clone elsewhere has neither.")
+    elif mode == "write" and args.shared and exclude_block_present(repo):
+        # --shared is the explicit switch back, so it finishes the job: leaving
+        # the block behind would keep hiding the files it names while the
+        # registry says they are shared, and the next reader would have two
+        # sources disagreeing about the same repo.
+        written = write_exclude(repo, [])
+        print()
+        print(f"Removed the local-exclusion block from {written}.")
+        print("This repo's rendered files are now ordinary untracked files —")
+        print("`git status` will show them, and committing them shares them.")
 
     if mode == "check":
         if drift:

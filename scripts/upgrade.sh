@@ -348,7 +348,7 @@ run_doctor() {
 # bookkeeping gap, not a reason to skip it. It is labelled in the same line,
 # since `render.py <repo>` closes both at once.
 report_repos() {
-  local file entries scan targets repo drift=0 live=0 stale=0 unreg=0 label
+  local file entries scan targets repo drift=0 live=0 stale=0 unreg=0 label rmode
   heading "Onboarded repos (render --check, nothing is rendered)"
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
@@ -412,18 +412,25 @@ ${repo}
       continue
     fi
 
+    # The same mode label repos-check.sh prints, from the same lib function.
+    # This is the report the issue came in against: `fix: ./scripts/render.py
+    # <repo>`, run verbatim, re-rendered a --local repo in shared mode. render.py
+    # preserves the mode now, and the label is what lets a reader see that.
+    rmode="$(sbw_registry_mode_effective "${repo}")"
     live=$((live + 1))
     if "${STANDARDS_DIR}/scripts/render.py" "${repo}" --check >/dev/null 2>&1; then
-      ok "up to date: ${repo}${label}"
+      ok "up to date: ${repo}${label}  [${rmode}]"
       [ -z "${label}" ] || echo "        register it: ./scripts/render.py ${repo}"
     else
       drift=$((drift + 1))
-      echo "  DRIFT ${repo}${label}"
+      echo "  DRIFT ${repo}${label}  [${rmode}]"
       if [ -z "${label}" ]; then
         echo "        fix: ./scripts/render.py ${repo}"
       else
         echo "        fix: ./scripts/render.py ${repo} — re-renders it and registers it"
       fi
+      [ "${rmode}" != "local" ] || \
+        echo "             stays local: the rendered files stay out of that remote"
     fi
   done <<EOF
 ${targets}

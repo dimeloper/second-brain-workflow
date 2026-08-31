@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# The set of repos this machine has rendered into. Source, don't execute.
+# The set of repos this machine has rendered into, and how. Source, don't execute.
 #
 #   . "$(dirname "$0")/lib/registry.sh"
 #   sbw_registry_path                 # where the list lives
 #   sbw_registry_read                 # one absolute path per line
+#   sbw_registry_mode PATH            # the recorded render mode, or "" if none
+#   sbw_registry_excluded DIR         # does DIR carry our .git/info/exclude block?
+#   sbw_registry_mode_effective DIR   # recorded mode, else inferred, else unknown
 #   sbw_registry_marker_present DIR   # does DIR still carry rendered output?
 #   sbw_scan_rendered_repos           # which repos on this machine do, found
 #   sbw_scan_scope_line               # ...and the boundary that answer holds in
@@ -15,6 +18,11 @@
 # and a glob that matches nothing looks exactly like a machine that has
 # onboarded nothing.
 #
+# An entry is an absolute path, optionally followed by TAB-separated key=value
+# fields — today only `mode=local` / `mode=shared`. sbw_registry_read yields the
+# path alone, so every caller that only wants the repo set is unaffected by the
+# field ever having been added.
+#
 # Keep in step with lib/registry.py: same path, same format. Deliberately not
 # the machine config file (that parser does not strip trailing comments, and
 # this is a list, not key/value), and deliberately not redirected by
@@ -25,8 +33,9 @@ sbw_registry_path() {
   echo "${base}/second-brain-workflow/repos"
 }
 
-# Blank lines and comments are stripped, so a hand-seeded file can be annotated.
-sbw_registry_read() {
+# Whole entries, fields and all. Blank lines and comments are stripped, so a
+# hand-seeded file can be annotated.
+sbw_registry_read_entries() {
   local file line
   file="$(sbw_registry_path)"
   [ -f "${file}" ] || return 0
@@ -38,6 +47,99 @@ sbw_registry_read() {
     esac
     printf '%s\n' "${line}"
   done < "${file}"
+}
+
+# One absolute path per line — the field list, if any, cut off at the first tab.
+# Every existing caller reads the repo set through this, so recording a mode
+# beside the path could not change what any of them sees.
+sbw_registry_read() {
+  local line
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    printf '%s\n' "${line%%$'\t'*}"
+  done <<EOF
+$(sbw_registry_read_entries)
+EOF
+}
+
+# The mode recorded for one path, or "" when the line carries none. Empty is
+# *unknown*, not shared: every line written before the field existed has no
+# mode, and reading those as shared is the silent switch the field exists to
+# stop. sbw_registry_mode_effective below is what a caller usually wants.
+sbw_registry_mode() {
+  local want="$1" line path rest field
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    path="${line%%$'\t'*}"
+    [ "${path}" = "${want}" ] || continue
+    rest="${line#"${path}"}"
+    while [ -n "${rest}" ]; do
+      rest="${rest#$'\t'}"
+      field="${rest%%$'\t'*}"
+      rest="${rest#"${field}"}"
+      case "${field}" in
+        mode=*) printf '%s\n' "${field#mode=}"; return 0 ;;
+      esac
+    done
+    return 0
+  done <<EOF
+$(sbw_registry_read_entries)
+EOF
+  return 0
+}
+
+# Mirrors EXCLUDE_HEADER in scripts/render.py — matched on its stable prefix, so
+# the sentence may be reworded without this stopping to match. The block in a
+# clone's .git/info/exclude was for three releases the *only* record that a repo
+# was rendered with --local, and adopt.sh's private grep for it was the only
+# reader. One definition here instead: the mode question now has one answer
+# whoever asks it.
+SBW_EXCLUDE_MARKER="second-brain-workflow: rendered locally"
+
+sbw_registry_excluded() {
+  grep -qF "${SBW_EXCLUDE_MARKER}" "$1/.git/info/exclude" 2>/dev/null
+}
+
+# What mode a render of this repo should use: local | shared | unknown.
+#
+# The recorded field wins, because it is declared. Absent, the exclude block is
+# the fallback — inference, but honest inference about a repo we did render, and
+# it is what stops a registry line written before the field existed from reading
+# as a decision to share. `unknown` is only for a repo we have no line for and
+# no block in: a first render, where the flags decide and nothing is overridden.
+sbw_registry_mode_effective() {
+  local repo="$1" real recorded
+  real="$(cd "${repo}" 2>/dev/null && pwd -P)" || real=""
+  [ -n "${real}" ] || real="${repo}"
+  recorded="$(sbw_registry_mode "${real}")"
+  if [ -n "${recorded}" ]; then
+    printf '%s\n' "${recorded}"
+    return 0
+  fi
+  if sbw_registry_excluded "${repo}"; then
+    echo local
+  elif [ -n "$(sbw_registry_mode_line "${real}")" ]; then
+    # Registered, no mode field, no exclude block: rendered before the field
+    # existed and not rendered locally, which is `shared` and not an unknown.
+    echo shared
+  else
+    echo unknown
+  fi
+}
+
+# Does the registry name this path at all? Separate from the mode lookup because
+# "registered with no mode" and "not registered" are different answers.
+sbw_registry_mode_line() {
+  local want="$1" line
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    [ "${line}" = "${want}" ] || continue
+    printf '%s\n' "${line}"
+    return 0
+  done <<EOF
+$(sbw_registry_read)
+EOF
+  return 0
 }
 
 # Mirrors MARKER in scripts/render.py. tests/test-repo-registry.sh asserts the
