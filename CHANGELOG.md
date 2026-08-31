@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.46.1] - 2026-08-31
+
 ### Fixed
 - **`context-sources.py` reported a false empty tier on non-JS stacks.** The
   tier-3 and tier-4 globs were JS/TS-shaped — `**/theme.*`, `**/locales/*.json`
@@ -3163,7 +3165,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.1...HEAD
+[0.46.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.0...v0.46.1
 [0.46.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.44.0...v0.45.0
 [0.44.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.1...v0.44.0
