@@ -17,6 +17,7 @@ CHECK="${ENGINE}/scripts/check-followups.py"
 FVAULT="${FIXTURES}/followups/vault"
 RVAULT="${FIXTURES}/followups/repos-vault"
 TVAULT="${FIXTURES}/followups/threads-vault"
+OVAULT="${FIXTURES}/followups/outcomes-vault"
 AS_OF="2026-08-03"
 
 # --no-repo-grouping for the window/staleness assertions below: without it the
@@ -834,6 +835,81 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "$(scoped --landed-all)" in
   *"PR #7 merged"*) pass "--landed-all reaches the other repos" ;;
   *) fail "--landed-all reaches the other repos" "$(scoped --landed-all)" ;;
+esac
+
+
+# --- outcomes: what a tick actually meant -----------------------------------
+# "Done" and "abandoned" look identical once ticked, and lead to opposite
+# actions when the question comes back. One is finished work you can cite; the
+# other is an open risk in somebody else's backlog with nobody watching.
+outcomes_run="${CHECK} --vault ${OVAULT} --as-of 2026-01-06 --stale-days 0"
+out="$(${outcomes_run} --no-landed --repo alpha-service 2>/dev/null)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Closed without being finished"*) pass "dropped and handed-off get a block of their own" ;;
+  *) fail "dropped and handed-off get a block of their own" "${out}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"[dropped] Rewrite the CSV importer"*) pass "a dropped item is listed, marked dropped" ;;
+  *) fail "a dropped item is listed, marked dropped" "${out}" ;;
+esac
+
+# The owner is the whole point of recording a hand-off: without a name it is an
+# item nobody is watching, and the report has no way to say who to ask.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"[handed off → ops-team]"*) pass "a handed-off item names its owner" ;;
+  *) fail "a handed-off item names its owner" "${out}" ;;
+esac
+
+# The tag is machinery to match on, not text to echo back at the reader.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"#outcome/dropped"*) fail "the raw tag is not echoed on the line" "${out}" ;;
+  *) pass "the raw tag is not echoed on the line" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Ship the v1 shim"*) fail "an #outcome/done item leaves the list" "${out}" ;;
+  *) pass "an #outcome/done item leaves the list" ;;
+esac
+
+# The compatibility guarantee. Every note written before this convention is
+# full of bare ticks; reopening those would re-raise years of finished work on
+# the strength of a missing tag.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Tidy the fixture directory"*) fail "a bare - [x] closes, exactly as it always did" "${out}" ;;
+  *) pass "a bare - [x] closes, exactly as it always did" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"1 ticked item(s) in this window carry no #outcome/ tag"*)
+    pass "...and is counted in a footer, once the vault records outcomes at all" ;;
+  *) fail "...and is counted in a footer, once the vault records outcomes at all" "${out}" ;;
+esac
+
+# The count precedes any grouping and counts everything, so what a reader acts
+# on cannot be changed by which bucket an item landed in.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Open follow-ups older than 0 days: 5 in 3 threads"*)
+    pass "the total counts every item exactly once, unresolved ones included" ;;
+  *) fail "the total counts every item exactly once, unresolved ones included" "${out}" ;;
+esac
+
+# A vault with no outcome tags at all must read exactly as it did before: the
+# footer is about a convention in use, not a backlog to feel bad about.
+TESTS_RUN=$((TESTS_RUN + 1))
+plain="$(run 2>/dev/null)"
+case "${plain}" in
+  *"carry no #outcome/ tag"*) fail "a vault recording no outcomes is told nothing about them" "${plain}" ;;
+  *) pass "a vault recording no outcomes is told nothing about them" ;;
 esac
 
 finish

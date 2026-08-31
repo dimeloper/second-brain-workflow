@@ -17,6 +17,93 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`projects/` — a fifth kind of vault content, for long-running initiative
+  context.** A per-initiative document: the current state of a multi-week piece
+  of work that spans dozens of daily notes and has produced no practice note.
+  Who is involved, what was decided when, which options are still live, which
+  claims are verified and which are second-hand, what is open. The thing you
+  would hand a fresh session so it does not re-derive the picture from six
+  weeks of notes.
+
+  It could not be any of the four kinds already there. A daily note is dated
+  and only ever grows, and this document has to be *corrected* when a plan is
+  superseded — splitting one initiative across twenty dated notes is the
+  problem it exists to solve. A practice note is a reusable rule with a
+  maturity bar and a promotion path, and initiative context is specifically not
+  reusable: it would never promote, and it must not. `00-maps/` is indices over
+  other notes, not standalone documents.
+
+  So the guard's allowlist takes `projects/*`, `init-vault.sh` scaffolds the
+  directory and `_templates/project-note.md`, `update-second-brain` stages and
+  revises them, and `build-vault-index.py` writes `projects/INDEX.md` — but
+  only once the directory holds a note, so a vault that has never written one
+  regenerates to exactly the bytes it had before. Kept out of the allowlist,
+  the one artefact most worth carrying across sessions was the one the tooling
+  refused to carry: permanently untracked, invisible to every other machine.
+  Closes [#10](https://github.com/dimeloper/second-brain-workflow/issues/10).
+
+- **`update-second-brain` revises a project doc when the session moved one.**
+  A new step, before the capture is published: if a decision was made or
+  reversed, a contested point closed, a question answered, or a `[second-hand]`
+  claim verified, correct the document in place and add a dated timeline entry
+  saying what it changed *from*. Appending to the daily note is not enough and
+  never was — the note records that the direction changed, and the document a
+  future session actually reads goes on describing the superseded plan as
+  current.
+
+  Write semantics sit between a daily note's and a practice note's, and the
+  vault says so in its own `propose-then-approve-vault-writes.md`: add and
+  revise freely, because a wrong line in a record is cheap and self-correcting,
+  but **propose deletions** — unlike a daily note this one is rewritten, and an
+  agent revising it can silently drop a fact rather than merely add a wrong
+  one. Adding is recoverable by reading; a removal leaves nothing to read.
+
+- **An opt-in backfill for vaults that already have the material.** `make
+  project-candidates` (`scripts/project-candidates.py`) reports which repos keep
+  turning up across the recent daily notes, over how many notes and how many
+  days, and which already have a project doc. Saying **backfill project docs**
+  has `update-second-brain` draft one document per candidate, show each draft in
+  full, and write only the ones approved, one at a time. Incomplete and guessed
+  drafts are expected — a draft assembled from six weeks of notes is almost
+  entirely `[second-hand]` and marks itself that way. Silent construction is
+  forbidden, nothing is auto-promoted, and an upgrade never triggers any of it.
+
+- **A closed follow-up carries an outcome, not just a tick.** `#outcome/done`,
+  `#outcome/dropped`, `#outcome/superseded`, or `#outcome/handed-off` with
+  `#owner/<name>` — written the same way the `#repo/` tag is, by the side that
+  knows. `update-second-brain` proposes the outcome whenever it would tick a
+  box and never guesses which of the four it was; `check-follow-ups` and
+  `check-followups.py` let `done` and `superseded` leave the open list and
+  report `dropped` and `handed-off` in a block of their own, **Closed without
+  being finished**.
+
+  "Done" and "abandoned" look identical once ticked, and lead to opposite
+  actions when the question comes back a month later. One is finished work you
+  can cite. The other is an open risk sitting in somebody else's backlog with
+  nobody watching, and the tick is what stopped anyone looking. The same
+  outcome is written on a project doc when one of its open questions or
+  contested points closes: that day's note is where it happened, the project
+  doc is where the next session looks.
+
+### Compatibility
+
+Additive throughout; an already-onboarded repo and an existing vault both keep
+working with nothing to do.
+
+- **`make upgrade` still never writes a vault.** After an upgrade `projects/`
+  is simply an allowed path that nothing has created. The directory and its
+  template arrive when you ask for them, with
+  `./scripts/init-vault.sh --path <your vault> --id <your id> --adopt`.
+- **A bare `- [x]` closes exactly as it always did.** Every note written before
+  the outcome convention is full of them, and reopening those would re-raise
+  years of finished work on the strength of a missing tag. Once a window
+  contains one outcome tag, a footer counts the ticks that carry none — a
+  count, never a list.
+- **`build-vault-index.py --check` cannot go red for this.** A vault with no
+  project docs generates no `projects/INDEX.md` and is not stale for lacking
+  one, so no adopter's next CI run fails for a change they did not make.
+
 ## [0.39.0] - 2026-08-25
 
 ### Added

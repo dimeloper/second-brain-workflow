@@ -2,19 +2,21 @@
 name: update-second-brain
 description: >-
   Capture the current agent session's work into the Obsidian "second brain"
-  vault and publish it: append to today's daily note, propose and promote
-  engineering practice notes, then commit and push. Runs from inside the
-  working repo; the vault lives elsewhere. Use when the user says update
-  second brain, update my second brain, capture this session, log this to
-  second brain, second brain this, publish second brain, commit the vault,
-  or push practices.
+  vault and publish it: append to today's daily note, revise the project docs
+  the session moved, propose and promote engineering practice notes, then
+  commit and push. Runs from inside the working repo; the vault lives
+  elsewhere. Use when the user says update second brain, update my second
+  brain, capture this session, log this to second brain, second brain this,
+  publish second brain, commit the vault, push practices, or backfill
+  project docs.
 ---
 
 # Update second brain
 
 Turns "what I just did in this session" into vault updates, then publishes them.
 This is the **only** write path into the vault: capture → **publish the capture**
-→ propose → promote → commit → push. The capture ships before the proposal on
+→ propose → promote → commit → push. The capture is today's daily note plus any
+project doc the session moved. The capture ships before the proposal on
 purpose — a daily note held back for approval is one another session can lose.
 You are usually invoked from a *different* repo (the one worked on); the vault is
 never the current working directory.
@@ -27,8 +29,15 @@ practices *during* work. It does not write.
 - Vault: `$SBW_VAULT` if set, else `~/vaults/second-brain`
 - Practices: `practices/{frontend,backend,app,cross-cutting}/`
 - Daily notes: vault root, `YYYY-MM-DD.md` (local date)
-- Templates: `_templates/{practice-note,daily-note}.md`
+- Projects: `projects/<initiative>.md` — one document per long-running
+  initiative, revised in place
+- Templates: `_templates/{practice-note,daily-note,project-note}.md`
 - Maps: `00-maps/{review-queue,promotion-candidates}.md`
+
+A vault with no `projects/` directory has not adopted them; `make upgrade` never
+writes a vault, so it arrives by running `init-vault.sh --adopt`. Skip every
+project step below in a vault that does not have one, and say so once — do not
+create the directory to have somewhere to write.
 
 **The vault is the source of truth for its own rules.** Before writing anything,
 read the meta-practice notes under `practices/cross-cutting/` and follow them
@@ -48,7 +57,9 @@ verbatim — they override anything below if they ever conflict:
 Do this first, so every later step reads a current `practices/INDEX.md` and the
 regenerated index is part of the same commit. Warnings name notes with malformed
 frontmatter or a missing `**Rule:**` — fix those as you go if the session touched
-them.
+them. The same run regenerates `projects/INDEX.md`, and only if the vault holds
+at least one project doc: a vault with none must regenerate to exactly the bytes
+it had before, or its next `--check` goes red for a change nobody made.
 
 ## Step 1 — Gather this session's context
 
@@ -134,7 +145,7 @@ Omit empty sections — leave them out of the block and they are never created.
 - `## Drift / gaps` records where reality diverged from a practice, or gaps with
   no note yet — raw material for new candidates.
 - `## Vault candidates` lists proposals; `(approved)` / `(declined)` record the
-  outcome after Step 5.
+  outcome after Step 6.
 
 ### Tag every follow-up with its repo
 
@@ -154,6 +165,37 @@ later with nothing but prose to go on, and one day's items routinely span
 several repos. Inferring it there works maybe four times in five, which for a
 task list is the worst place to be — so record it once, at the moment it is
 certain.
+
+### Closing a follow-up takes an outcome, not just a tick
+
+**A bare `- [x]` is an incomplete write.** When you would tick a box, propose the
+outcome with it — one of `done`, `dropped`, `superseded`, `handed-off` — as a
+`#outcome/<value>` tag, plus `#owner/<name>` when it was handed off:
+
+```markdown
+- [x] Merge the barcode PR #outcome/done #repo/acme-app
+- [x] Rewrite the importer in Rust #outcome/dropped — the CSV path was fast enough
+- [x] Pin the old auth flow's migration #outcome/superseded — the OAuth rewrite replaces it
+- [x] Rotate the CRM key #outcome/handed-off #owner/ops-team #repo/acme-backend
+```
+
+"Done" and "abandoned" look identical once ticked, and they lead to opposite
+actions when the question comes back a month later. One is finished work you can
+cite. The other is an open risk sitting in somebody else's backlog with nobody
+watching it, and the tick is what stopped anyone looking.
+
+- **Do not guess the outcome.** If the session does not say which of the four it
+  was, ask in one line, or leave the item `- [ ]`. A wrong `#outcome/done` is
+  strictly worse than an untagged tick, because it closes the item *and* asserts
+  something false about it.
+- `handed-off` without an owner is half an answer. Record who owns it now — a
+  team, a person, a queue. If you do not know, that is a `- [ ]` item asking.
+- **Never retrofit outcomes onto existing ticks.** Same rule as the `#repo/` tag:
+  tag what you are writing, not what is already written. An old bare `- [x]`
+  closes exactly as it always did.
+- The read side reads this: `check-follow-ups` lets `done` and `superseded` leave
+  the open list, and keeps `dropped` and `handed-off` visible as unresolved risk
+  or a named owner — not as finished work.
 
 Rules:
 
@@ -189,24 +231,92 @@ git -C <vault> commit -m "docs: move the kit block to 2026-08-22, where it happe
 Daily-rewrite: block was filed a day late; boundary fixed against commit timestamps"
 ```
 
-## Step 4 — Publish the daily note, before you ask about anything else
+## Step 4 — Revise the project docs this session moved
 
-Commit and push the daily note **now**, in its own commit, before proposing a
-single practice note. It is written; it is not yours to hold.
+Skip this entirely if the vault has no `projects/` directory.
+
+A project doc (`projects/<initiative>.md`) is the current state of one
+long-running piece of work: who is involved, what was decided when, which
+options are still live, what is open. It is what you would hand a fresh session
+so it does not re-derive six weeks of daily notes. It is **not** a practice note
+— no maturity, no `applies-to`, no promotion path, ever — and it is **not** a
+daily note: it is revised in place, because a sentence that was true three weeks
+ago has to be *corrected*, not appended to.
+
+**If the session materially changed an initiative's state, revise its doc.**
+Appending to the daily note is not enough and never was: the note records that
+the direction changed, and the document a future session actually reads goes on
+describing the superseded plan as current. That is the failure this step exists
+for.
+
+Materially changed means at least one of:
+
+- a decision was made, reversed, or overtaken
+- a contested point closed, or a new one opened
+- an open question was answered — or dropped, superseded, or handed off
+- the cast changed: someone joined, left, or moved position
+- a claim previously marked `[second-hand]` got verified, or turned out false
+
+Then, in the doc:
+
+1. **Correct what is now wrong**, in place. Do not leave a superseded plan
+   standing next to its replacement with no indication which one is current.
+2. **Add a dated `## Timeline` entry** for what changed, and what it changed
+   *from*. The "from" is the half that is impossible to reconstruct later.
+3. **Mark every claim you add** `[verified]` (you read it in the repo, the PR,
+   the migration, the log) or `[second-hand]` (someone said it, a doc asserted
+   it, you remember it). Unmarked reads as verified, and that is the one way
+   this document lies to the next session.
+4. **Close open questions and contested points with an outcome**, in exactly the
+   form the daily note uses — `#outcome/done`, `#outcome/dropped`,
+   `#outcome/superseded`, `#outcome/handed-off` plus `#owner/<name>`. When an
+   item closes, it closes *here* as well as in that day's note. The day's note
+   is where it happened; this is where the next session looks.
+5. **Bump `last-reviewed`** to today. It is the only field that says whether the
+   document still describes the present.
+
+**Write freely; propose deletions.** Adding and correcting need no approval —
+this is a record, and a wrong line is cheap and self-correcting, like a daily
+note's. Removing is different: an agent revising a document can silently drop a
+fact rather than merely add a wrong one, and there is nothing left to read
+afterwards. So when a revision would *remove* a claim, a timeline entry, or a
+cast row, name the lines and why in the proposal message of Step 6, and leave
+them in place until they are approved.
+
+A new project doc is a write like any other here — draft it from
+`_templates/project-note.md`, write it, say you did. Do not create one for a
+piece of work that fits in a daily note; the bar is that its state spans notes
+and no single note answers "where is this now".
+
+**Nothing here promotes.** A project doc is not a candidate for `practices/`,
+and no amount of re-application makes it one. If something in it does turn out
+to be a reusable rule, that is a separate practice note, proposed the normal way
+in Step 6 with its own provenance.
+
+## Step 5 — Publish the capture, before you ask about anything else
+
+Commit and push the daily note and any revised project docs **now**, in one
+commit, before proposing a single practice note. They are written; they are not
+yours to hold.
 
 A wrap-up that writes the note and then waits for approval can lose it outright:
 a later session committing the vault from a clean tree carries it off, or a
 concurrent one overwrites it. Saturday's `motion-site-kit` block was lost the
 first way and 2026-08-24's `echo-city-hotel` block the second. Committing here
 also gives the guard a committed baseline to diff the next write against, which
-is what makes the lost-update check in Step 7 able to see anything at all.
+is what makes the lost-update check in Step 8 able to see anything at all.
 
 ```bash
-git -C <vault> add <YYYY-MM-DD>.md
+git -C <vault> add <YYYY-MM-DD>.md projects
 ~/second-brain-workflow/scripts/guard-vault-commit.sh --expect-id <this machine's vault id>
-git -C <vault> commit -m "docs: capture the <repo> wrap-up in the daily note" -- <YYYY-MM-DD>.md
+git -C <vault> commit -m "docs: capture the <repo> wrap-up in the daily note" \
+  -- <YYYY-MM-DD>.md projects
 git -C <vault> push
 ```
+
+Drop `projects` from both lines when the vault has none, or when nothing there
+changed — an unchanged path in a pathspec is harmless, a path that does not
+exist is an error.
 
 **The pathspec after `--` is what scopes the commit, not the `git add` above it.**
 A commit with no pathspec takes the whole index — including whatever a
@@ -218,10 +328,13 @@ Practice notes are a second commit, after approval. Two commits per wrap-up is
 the intended shape, not a defect: the capture is a fact and does not need
 approval, and the promotion is a proposal and does.
 
-## Step 5 — Propose practice-note changes (approval required)
+## Step 6 — Propose practice-note changes (approval required)
 
 Derive candidates in three buckets. **Propose all of them in one message and wait
-for approval before writing any practice note.**
+for approval before writing any practice note.** Any project-doc *deletion* held
+back from Step 4 goes in the same message, listed separately — it is a different
+kind of ask, and burying it under practice candidates is how it gets waved
+through.
 
 1. **New practice.** A reusable rule not yet in the vault. Draft from
    `_templates/practice-note.md`: `domain`, `applies-to` (`""` until enforced, or
@@ -279,8 +392,16 @@ for approval before writing any practice note.**
   yet" is correct, not a gap. Do not back-fill it with invented evidence.
 - If a candidate is declined, record it under `## Vault writes (declined)` with a
   one-line reason.
+- A project doc never appears in these buckets as a promotion candidate. It has
+  no maturity to raise and nothing in it is a reusable rule; the only project-doc
+  item that belongs in this message is a proposed deletion.
 
-## Step 6 — Apply approved writes
+**Project-doc deletions**, if any, as their own list: the file, the exact lines
+that would go, and why each one stopped being true. A deletion approved here is
+applied in Step 7 with the rest; one that is declined stays in the document, and
+the disagreement is worth a line in `## Drift / gaps`.
+
+## Step 7 — Apply approved writes
 
 Write only what was approved. Do not partially write a practice note.
 
@@ -289,10 +410,11 @@ The outcome goes into the daily note's `## Vault writes (approved)` /
 exactly as in Step 3. The note has been committed and possibly written to by
 another session since; re-reading it is not optional here.
 
-## Step 7 — Commit the practice notes
+## Step 8 — Commit the practice notes
 
-The daily note went out in Step 4. This commit is the approved practice notes,
-the regenerated index, and the daily note's `## Vault writes` sections.
+The capture went out in Step 5. This commit is the approved practice notes, the
+regenerated indexes, the daily note's `## Vault writes` sections, and any
+project-doc deletion approved in Step 6.
 
 Run in parallel first: `git status`, `git diff`, `git log -5 --oneline` (for
 message style).
@@ -302,8 +424,8 @@ config; ignore `workspace.json`, cache, `.trash`, `.DS_Store`), and create a
 **private** remote if none exists. If `.git` exists but has no `origin`, ask once
 for the URL. Never change git config.
 
-Stage vault content only — practices, daily notes, templates, maps, tracked
-`.obsidian` config. Never stage secrets, `.env`, or trash.
+Stage vault content only — practices, daily notes, project docs, templates,
+maps, tracked `.obsidian` config. Never stage secrets, `.env`, or trash.
 
 Then run the guard, which is the mechanical backstop:
 
@@ -333,12 +455,12 @@ git commit -m "docs: publish practice notes from <session> wrap-up" \
   -- practices <YYYY-MM-DD>.md
 ```
 
-Same pathspec rule as Step 4: name what this commit carries, so a concurrent
+Same pathspec rule as Step 5: name what this commit carries, so a concurrent
 session's staged work cannot ride along.
 
 If there is nothing to publish, say so and stop — no empty commits.
 
-## Step 8 — Push
+## Step 9 — Push
 
 ```bash
 git push -u origin HEAD
@@ -347,11 +469,13 @@ git push -u origin HEAD
 Never `--force`, never a rewriting refspec. Never commit or push `second-brain-workflow`
 or the product repo as part of this skill.
 
-## Step 9 — Report
+## Step 10 — Report
 
-- Vault path, remote, and **both** commit SHAs + subjects — the Step 4 capture
-  and the Step 7 practice notes
+- Vault path, remote, and **both** commit SHAs + subjects — the Step 5 capture
+  and the Step 8 practice notes
 - Daily-note bullets added
+- Project docs revised, and in one line each what changed about the initiative's
+  state — a doc touched without saying why reads as a formatting pass
 - Notes created / updated / promoted, and any remaining promotion candidates
 - Anything left unstaged, and why
 - Whether a write was ever refused as stale, and what you re-read — a wrap-up
@@ -360,6 +484,69 @@ or the product repo as part of this skill.
 If the vault's structure or counts changed materially and you keep a memory file
 for it, update that too.
 
+## Backfill mode — only when asked for it by name
+
+**Never part of a normal wrap-up.** This runs when the user says *backfill
+project docs*, *write up the initiatives in my notes*, or asks for the same
+thing in their own words. An upgrade does not trigger it, a wrap-up does not
+trigger it, and a vault that just gained a `projects/` directory does not
+trigger it. Silent construction of project docs is forbidden — the whole value
+of these documents is that a reader can trust what is in them, and a directory
+that filled itself overnight from six weeks of notes has no such claim.
+
+### 1. Find the candidates
+
+```bash
+~/second-brain-workflow/scripts/project-candidates.py
+~/second-brain-workflow/scripts/project-candidates.py --notes 40 --min-span 21
+```
+
+Read-only. It reports which repos keep turning up across the recent daily notes,
+how many notes and over how many days, and which already have a project doc. The
+unit it can count is the repo; the initiative is usually narrower, and telling
+those apart is the reader's job, not the script's. Say so when you present the
+list.
+
+### 2. Draft, one document per candidate
+
+Read the notes that actually mention each candidate — the ones the script named,
+not a sample — and draft from `_templates/project-note.md`. Fill only what the
+notes evidence:
+
+- `## TL;DR` — where this is *now*, in two or three sentences
+- `## Cast` — only people the notes actually name in a role. Do not infer.
+- `## Timeline` — dated entries, each from a note you read
+- `## Contested points` / `## Open questions` — including items still `- [ ]`
+- `## Artifacts and links` — PRs, commits, dashboards the notes cite
+
+**Mark every claim** `[verified]` or `[second-hand]`. A backfill draft is almost
+entirely `[second-hand]`: it is assembled from what a note said at the time, not
+from anything re-checked today. Marking it that way is the honest state, and it
+is what makes the document safe to write at all.
+
+**Incomplete and guessed drafts are expected and fine.** A draft that says "the
+notes do not say who owns this" is more useful than one that quietly picks
+somebody. Say what you could not establish, in the document, in the section
+where it is missing. Do not fill a section by inference to make the shape look
+finished.
+
+### 3. Show each draft; write only what is approved
+
+Show the drafts **one at a time**, in full, and take approval per document. Not a
+batch, not a summary with a "write them all?" at the end — the reader is
+approving a document they will later trust as a record, and a list of titles is
+not something anyone can approve meaningfully.
+
+- Approved → write it, then it commits with the normal capture in Step 5.
+- Declined → write nothing, and record it under `## Vault writes (declined)` in
+  today's note with the one-line reason.
+- Edited → apply the edit and re-show before writing.
+
+**Nothing here promotes, and nothing here becomes a practice note.** If a pattern
+shows up across three of the drafts, that is a note for `## Vault candidates`
+and a normal Step 6 proposal, with its own provenance — not something the
+backfill decides.
+
 ## Relationship to other skills
 
 | Phrase | Skill |
@@ -367,4 +554,6 @@ for it, update that too.
 | feature complete / wrap up | cleanup, then this skill |
 | consult the vault mid-task | `obsidian-knowledge-base` (read only) |
 | **update second brain** / publish / commit the vault | **this skill** |
+| **backfill project docs** | **this skill**, backfill mode above — never on its own |
+| what's still open / check my tasks | `check-follow-ups` (read only) |
 | onboard repo | `onboard-repo`; appends a daily-note line only |

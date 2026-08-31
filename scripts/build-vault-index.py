@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Generate practices/INDEX.md for a second-brain vault.
+"""Generate practices/INDEX.md (and projects/INDEX.md) for a second-brain vault.
 
 The index is the hot path into a cold-path vault: an agent reads one file to
 learn what notes exist and roughly what each says, then opens only the notes
 that matter. Output is deterministic — re-running without vault changes
 produces a byte-identical file, so a no-op run is a zero-line diff.
 
+`projects/` gets an index of its own on exactly the same terms, and only once
+it holds a note: a vault that has never written a project doc must regenerate
+to the bytes it had before this engine knew about them, or every adopter's next
+`--check` goes red for a change they did not make.
+
 Usage:
   build-vault-index.py [--vault PATH] [--check]
 
-  --check   exit 1 if the index on disk differs from what would be generated
+  --check   exit 1 if an index on disk differs from what would be generated
             (for CI or a pre-commit hook); writes nothing
 
 Vault resolution: --vault, else $SBW_VAULT, else ~/vaults/second-brain
@@ -243,6 +248,135 @@ def render(notes, two_bars=True):
     return "\n".join(out).rstrip("\n") + "\n"
 
 
+# --- projects -----------------------------------------------------------
+# A fifth kind of vault content: the current state of one multi-week initiative,
+# revised in place. Indexed separately from practices/ rather than folded into
+# it, because the two answer different questions and are judged on different
+# things — a practice note carries a maturity and a promotion bar, and a project
+# doc has neither and never will. Mixing them into one table would be the first
+# step towards a project doc being read as a rule.
+PROJECT_STATUS_ORDER = {"active": 0, "paused": 1, "closed": 2}
+
+
+def extract_tldr(text, limit=RULE_MAX):
+    """The first bullet or line under `## TL;DR`, for the index row.
+
+    Same job as a practice note's **Rule:** excerpt — enough to decide whether
+    to open the document, not a summary of it. Comment blocks are skipped: the
+    template ships explanatory HTML comments and they are not content.
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().lower() != "## tl;dr":
+            continue
+        in_comment = False
+        for follow in lines[i + 1:]:
+            stripped = follow.strip()
+            if stripped.startswith("#"):
+                break
+            if in_comment:
+                if "-->" in stripped:
+                    in_comment = False
+                continue
+            if stripped.startswith("<!--"):
+                in_comment = "-->" not in stripped
+                continue
+            if not stripped:
+                continue
+            return re.sub(r"^(?:[-*]|\d+\.)\s+", "", stripped)
+        break
+    return ""
+
+
+def collect_projects(vault):
+    """(notes, problems), or (None, []) when the vault has no projects/ at all."""
+    projects = vault / "projects"
+    if not projects.is_dir():
+        return None, []
+
+    notes, problems = [], []
+    for path in sorted(projects.rglob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        rel = path.relative_to(projects)
+        text = path.read_text(encoding="utf-8")
+        fm, warnings = parse_frontmatter(text)
+        if fm is None:
+            problems.append((str(rel), warnings[0]))
+            fm = {}
+        else:
+            for w in warnings:
+                problems.append((str(rel), w))
+
+        status = fm.get("status") or "?"
+        if status not in PROJECT_STATUS_ORDER and status != "?":
+            problems.append((str(rel), f"unknown status: {status}"))
+        for required in ("status", "last-reviewed"):
+            if not fm.get(required):
+                problems.append((str(rel), f"missing {required}"))
+
+        title = ""
+        for line in text.splitlines():
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        if not title:
+            problems.append((str(rel), "no H1 title"))
+        tldr = extract_tldr(text)
+        if not tldr:
+            problems.append((str(rel), "no ## TL;DR line"))
+
+        repos = fm.get("repos") or []
+        notes.append(
+            {
+                "slug": path.stem,
+                "title": title or path.stem,
+                "status": status,
+                "reviewed": fm.get("last-reviewed") or "—",
+                "repos": repos if isinstance(repos, list) else [repos],
+                "tldr": first_sentence(tldr) if tldr else "",
+            }
+        )
+    return notes, problems
+
+
+def render_projects(notes):
+    counts = {}
+    for n in notes:
+        counts[n["status"]] = counts.get(n["status"], 0) + 1
+    summary = " · ".join(
+        f"{counts[st]} {st}"
+        for st in sorted(counts, key=lambda k: PROJECT_STATUS_ORDER.get(k, 9))
+    )
+    out = [
+        "# Projects index",
+        "",
+        f"> Generated by `{GENERATED_BY}` — do not edit by hand.",
+        f"> {len(notes)} initiatives · {summary}",
+        "",
+        "One row per long-running initiative. These are context documents, not",
+        "practices: they are revised in place, they carry no maturity, and none of",
+        "them promotes. `Reviewed` is the note's own `last-reviewed` field — the",
+        "date somebody last checked it against reality, which is the only thing",
+        "that says whether a row still describes the present.",
+        "",
+        "| Project | Status | Reviewed | Repos | TL;DR |",
+        "|---|---|---|---|---|",
+    ]
+    for n in sorted(notes, key=lambda n: (PROJECT_STATUS_ORDER.get(n["status"], 9),
+                                          n["slug"])):
+        out.append(
+            "| [[{slug}]] | {status} | {reviewed} | {repos} | {tldr} |".format(
+                slug=cell(n["slug"]),
+                status=cell(n["status"]),
+                reviewed=cell(n["reviewed"]),
+                repos=cell(", ".join(n["repos"])),
+                tldr=cell(n["tldr"]),
+            )
+        )
+    return "\n".join(out).rstrip("\n") + "\n"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--vault", help="vault path (default: $SBW_VAULT)")
@@ -265,19 +399,38 @@ def main():
     content = render(notes, two_bars)
     index = vault / "practices" / "INDEX.md"
 
+    projects, project_problems = collect_projects(vault)
+    problems = problems + [(f"projects/{rel}", p) for rel, p in project_problems]
+
     for rel, problem in problems:
         print(f"warning: {rel}: {problem}", file=sys.stderr)
 
     if args.check:
+        rc = 0
         current = index.read_text(encoding="utf-8") if index.exists() else None
         if current == content:
             print(f"{index} is current ({len(notes)} notes)")
-            return 0
-        print(f"{index} is stale — run build-vault-index.py", file=sys.stderr)
-        return 1
+        else:
+            print(f"{index} is stale — run build-vault-index.py", file=sys.stderr)
+            rc = 1
+        # An empty (or absent) projects/ has no index and is not stale for
+        # lacking one — same reasoning as the two-bar column above.
+        if projects:
+            pindex = vault / "projects" / "INDEX.md"
+            pcurrent = pindex.read_text(encoding="utf-8") if pindex.exists() else None
+            if pcurrent == render_projects(projects):
+                print(f"{pindex} is current ({len(projects)} initiatives)")
+            else:
+                print(f"{pindex} is stale — run build-vault-index.py", file=sys.stderr)
+                rc = 1
+        return rc
 
     index.write_text(content, encoding="utf-8")
     print(f"Wrote {index} ({len(notes)} notes, {len(problems)} warning(s))")
+    if projects:
+        pindex = vault / "projects" / "INDEX.md"
+        pindex.write_text(render_projects(projects), encoding="utf-8")
+        print(f"Wrote {pindex} ({len(projects)} initiatives)")
     return 0
 
 

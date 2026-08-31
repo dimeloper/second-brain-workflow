@@ -37,6 +37,12 @@
 # Writes no *domain* practice notes — a vault's content is earned, not
 # scaffolded. It does seed the four cross-cutting notes that describe how the
 # vault itself operates, because `update-second-brain` reads them at runtime.
+#
+# `projects/` is scaffolded empty, with its template. It is a fifth kind of
+# vault content — a per-initiative context document, revised in place — and it
+# arrives in an existing vault through `--adopt`, deliberately: `make upgrade`
+# never writes a vault, so an engine upgrade alone leaves the directory absent
+# and the guard's allowlist simply permitting a path nothing has created yet.
 set -euo pipefail
 
 STANDARDS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -211,12 +217,17 @@ write_if_absent() {
 echo "Vault: ${VAULT}  (id: ${ID})"
 make_dir "${VAULT}"
 for d in practices/app practices/backend practices/frontend practices/cross-cutting \
-         _templates 00-maps bases; do
+         _templates 00-maps bases projects; do
   make_dir "${VAULT}/${d}"
 done
 for d in app backend frontend cross-cutting; do
   [ -e "${VAULT}/practices/${d}/.gitkeep" ] || : > "${VAULT}/practices/${d}/.gitkeep"
 done
+# projects/ starts empty and stays empty until an initiative earns a document,
+# same as the practice domains — and, same as them, git does not track an empty
+# directory, so a fresh clone would arrive without it and the first project doc
+# would land in a directory nobody could see was intended.
+[ -e "${VAULT}/projects/.gitkeep" ] || : > "${VAULT}/projects/.gitkeep"
 
 # The identity block is written only when the file is created. Adding a key to
 # an existing vault.json would be an *edit*, and this script's one invariant
@@ -303,7 +314,19 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
 - [ ]
 
 <!-- Open items you'd otherwise forget by next week. `- [ ]` pending,
-     `- [x]` done — check-follow-ups reads these, nothing else.
+     `- [x]` closed — check-follow-ups reads these, nothing else.
+
+     A CLOSED ITEM CARRIES AN OUTCOME. `- [x]` alone says the item left the
+     list; it does not say how, and the four ways lead to opposite actions when
+     the question comes back:
+       - [x] Merge the barcode PR #outcome/done
+       - [x] Rewrite the importer in Rust #outcome/dropped — CSV was fast enough
+       - [x] Pin the old migration #outcome/superseded — the rewrite replaces it
+       - [x] Rotate the CRM key #outcome/handed-off #owner/ops-team
+     "Done" is finished work you can cite. "Dropped" is an accepted risk and
+     "handed off" is somebody else's backlog — check-follow-ups keeps those two
+     visible instead of reading them as work that happened. A bare `- [x]` still
+     closes, so nothing written before this convention changes.
 
      End each item with `#repo/<name>` for the repo it belongs to, spelled the
      way practice notes' `repos:` field spells it:
@@ -331,6 +354,79 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
 
 ## Vault writes (declined)
 -
+EOF
+
+write_if_absent "${VAULT}/_templates/project-note.md" <<'EOF'
+---
+kind: project
+status: active          # active | paused | closed
+started:
+last-reviewed:
+repos: []               # repos this initiative touches, spelled the way
+                        # practice notes' `repos:` field spells them
+tags: []
+---
+
+# <Initiative name>
+
+<!-- An INITIATIVE RECORD, not a product brief. It answers "what is the state of
+     this thing" for a session that has never seen it — not "what should we
+     build". Everything here is specific to one piece of work: who is involved,
+     what was decided when, which options are still live, what is open.
+
+     It is revised in place. A sentence that stopped being true is corrected
+     here, not appended to — which is exactly why it cannot live in a daily
+     note, and why an agent editing it proposes deletions rather than making
+     them (see practices/cross-cutting/propose-then-approve-vault-writes).
+
+     It never promotes. A project doc is not a reusable rule and has no maturity
+     bar; nothing in it is a candidate for practices/. If something here does
+     turn out to be reusable, that is a separate practice note, proposed the
+     normal way. -->
+
+**Mark every claim.** `[verified]` — you read it yourself in the repo, the PR,
+the migration, the log, the config. `[second-hand]` — someone said it, a
+document asserted it, an agent summarised it, you remember it. Unmarked reads
+as verified, and that is the one way this document lies to the next session.
+
+## TL;DR
+
+- <the two or three sentences a fresh session needs before anything else>
+
+## Cast
+
+| Who | Role | Standing position |
+|---|---|---|
+|  |  |  |
+
+## Timeline
+
+- YYYY-MM-DD — what changed, and what it changed *from* [verified]
+
+## Contested points
+
+- **<the disagreement>** — the positions, and what evidence would settle it.
+  A point that closes keeps its outcome on this line:
+  `done | dropped | superseded | handed-off`, plus who owns it now if it was
+  handed off.
+
+## Open questions
+
+- [ ] <question> [second-hand]
+
+<!-- Closing one of these is the same act as closing a daily-note follow-up:
+     record the OUTCOME, not just the tick.
+
+       - [x] Does the importer need the CSV path? #outcome/dropped
+       - [x] Who owns the key rotation? #outcome/handed-off #owner/<name>
+
+     `- [x]` alone says the question stopped being asked. It does not say
+     whether it was answered, abandoned, replaced, or given to somebody else —
+     and those lead to opposite actions when it comes back. -->
+
+## Artifacts and links
+
+- <PRs, migrations, dashboards, documents — with what each one is evidence of>
 EOF
 
 write_if_absent "${VAULT}/00-maps/review-queue.md" <<'EOF'

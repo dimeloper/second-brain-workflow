@@ -2,10 +2,11 @@
 name: check-follow-ups
 description: >-
   Scan recent daily notes' Follow-ups sections and report what's still open,
-  oldest first, leading with the ones for the repo you're in. Read-only — walks
-  back to the last real notes, so it survives a weekend, a holiday, or a
-  vacation gap without missing anything, and it groups by repo rather than
-  filtering, so nothing is hidden. Use when the user asks to check my tasks,
+  oldest first, leading with the ones for the repo you're in — plus anything
+  ticked as dropped or handed off, which is closed without being finished.
+  Read-only — walks back to the last real notes, so it survives a weekend, a
+  holiday, or a vacation gap without missing anything, and it groups by repo
+  rather than filtering, so nothing is hidden. Use when the user asks to check my tasks,
   check follow ups, what's pending, what do I still need to do, or any open
   items.
 ---
@@ -20,7 +21,7 @@ never pushes — that is `update-second-brain`'s job, not this one.
 
 - Path: `$SBW_VAULT` if set, else `~/vaults/second-brain`
 - Daily notes: vault root, `YYYY-MM-DD.md` (local date)
-- Section read: `## Follow-ups`, items as `- [ ]` (pending) / `- [x]` (done)
+- Section read: `## Follow-ups`, items as `- [ ]` (pending) / `- [x]` (closed)
 
 **Items wrap.** An item is the `- [ ]` line plus every indented line under it,
 joined — these are prose and routinely run to three or four lines. Reading only
@@ -80,6 +81,37 @@ If a thread was ticked off in a newer note while an older note still shows it
 unchecked, it is closed and not listed, and a footer line says how many. **Read
 that line out** — it is the only thing the report removes. `--no-threads` shows
 every restatement separately.
+
+## Outcomes
+
+A tick says an item left the list. It does not say how, and the four ways lead
+to opposite actions when the question comes back:
+
+| Tag | Means | This report |
+|---|---|---|
+| `#outcome/done` | finished; you can cite it | closed, not listed |
+| `#outcome/superseded` | replaced by something else, which is its own item | closed, not listed |
+| `#outcome/dropped` | nobody is doing it, and it was not done | **listed**, as unresolved risk |
+| `#outcome/handed-off` | somebody else's now — `#owner/<name>` says who | **listed**, with the owner |
+
+The last two go in a block of their own, above the groups: **Closed without
+being finished**. They are not open work and they are not finished work, and
+putting them in either list misreports them — mixed into the open items they
+read as things still being carried, hidden with the ticks they read as done.
+
+`#outcome/handed-off` with no `#owner/` renders as "handed off, no owner
+recorded", which is a real finding: an item with no name against it is one
+nobody is watching.
+
+**A bare `- [x]` closes, exactly as it always did.** Every note written before
+this convention is full of them, and reopening those would re-raise years of
+finished work on the strength of a missing tag. Once a window contains at least
+one `#outcome/` tag, a footer says how many of its ticks carry none — a count,
+never a list, and never a nag about history.
+
+The tags are written on the write side, by `update-second-brain`, at the moment
+the item is closed and the reason is still known. Do not add them here to items
+that already exist.
 
 ## Repo
 
@@ -253,11 +285,17 @@ tool's.
    appears-exactly-once contract in practice.
 5. If nothing is unchecked anywhere in the window, say so plainly rather than
    printing an empty report.
-6. If the user confirms an item is done during the conversation, edit that
-   item's checkbox to `- [x]` in place in that day's note. This is the only
-   write this skill makes — a mechanical toggle of existing content, not new
-   material — and it still rides on the normal `update-second-brain` commit,
-   not a commit of its own.
+6. If the user confirms an item is closed during the conversation, edit that
+   item's checkbox to `- [x]` in place in that day's note **and record the
+   outcome with it** — `#outcome/done`, `#outcome/dropped`,
+   `#outcome/superseded`, or `#outcome/handed-off` plus `#owner/<name>`. A bare
+   tick is an incomplete write: it is the state that makes "finished" and
+   "abandoned" indistinguishable a month later. Ask which of the four it was
+   rather than assuming `done` — that is one short question, and a wrong
+   `#outcome/done` closes the item *and* asserts something false about it. This
+   is the only write this skill makes — a mechanical edit of existing content,
+   not new material — and it still rides on the normal `update-second-brain`
+   commit, not a commit of its own.
 
 ## What this does not do
 
@@ -270,7 +308,8 @@ same thread and keeps its original age, so there is no reason to preserve
 yesterday's wording for a task you now understand better.
 
 **It never ticks anything off by itself**, whatever the repo says. A merged PR
-is evidence, and step 6 is still the only write — after the user confirms.
+is evidence, and step 6 is still the only write — after the user confirms, and
+with the outcome the user names, not one inferred from the evidence.
 
 **It never filters by repo, and never hides an item it couldn't attribute.**
 Attribution is best-effort and "No repo identified" is a normal, populated

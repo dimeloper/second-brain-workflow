@@ -241,6 +241,17 @@ an item the note calls **blocking**, or a **live credential** to rotate or revok
 is listed in full whatever repo it belongs to and keeps its repo name. Flags are
 markers *in place* in the full report, never a second listing of the same item.
 
+A ticked item is reported too, when the tick says the work did not happen. A
+closed follow-up carries an outcome — `#outcome/done`, `#outcome/dropped`,
+`#outcome/superseded`, `#outcome/handed-off` with `#owner/<name>` — and the last
+two are listed in a block of their own, **Closed without being finished**: an
+accepted risk, or somebody else's backlog with a name against it. Neither is
+open work and neither is finished work, and reporting them as either is the
+failure this exists for. A bare `- [x]` closes exactly as it always did, so
+every note written before the convention reads unchanged; once a window contains
+one outcome tag, a footer counts how many of its ticks carry none. See the
+reference's [Follow-ups close with an outcome](REFERENCE.md#follow-ups-close-with-an-outcome).
+
 An item with no repo identified is a normal result, not a gap to close — plenty
 of follow-ups (an email awaiting a reply, a key to revoke in a console) belong
 to no repo at all. Tagging happens on the write side, in `update-second-brain`,
