@@ -17,7 +17,95 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **A project is a directory, not one file.** `projects/<project>/_project.md`
+  is the stable overview — what the initiative is, who is involved, what
+  constrains it, where it is heading, what is open about the project itself —
+  and `projects/<project>/features/<feature>.md` is one file per slice of work:
+  its current state, the decisions that got it there and what they changed
+  *from*, its own open questions, and an outcome when it closes.
+
+  One file per project could not hold both. That document is written by an agent
+  at the end of every session, so every wrap-up appended the newest slice of
+  work, the overview a fresh session actually reads got buried under it, and the
+  next wrap-up overwrote whatever the last one had said. The two halves have
+  different revision rates — a project's direction changes a handful of times
+  over months, a feature's state changes most sessions — and the faster one
+  buries the slower one whenever they share a file.
+
+  So `update-second-brain` revises the **feature** file when the session moved a
+  feature, and touches `_project.md` only when the project itself changed: the
+  audience, the constraints, the direction, the cast. A session that shipped a
+  feature has not changed the project, and the correct number of edits to
+  `_project.md` in most wrap-ups is zero. `init-vault.sh` scaffolds
+  `_templates/project.md` (the stable overview, with no feature changelog in it)
+  and `_templates/feature.md`; the commit guard's
+  allowlist was already nested, and is now spelled out and tested as such;
+  `build-vault-index.py` lists one row per project and a `## Features` table
+  grouped under them. Follow-up to
+  [#10](https://github.com/dimeloper/second-brain-workflow/issues/10).
+
+- **A closed feature carries an outcome.** `status: closed` plus
+  `outcome: done | dropped | superseded | handed-off`, and a `## Outcome`
+  section saying what actually happened. Closed with neither is the same gap a
+  bare `- [x]` leaves on a follow-up — it says the work left the list and
+  nothing about how — so the index warns about it and shows the outcome beside
+  the status. Closed *follow-up* outcomes are unchanged, and a feature's open
+  questions still close with the same `#outcome/` tags the daily note uses.
+
+- **`--shared`, and the render mode recorded in the registry.**
+  `~/.config/second-brain-workflow/repos` recorded which repos are onboarded and
+  not how, so the only record that a repo was rendered with `--local` was a
+  marked block inside that one clone's `.git/info/exclude` — which `adopt.sh`
+  read and `render.py`, `make render` and `repos-check.sh` did not. The `fix:`
+  command `make upgrade` prints, run verbatim, re-rendered a `--local` repo in
+  shared mode: the old block survived, but rules added since onboarding landed
+  outside it and showed up untracked in a repo that deliberately hides them, and
+  in a repo where those paths are tracked (or after a `git add -A`) that is
+  personal conventions committed to a shared remote. Nothing warned.
+
+  An entry now carries the mode beside the path
+  (`/path/to/repo<TAB>mode=local`), and the default for an already-onboarded
+  repo is not "shared" but *preserve*: `render.py <repo>` re-renders in the
+  recorded mode and says which, every run. `--shared` is the explicit way back,
+  and it removes the exclusion block rather than leaving one that hides files
+  the registry now calls shared. `--local` and `--shared` are mutually
+  exclusive. `--check` and `--dry-run` report the mode and record nothing.
+  `make repos-check` and `make upgrade` print `[local]` / `[shared]` /
+  `[unknown]` beside each verdict, so the command they hand you says what it
+  will do. Closes
+  [#13](https://github.com/dimeloper/second-brain-workflow/issues/13).
+
 ### Changed
+- **The project template is `_templates/project.md`, not `project-note.md`.**
+  Named for what it is, alongside the new `_templates/feature.md`, and matching
+  the paths it describes (`_project.md`, `features/`). `practice-note.md` and
+  `daily-note.md` keep their names: those exist in every vault ever created here,
+  and `init-vault.sh` only writes a template that is absent, so renaming one
+  would add a file rather than replace it. The project template is one release
+  old, which is why this one can move.
+
+  `init-vault.sh --adopt` adds `project.md` and `feature.md` and **names** a
+  leftover `project-note.md` rather than deleting it — nothing reads that file
+  any more, and this script has never removed anything from a vault. Delete it
+  yourself when you are ready.
+
+- **A registry line with no mode heals itself.** Every line written before the
+  field existed is in that state. It is treated as *unknown* rather than shared,
+  resolved once from the `.git/info/exclude` block `adopt.sh` already grepped
+  for — block present is `local`, registered with no block is `shared` — and the
+  answer is recorded on the first render that learns it. No migration, no user
+  decision. A recorded value this engine does not understand refuses instead,
+  the same fail-closed shape as the vault id: the mode decides who sees your
+  conventions, so it is not a thing to guess at. An explicit `--local` or
+  `--shared` is itself the answer and repairs the line.
+
+  Rolling *back* past this reads a whole line as a path, so an older engine
+  reports every repo whose line carries a mode as "registered, but not there".
+  Nothing is destroyed and no repo stops loading its rules — strip the fields
+  with `sed -i "" "s/\t.*//" ~/.config/second-brain-workflow/repos`, or roll
+  forward again and let the exclude-block fallback recover them.
+
 - **`project-candidates.py` bars an initiative at 7 days, not 14.** The bar
   shipped at a fortnight and was wrong on the first real vault it saw: it
   excluded an initiative running 8 notes over 7 days that carried 17 of that
@@ -27,6 +115,20 @@ write release notes, not two to keep in sync by hand.
   standing in for depth, and it is not a good proxy: an initiative that takes
   over a week of consecutive days is exactly the one whose state no longer fits
   in any single note. `--min-span` is unchanged, so the old bar is one flag away.
+
+- **A flat `projects/<name>.md` keeps working, and nothing rewrites it.** It is
+  still read, still indexed, still linked by its bare wikilink, and
+  `project-candidates.py` still counts it as coverage — including a repo named
+  only on a feature file one level down, which would otherwise have been
+  proposed for a second document. A vault whose projects are all flat files
+  regenerates `projects/INDEX.md` to exactly the bytes it had before this engine
+  knew about feature files, so no adopter's `--check` goes red for a change they
+  did not make; the same guarantee an empty `projects/` already had. Moving a
+  flat doc into `projects/<name>/_project.md` is a documented one-time `git mv`
+  you run yourself — see the reference. `make upgrade` still never writes a
+  vault, `init-vault.sh --adopt` still never replaces a template it did not just
+  write (it names an out-of-date one instead), and the backfill is still
+  propose-then-approve, never triggered by an upgrade.
 
 ## [0.40.0] - 2026-08-31
 
