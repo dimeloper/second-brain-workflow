@@ -397,3 +397,47 @@ each is in a different place:
 broken path two different ways. The Python auditors (`check-lineage.py`,
 `check-followups.py`, `build-vault-index.py`) use the Python mirror of it for
 the same reason.
+
+## The vault lock
+
+The guard answers *is this write aimed somewhere it should not go*. It does not
+answer *is this write yours* — and on a machine running two sessions against one
+vault, that second question is the one that bites.
+
+Two sessions share a vault's working tree **and its git index**. So a
+`git add projects` in one stages whatever the other has in flight, and a commit
+without a pathspec takes it. On 2026-08-31 exactly that happened: a wrap-up
+swept another session's uncommitted project edits into its own index while that
+session was still writing. Nothing refused it, correctly — the files were
+legitimate vault content, they were simply somebody else's. It was caught by
+reading `git status` by hand, which is not a mechanism.
+
+```bash
+./scripts/with-vault-lock.sh -- git -C ~/vaults/second-brain push
+./scripts/with-vault-lock.sh --vault ~/vaults/work-brain --timeout 30 -- make guard
+```
+
+The general form is `with-vault-lock.sh [--vault PATH] [--timeout N] --` followed
+by the command to run while holding the lock.
+
+Wrap the whole stage → guard → commit → push sequence in one call, as
+`update-second-brain` Steps 5 and 8 now do. Exit **75** means another session
+holds it: wait and retry rather than working around it.
+
+- **The lock lives in `<vault>/.git/sbw-vault.lock`** — per-vault, impossible to
+  commit, and gone with the clone. A lock under the content root would be a path
+  the guard has to learn to ignore and one an adopter eventually commits.
+- **`mkdir`, not `flock`.** `mkdir` is atomic on every POSIX filesystem and is in
+  every shell; `flock(1)` is util-linux and ships on no macOS this engine runs
+  on. The portable primitive is the one that looks the most primitive.
+- **A crashed session cannot wedge the vault.** A lock whose recorded pid is gone
+  is broken automatically, and loudly. A lock recorded on *another host* is never
+  broken — a pid means nothing across machines, so the only safe answer is to
+  wait.
+- **No maximum age.** A legitimate push over a slow link can take minutes, and a
+  clock-based break would eventually cut one in half. Process liveness is the
+  only test that distinguishes crashed from slow.
+
+**It is a mutex, not a permission system.** A session that does not go through it
+still commits. That is why the pathspec rule stays: the lock stops the race, the
+pathspec bounds the damage if a race happens anyway.

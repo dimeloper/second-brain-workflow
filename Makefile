@@ -19,7 +19,7 @@ SHELL_SOURCES := scripts/sync-rules.sh scripts/sync-skills.sh scripts/init-vault
                  scripts/guard-vault-commit.sh scripts/doctor.sh scripts/verify-claude-load.sh \
                  scripts/lib/config.sh scripts/lib/vault-identity.sh \
                  scripts/lib/registry.sh scripts/upgrade.sh scripts/release-check.sh \
-                 scripts/repos-check.sh \
+                 scripts/repos-check.sh scripts/with-vault-lock.sh \
                  scripts/lib/resolve-vault.sh scripts/uninstall.sh \
                  scripts/fetch-skill-sources.sh scripts/lib/skill-links.sh \
                  tests/lib.sh $(wildcard tests/test-*.sh)
