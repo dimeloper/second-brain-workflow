@@ -17,6 +17,60 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`projects/` has a read path.** `./scripts/project-for.py --repo PATH` (or
+  `make project-for REPO=...`) prints what the vault already knows about a
+  repo's initiative: the `_project.md` overview whole, then each feature's
+  `## State`, with every file named by its vault-relative path.
+
+  `projects/` had a write path and nothing else for two releases. Wrap-ups
+  revised the docs, `build-vault-index.py` generated `projects/INDEX.md`, and
+  the commit guard carried them — and nothing loaded one *into* a session. For a
+  document whose whole purpose is *what you would hand a fresh session so it does
+  not re-derive six weeks of daily notes*, that was the hole: open a repo, start
+  a session, and the context was invisible unless you remembered it existed and
+  pasted it by hand.
+
+  It is `practices-for.py`'s sibling and deliberately the same shape, so there
+  is one way to ask "what does the vault know about this repo" rather than one
+  per kind of note. Matching is on the `repos:` frontmatter that `_project.md`
+  and each feature file already carry, spelled the way `practices-for` spells a
+  repo — the directory basename. **Nothing is inferred from the stack**, unlike
+  `practices-for`'s domain fallback: a project doc is about one named
+  initiative, and a guess would hand a session six weeks of somebody else's
+  context as though it were their own.
+
+  A feature's decision log, contested points and open questions stay in the
+  file. That is the expensive half and the half a session usually does not need,
+  and printing every one of them would bury the overview under exactly the thing
+  the two-file split exists to stop burying it.
+
+  A repo with no project doc is a clean "nothing here" at exit 0. Most repos
+  have none and never will, so a non-zero exit would make the ordinary answer
+  look like a failure and teach every caller to ignore it. Reports only: never
+  edits the repo, never touches the vault.
+
+### Changed
+- **`obsidian-knowledge-base` loads the project context before it reads a
+  practice note.** Adding the script was not the fix; the read-side skill
+  invoking it was. "Consult the vault" now means practices *and* project
+  context — a practice says how to write the code, the project says what the
+  code is for and what has already been decided against. The skill's review also
+  scores a fourth list, **Project**: where the session leaves the initiative,
+  cited to the feature file it belongs on.
+
+  Skills that need brand, audience, voice or product context — image generation,
+  ASO, copywriting — call `project-for` too rather than keeping their own copy.
+  The vault is the source, and a second copy inside a skill is a copy that goes
+  stale without anyone noticing.
+- **One reader for what counts as a project.** `lib/projects.discover()` now
+  owns the layout — which file is the overview, where the features sit, and that
+  a flat `projects/<name>.md` is still a project — and both `build-vault-index.py`
+  and `project-for.py` go through it. Two implementations would have drifted the
+  way two glob matchers do, and quietly: the index listing a document the read
+  path skips, so it is visible in Obsidian and invisible to every session. The
+  index's own output is unchanged, byte for byte.
+
 ## [0.41.0] - 2026-08-31
 
 ### Added
