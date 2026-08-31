@@ -54,6 +54,30 @@ write release notes, not two to keep in sync by hand.
   the tags land at the end of its last, which is where the notes already put
   them.
 
+- **Context shared by several projects lives once.** Closes #24. `context/` is
+  product-scoped where `features/` is initiative-scoped, and one directory was
+  holding both — so a product spanning two initiatives had to write its audience,
+  brand and locale set into each project that needed them. Two documents each
+  revised in place, each carrying a copy of one fact, is the
+  superseded-plan-beside-its-replacement failure these documents exist to
+  prevent.
+
+  A project's `_project.md` may now name a `product:`, and the shared files live
+  at `projects/_products/<product>/context/`. `project-for` prints the product's
+  context first and the project's own second — **nearest scope last**, labelled
+  with the product, so a same-named project file visibly overrides rather than
+  the two silently merging.
+
+  **A pointer, not containment**, the same shape as `repos:`. Nesting
+  (`projects/housemaster/{context/,backend/,ingestion/}`) was the first idea and
+  was rejected: it forces a hierarchy onto projects that have none, and conflates
+  "shares context with" and "is contained by".
+
+  Optional and additive — a project with no `product:` behaves exactly as before,
+  and no existing vault changes shape. `_products/` is skipped by `discover()`,
+  so it is never reported as a project with no `_project.md` and takes no row in
+  the index.
+
 ### Changed
 - `lib/followups.py` grew `collect_spans()` — item text with the line numbers it
   occupies — and `_collect()` is now the text-only view of it. The write side

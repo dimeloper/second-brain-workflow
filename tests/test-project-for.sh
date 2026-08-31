@@ -197,6 +197,75 @@ case "$("${PF}" --repo "${REPO}" --vault "${V}" 2>&1 | sed -n "/PROJECT  beta/,/
 esac
 rm -rf "${V}/projects/alpha/context"
 
+# --- shared product context, and the override being visible -----------------
+# A fact belonging to a product, not a project. Two projects revised in place,
+# each holding a copy of it, is the superseded-plan-beside-its-replacement
+# failure these documents exist to prevent.
+mkdir -p "${V}/projects/_products/widgets/context" "${V}/projects/alpha/context"
+cat > "${V}/projects/_products/widgets/context/audience.md" <<'EOF'
+# audience
+Shared across the product.
+EOF
+cat > "${V}/projects/_products/widgets/context/brand.md" <<'EOF'
+# brand
+Shared across the product.
+EOF
+cat > "${V}/projects/alpha/context/brand.md" <<'EOF'
+# brand
+Alpha's own, nearer scope.
+EOF
+python3 - "${V}/projects/alpha/_project.md" <<'PYEOF'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1]); t = p.read_text()
+p.write_text(t.replace("kind: project", "kind: project\nproduct: widgets", 1))
+PYEOF
+out_prod="$("${PF}" --repo "${REPO}" --vault "${V}" 2>&1)"
+assert_exit 0 $? "a project naming a product reports cleanly"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prod}" in
+  *"_products/widgets/context/audience.md"*"[widgets]"*)
+    pass "product context is printed and labelled with its product" ;;
+  *) fail "product context is printed and labelled" "${out_prod}" ;;
+esac
+# Nearest scope last. Two files answering one question must both be visible
+# rather than silently merging into one answer.
+shared_at="$(printf '%s\n' "${out_prod}" | grep -n "_products/widgets/context/brand.md" | head -1 | cut -d: -f1)"
+own_at="$(printf '%s\n' "${out_prod}" | grep -n "projects/alpha/context/brand.md" | head -1 | cut -d: -f1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -n "${shared_at}" ] && [ -n "${own_at}" ] && [ "${shared_at}" -lt "${own_at}" ]; then
+  pass "the project's own file is printed after the product's, nearest scope last"
+else
+  fail "nearest scope is printed last" "shared@${shared_at:-none} own@${own_at:-none}"
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prod}" in
+  *"nearer scope and wins"*) pass "and the override is stated, not left to be noticed" ;;
+  *) fail "the override is stated" "${out_prod}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prod}" in
+  *"3 context file(s)"*) pass "the summary counts shared and own together" ;;
+  *) fail "the summary counts shared and own together" "${out_prod}" ;;
+esac
+# _products/ is not an initiative: no row, no half-written-project warning.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_prod}" in
+  *"PROJECT  _products"*) fail "_products is never treated as a project" "${out_prod}" ;;
+  *) pass "_products is never treated as a project" ;;
+esac
+# A project with no product: key must behave exactly as before.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(printf '%s\n' "${out_prod}" | sed -n '/PROJECT  beta/,$p')" in
+  *widgets*) fail "a project with no product: key gets no shared context" "${out_prod}" ;;
+  *) pass "a project with no product: key gets no shared context" ;;
+esac
+rm -rf "${V}/projects/_products" "${V}/projects/alpha/context"
+python3 - "${V}/projects/alpha/_project.md" <<'PYEOF'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1]); t = p.read_text()
+p.write_text(t.replace("kind: project\nproduct: widgets", "kind: project", 1))
+PYEOF
+
 # --- a feature-only match does not drag in the rest of the initiative --------
 # Printing every sibling would hand a session context for work in repos it is
 # not in, which is the failure mode a context tool can least afford.

@@ -23,6 +23,8 @@ Two shapes are read:
     projects/<project>/features/<feature>.md  one slice of work
     projects/<project>/context/<topic>.md     audience, voice, brand — what does
                                               not change per session
+    projects/_products/<product>/context/     the same, shared by every project
+                                              whose _project.md names it
     projects/<project>.md                     the flat shape, from before the split
 
 The flat one stays supported because it is somebody's committed vault content;
@@ -33,6 +35,10 @@ document.
 PROJECT_FILE = "_project.md"
 FEATURES_DIR = "features"
 CONTEXT_DIR = "context"
+# Shared context lives here, one directory per product, and is NOT a project:
+# it has no _project.md, no features, and no row in the index. Skipped by
+# discover() so it cannot be reported as a half-written initiative.
+PRODUCTS_DIR = "_products"
 
 
 def discover(vault):
@@ -58,6 +64,8 @@ def discover(vault):
 
     out = []
     for entry in sorted(root.iterdir()):
+        if entry.name == PRODUCTS_DIR:
+            continue
         if entry.is_dir():
             overview = entry / PROJECT_FILE
             out.append({
@@ -78,6 +86,21 @@ def discover(vault):
             "flat": True,
         })
     return out
+
+
+def product_context(vault, product):
+    """Shared context files for one product, name-sorted, or [].
+
+    A pointer rather than containment: a project names its product in
+    frontmatter, exactly as it names its repos, and the files stay in one place
+    instead of being copied into each project that needs them. Two projects
+    revised in place, each holding its own copy of one fact, is the
+    superseded-plan-beside-its-replacement failure these documents exist to
+    prevent.
+    """
+    if not product:
+        return []
+    return md_files(vault / "projects" / PRODUCTS_DIR / str(product) / CONTEXT_DIR)
 
 
 def feature_files(project_dir):

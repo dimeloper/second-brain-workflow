@@ -23,7 +23,10 @@ and the half a session usually does not need; printing all of them would bury
 the overview under the thing the two-file split exists to stop burying it.
 
 Between the two sits `context/` — audience, voice, brand: what does not change
-per session — and it is printed as **paths only**. The overview is printed whole
+per session — and it is printed as **paths only**. A project whose frontmatter
+names a `product:` gets that product's shared context first, then its own:
+nearest scope last, so a project-level file visibly overrides a product-level
+one of the same name rather than the two silently merging. The overview is printed whole
 because it is short and stable; context is neither, and printing it would bury
 the overview under exactly the thing the two-file split exists to stop burying
 it. The reader also knows better than this tool which of the three files they
@@ -59,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
-from lib.projects import PROJECT_FILE, discover  # noqa: E402
+from lib.projects import PROJECT_FILE, discover, product_context  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
 STATUS_ORDER = {"active": 0, "paused": 1, "closed": 2}
@@ -96,6 +99,7 @@ def read_note(path):
         repos = [repos]
     return {
         "path": path,
+        "product": str(fm.get("product") or "").strip(),
         "status": (fm.get("status") or "?").strip(),
         "reviewed": str(fm.get("last-reviewed") or "").strip(),
         "outcome": str(fm.get("outcome") or "").strip(),
@@ -163,6 +167,7 @@ def matching(vault, slug):
             "slug": project["slug"],
             "flat": project["flat"],
             "context": project["context"],
+            "product": overview["product"] if overview else "",
             "overview": overview,
             "features": features if by_overview else named,
             "whole": by_overview,
@@ -207,14 +212,24 @@ def print_project(project, vault, today):
     # the module docstring. Silent when there is none — most projects have no
     # context/, and a "none found" line on every run is noise that teaches a
     # reader to skim past the block on the projects that do.
-    if project["context"]:
+    shared = product_context(vault, project["product"])
+    if shared or project["context"]:
         print("CONTEXT")
-        width = max(len(c.stem) for c in project["context"])
-        for path in project["context"]:
-            print(f"  {path.stem:<{width}}  {rel(path, vault)}")
+        rows = ([(c.stem, c, project["product"]) for c in shared]
+                + [(c.stem, c, "") for c in project["context"]])
+        width = max(len(r[0]) for r in rows)
+        for stem, path, product in rows:
+            scope = f"  [{product}]" if product else ""
+            print(f"  {stem:<{width}}  {rel(path, vault)}{scope}")
         print()
+        if shared:
+            # Nearest scope last, and the override said out loud: two files
+            # answering the same question must not look like one answer.
+            print(f"  [{project['product']}] files are shared by every project in")
+            print("  that product. A project's own file of the same name is the")
+            print("  nearer scope and wins.")
         print("  Read these before writing anything public about the product.")
-        print("  Paths only — open the one you need rather than all three.")
+        print("  Paths only — open the one you need rather than all of them.")
         print()
 
     if not project["whole"] and overview is not None:
@@ -287,7 +302,8 @@ def main():
         return 0
 
     total_features = sum(len(p["features"]) for p in projects)
-    total_context = sum(len(p["context"]) for p in projects)
+    total_context = sum(len(p["context"]) + len(product_context(vault, p["product"]))
+                        for p in projects)
     line = f"{len(projects)} project(s), {total_features} feature(s)"
     if total_context:
         line += f", {total_context} context file(s)"

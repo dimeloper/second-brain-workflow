@@ -146,6 +146,28 @@ projects/
   INDEX.md                          generated
 ```
 
+**Context shared by several projects lives once, and is pointed at.** A product
+often spans more than one initiative — a backend and an ingestion service with
+separate multi-week efforts still share one audience, one brand and one locale
+set. Naming a `product:` in a project's frontmatter attaches the shared files:
+
+```
+projects/
+  _products/housemaster/context/{audience,brand,voice}.md
+  housemaster-backend/_project.md      product: housemaster
+  housemaster-ingestion/_project.md    product: housemaster
+```
+
+`project-for` prints the product's context first and the project's own second —
+**nearest scope last**, so a project-level file of the same name visibly
+overrides rather than silently merging. `_products/` is not a project: it has no
+`_project.md`, takes no row in the index, and is skipped by the reader that
+would otherwise report it as half-written. The key is optional; a project
+without one behaves exactly as before.
+
+It is a pointer, not containment — the same shape as `repos:` — because nesting
+would force a hierarchy onto projects that have none.
+
 `context/` is optional and holds whatever topics a product needs — the filename
 set is not fixed. It is surfaced by `project-for` and deliberately **not** by
 `projects/INDEX.md`, which is one row per project and one per feature; context

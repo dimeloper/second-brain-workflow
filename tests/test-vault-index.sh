@@ -416,6 +416,24 @@ case "${out_both}" in
   *) pass "no template warning when both are present" ;;
 esac
 
+# --- _products/ is shared context, not an initiative ------------------------
+# It has no _project.md by design, so without an explicit skip it reports as a
+# half-written project and takes a row in the index.
+mkdir -p "${VAULT}/projects/_products/widgets/context"
+printf '# audience\nShared.\n' > "${VAULT}/projects/_products/widgets/context/audience.md"
+out="$("${INDEX}" --vault "${VAULT}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *_products*) fail "_products is never reported as a project" "${out}" ;;
+  *) pass "_products is never reported as a project" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(cat "${VAULT}/projects/INDEX.md")" in
+  *_products*) fail "_products takes no row in the index" "$(cat "${VAULT}/projects/INDEX.md")" ;;
+  *) pass "_products takes no row in the index" ;;
+esac
+rm -rf "${VAULT}/projects/_products"
+
 rm -rf "${VAULT}/projects/no-overview" "${VAULT}/projects/auth-rewrite"
 "${INDEX}" --vault "${VAULT}" >/dev/null 2>&1
 TESTS_RUN=$((TESTS_RUN + 1))
