@@ -34,6 +34,7 @@ from lib.config import origin_describe  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
 from lib.promotion import application_bars, is_process_note  # noqa: E402
+from lib.projects import FEATURES_DIR, PROJECT_FILE, discover  # noqa: E402
 
 GENERATED_BY = "scripts/build-vault-index.py"
 
@@ -269,9 +270,10 @@ def render(notes, two_bars=True):
 # fresh session actually reads. The flat form stays supported: it is somebody's
 # committed vault content, and an engine upgrade that stopped indexing it would
 # be this tool deciding to lose a document.
+# The layout itself — which file is the overview, where the features sit, and
+# that a flat projects/<name>.md is still a project — lives in lib/projects, so
+# the index and project-for.py cannot disagree about what a project is.
 PROJECT_STATUS_ORDER = {"active": 0, "paused": 1, "closed": 2}
-PROJECT_FILE = "_project.md"
-FEATURES_DIR = "features"
 
 
 def extract_tldr(text, limit=RULE_MAX, headings=("## tl;dr",)):
@@ -352,15 +354,10 @@ def read_doc(path, rel, problems, summary_headings, required=("status", "last-re
     }
 
 
-def collect_features(project_dir, project_slug, problems):
-    """The feature files under one project directory, sorted by status then slug."""
-    features_dir = project_dir / FEATURES_DIR
-    if not features_dir.is_dir():
-        return []
+def collect_features(paths, project_slug, problems):
+    """The feature files of one project, sorted by status then slug."""
     out = []
-    for path in sorted(features_dir.glob("*.md")):
-        if path.name == "INDEX.md":
-            continue
+    for path in paths:
         rel = f"{project_slug}/{FEATURES_DIR}/{path.name}"
         doc = read_doc(path, rel, problems, ("## state",))
         # A closed feature with no outcome is the same gap a bare `- [x]` leaves
@@ -376,38 +373,33 @@ def collect_features(project_dir, project_slug, problems):
 
 def collect_projects(vault):
     """(projects, problems), or (None, []) when the vault has no projects/ at all."""
-    projects = vault / "projects"
-    if not projects.is_dir():
+    if not (vault / "projects").is_dir():
         return None, []
 
     notes, problems = [], []
-    for entry in sorted(projects.iterdir()):
-        if entry.is_dir():
-            project_file = entry / PROJECT_FILE
-            if not project_file.is_file():
-                # Named, not skipped. A directory of features with no overview is
-                # a half-written project, and dropping it from the index would
-                # hide the features too.
-                problems.append((entry.name, f"no {PROJECT_FILE}"))
-                doc = {"title": entry.name, "status": "?", "reviewed": "—",
-                       "outcome": "", "repos": [], "summary": ""}
-            else:
-                doc = read_doc(project_file, f"{entry.name}/{PROJECT_FILE}",
-                               problems, ("## tl;dr",))
-            doc["slug"] = entry.name
-            doc["link"] = f"{entry.name}/{PROJECT_FILE[:-3]}"
-            doc["features"] = collect_features(entry, entry.name, problems)
-            notes.append(doc)
-            continue
-        if entry.suffix != ".md" or entry.name == "INDEX.md":
-            continue
-        # The flat shape. Still read, still indexed, still linked by bare slug —
-        # somebody's committed vault content does not stop being indexed because
-        # a newer layout exists.
-        doc = read_doc(entry, entry.name, problems, ("## tl;dr",))
-        doc["slug"] = entry.stem
-        doc["link"] = entry.stem
-        doc["features"] = []
+    for project in discover(vault):
+        slug = project["slug"]
+        if project["flat"]:
+            # The flat shape. Still read, still indexed, still linked by bare
+            # slug — somebody's committed vault content does not stop being
+            # indexed because a newer layout exists.
+            doc = read_doc(project["overview"], f"{slug}.md", problems,
+                           ("## tl;dr",))
+            doc["link"] = slug
+        elif project["overview"] is None:
+            # Named, not skipped. A directory of features with no overview is a
+            # half-written project, and dropping it from the index would hide
+            # the features too.
+            problems.append((slug, f"no {PROJECT_FILE}"))
+            doc = {"title": slug, "status": "?", "reviewed": "—",
+                   "outcome": "", "repos": [], "summary": ""}
+            doc["link"] = f"{slug}/{PROJECT_FILE[:-3]}"
+        else:
+            doc = read_doc(project["overview"], f"{slug}/{PROJECT_FILE}",
+                           problems, ("## tl;dr",))
+            doc["link"] = f"{slug}/{PROJECT_FILE[:-3]}"
+        doc["slug"] = slug
+        doc["features"] = collect_features(project["features"], slug, problems)
         notes.append(doc)
     return notes, problems
 

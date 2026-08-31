@@ -117,7 +117,7 @@ Three skills own the vault, and the read/write split is deliberate:
 
 | Skill | Role |
 |-------|------|
-| `obsidian-knowledge-base` | **read only** — find applicable notes, score work against them |
+| `obsidian-knowledge-base` | **read only** — load this repo's project context, find applicable notes, score work against them |
 | `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
 | `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first, plus anything closed without being finished |
 
@@ -241,6 +241,68 @@ That leaves one overview per project and no feature files. Splitting the work ou
 of it is editorial and yours: move each slice into `features/<slice>.md`, or leave
 the whole thing in `_project.md` and let new work land in feature files from now
 on. Nothing does this for you, and no upgrade does it behind your back.
+
+#### Reading a project into a session
+
+```bash
+make project-for REPO=/path/to/repo
+```
+
+`practices-for`'s sibling, and deliberately the same shape, so there is one way
+to ask "what does the vault know about this repo" rather than one per kind of
+note. It prints the overview whole, then each feature's `## State`, and names
+every file by its vault-relative path.
+
+`projects/` had a write path and no read path for two releases. Wrap-ups revised
+the docs, `build-vault-index.py` generated the index, and the commit guard
+carried them — and nothing loaded one *into* a session. For a document whose
+whole purpose is *what you would hand a fresh session so it does not re-derive
+six weeks of daily notes*, that was the hole.
+
+Matching is on the `repos:` frontmatter that `_project.md` and each feature file
+already carry, spelled the way `practices-for` spells a repo — the directory
+basename. **Nothing is inferred from the stack.** A project doc is about one
+named initiative, and a guess would hand a session six weeks of somebody else's
+context as though it were their own — the failure mode a context tool can least
+afford, and the reason there is no domain fallback here of the kind
+`practices-for` has.
+
+A project's overview and one of its features can name different repos, and the
+two cases are not folded together:
+
+- the **overview** names this repo — the initiative is about it, so every
+  feature under it is in scope
+- only a **feature** names it — one slice of another initiative touches this
+  repo, so that slice is printed and its siblings are not, with a line saying
+  the view is partial
+
+A feature's decision log, contested points and open questions stay in the file.
+That is the expensive half and the half a session usually does not need;
+printing every one of them would bury the overview under exactly the thing the
+[two-file split](#project-notes) exists to stop burying it.
+
+`last-reviewed` is printed with its age in days and **no bar is applied**. How
+stale is too stale depends on how fast the initiative moves, and a threshold
+invented by the tool would be an opinion it has no evidence for.
+
+**A repo with no project doc is a clean "nothing here" at exit 0.** Most repos
+have none and never will — a project doc is for a multi-week initiative, not for
+every checkout — so a non-zero exit would make the ordinary answer look like a
+failure and teach every caller to ignore it.
+
+The read-side skill runs this: `obsidian-knowledge-base` loads the project
+context before it reads a practice note, because a practice says how to write
+the code and the project says what the code is for and what has already been
+decided against. Skills that need brand, audience, voice or product context
+call it too rather than keeping their own copy. **The vault is the source**, and
+a second copy inside a skill is a copy that goes stale without anyone noticing.
+
+Project context is deliberately **not rendered** into `.cursor/rules` or
+`AGENTS.md`. That path is the hot path for reusable conventions on a
+[budget](#hot-path-and-cold-path), and project context is scoped to one initiative: it
+has no maturity, no `applies-to`, and no claim to hold anywhere else, so putting
+it there is how the rules file grows again. Rendered files also follow one
+coding agent in one repo, and a project is discussed in more places than that.
 
 There is also a backfill: `make project-candidates` reports which long-running
 initiatives the daily notes already evidence, and saying **backfill project
@@ -497,7 +559,10 @@ Two things make it safe rather than merely smaller:
 
 Matching goes through `lib/repo_match`, the same code behind
 `skill_manifest relevant` and `practices-for`, so "does this apply here" cannot
-get two answers for one repo depending on which command asked.
+get two answers for one repo depending on which command asked. `projects/`'s
+layout is factored out the same way, into `lib/projects`: the index and
+`project-for` discover projects through one reader, so a committed document
+cannot end up listed in `projects/INDEX.md` and unreachable from a session.
 
 `--no-register` renders normally but leaves the [repo registry](#the-repo-registry)
 alone. Reach for it when the target is a throwaway — a probe, a scratch checkout,
@@ -907,6 +972,16 @@ vault's rule is that `trialing` is *earned by deliberate re-application, not jus
 counted*, so applying a dozen notes in one pass would manufacture exactly the
 evidence the bar exists to measure. Apply one, then record it through
 `update-second-brain`.
+
+#### What the vault knows about this repo's initiative
+
+```bash
+make project-for REPO=/path/to/repo
+```
+
+The read path for `projects/**` — the overview whole, then each feature's
+current state. See [Reading a project into a session](#reading-a-project-into-a-session)
+for what it matches on and what it deliberately leaves in the file.
 
 Cross-cutting notes without a matching glob are excluded and the count is
 printed — they apply everywhere, so listing a hundred of them would bury the
