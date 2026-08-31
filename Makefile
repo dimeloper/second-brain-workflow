@@ -48,7 +48,7 @@ help:
 	@echo "make init              explain this engine, detect the machine, preview a config"
 	@echo "                         (make init YES=1 VAULT_ID=... writes it, then runs doctor)"
 	@echo "make doctor              report gaps: commit-guard hook, skill parity, submodule drift"
-	@echo "make audit               lineage + stale follow-ups + always-on rule token budget"
+	@echo "make audit               lineage + stale follow-ups + rule budget + note markdown"
 	@echo "make verify-claude       prove Claude Code loads rendered rules (3 model calls)"
 	@echo "make check               lint + test + non-mutating checks"
 	@echo "                         (skips shellcheck if it isn't installed)"
@@ -97,6 +97,7 @@ lint-python:
 	  scripts/lib/repo_match.py scripts/lib/promotion.py scripts/practices-for.py \
 	  scripts/lib/followups.py scripts/lib/followup_threads.py scripts/lib/landed.py \
 	  scripts/project-candidates.py scripts/project-for.py scripts/lib/projects.py \
+  scripts/check-markdown.py scripts/lib/markdown.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -155,6 +156,8 @@ audit:
 	./scripts/check-rules.py || fail=1; \
 	echo; \
 	./scripts/rule-budget.py || fail=1; \
+	echo; \
+	./scripts/check-markdown.py --vault "$(VAULT)" || fail=1; \
 	exit $$fail
 
 # Not part of `make check`: costs model calls and needs network. Run it once per

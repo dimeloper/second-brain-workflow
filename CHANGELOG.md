@@ -17,6 +17,46 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **Vault notes are checked as markdown.** `make audit` now runs
+  `check-markdown.py`, and `build-vault-index.py` reports the same finding as a
+  warning. One rule: a code span that wraps across a line break.
+
+  CommonMark converts the line ending inside a code span to a space and then
+  strips **at most one** leading space, so a hard-wrapped bullet's continuation
+  indent survives *inside* the span — `` `group:` `` plus a two-space indent
+  renders as `group:` followed by three spaces. A config key that renders wrong
+  is a config key somebody copies wrong. It has a second symptom: while the span
+  is wrapped, angle-bracket placeholders on the continuation line sit outside any
+  single-line span, so a tool reading line-by-line takes them for raw HTML tags.
+
+  Six instances were in one vault on 2026-08-31, five written that day, and every
+  check the engine runs was green throughout — frontmatter validated, required
+  sections validated, index regenerated clean, guard passed. Nothing looked at
+  the text. They were found by eye.
+
+  **Finding in the index, gate in `audit`.** The index already opens every note,
+  so it is the cheapest place to notice; its problems print to stderr and do not
+  affect its exit code, by design, so it names the defect and does not fail for
+  it. `check-markdown.py` is what fails.
+
+  **Not in the commit guard**, deliberately. The guard reads the staged *diff*,
+  and a wrapped span is a property of two adjacent lines: edit one of the pair
+  and the diff shows a line with an odd backtick count and no way to tell whether
+  its partner closes it. The guard's contract is *this write is aimed somewhere
+  it should not go*; prose quality is not that.
+
+  `practices/**` and `projects/**` are scanned; **daily notes are not**. Every
+  note written before this existed is full of prose nobody is going to re-wrap,
+  and the vault's own rule for `#outcome/` tags applies unchanged — check what is
+  being written, do not retrofit. A generated `INDEX.md` is skipped too.
+
+  **This is not a markdown linter and is not on the way to becoming one.** The
+  notes are hand-written prose with deliberate hard wrapping, and most of what a
+  general linter flags — line length, list markers, heading spacing — is house
+  style it would be wrong about. The rule shipped with six real instances behind
+  it; a second rule goes in when it has evidence of its own.
+
 ## [0.42.0] - 2026-08-31
 
 ### Added

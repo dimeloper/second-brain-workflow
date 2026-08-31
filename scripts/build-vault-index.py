@@ -33,6 +33,7 @@ from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
+from lib.markdown import wrapped_code_spans  # noqa: E402
 from lib.promotion import application_bars, is_process_note  # noqa: E402
 from lib.projects import FEATURES_DIR, PROJECT_FILE, discover  # noqa: E402
 
@@ -136,6 +137,8 @@ def collect(vault):
             problems.append((str(rel), "no H1 title"))
         if not rule:
             problems.append((str(rel), "no **Rule:** line"))
+        for lineno, _ in wrapped_code_spans(text):
+            problems.append((str(rel), f"line {lineno}: code span wraps"))
 
         repos = fm.get("repos") or []
         applications = fm.get("applications") or []
@@ -342,6 +345,10 @@ def read_doc(path, rel, problems, summary_headings, required=("status", "last-re
     summary = extract_tldr(text, headings=summary_headings)
     if not summary:
         problems.append((rel, f"no {summary_headings[0].replace('## ', '')} line"))
+    # Reported here rather than in a pass of its own, because this function is
+    # already the one place both a project overview and a feature file are read.
+    for lineno, _ in wrapped_code_spans(text):
+        problems.append((rel, f"line {lineno}: code span wraps"))
 
     repos = fm.get("repos") or []
     return {

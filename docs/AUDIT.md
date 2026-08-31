@@ -1,6 +1,6 @@
 # Auditing the vault
 
-`make audit` runs three read-only scripts against a real vault — the review
+`make audit` runs four read-only scripts against a real vault — the review
 side of the capture-then-review loop the README's project model describes.
 Read the README first for why this exists; this is the reference material.
 
@@ -310,6 +310,54 @@ ships no rules of its own, so there's nothing here to calibrate the starting
 number against; run `make audit` once you have a real rule set and adjust
 from what's actually there, not the other way around. See
 `.rule-budget.example`.
+
+## Note markdown
+
+`make audit` also runs `check-markdown.py`, which is the one thing here that
+looks at the *text* of a note rather than its frontmatter:
+
+```bash
+./scripts/check-markdown.py --vault ~/vaults/second-brain
+```
+
+It reports **one** defect: a code span that wraps across a line break.
+CommonMark converts the line ending inside a span to a space and then strips at
+most one leading space, so a hard-wrapped bullet's continuation indent survives
+*inside* the span:
+
+```markdown
+- `eks-deploy-staging.yml` has had one throughout (`group:
+  staging-<release>-<ns>`, `cancel-in-progress: false`).
+```
+
+renders as `group:` followed by **three** spaces. A config key that renders
+wrong is a config key somebody copies wrong, in a document whose whole job is to
+be trusted as a record. It has a second symptom too: while the span is wrapped,
+the `<release>` and `<ns>` on the continuation line sit outside any single-line
+span, so a tool reasoning line-by-line reads them as raw HTML tags.
+
+**This is deliberately not a markdown linter.** The notes are hand-written prose
+with deliberate hard wrapping, and most of what a general linter flags — line
+length, list markers, heading spacing — is house style it would be wrong about.
+The rule shipped with six real instances behind it, all found by eye on
+2026-08-31 while every check the engine runs stayed green. A second rule goes in
+when it has evidence of its own.
+
+**Finding here, gate there.** `build-vault-index.py` reports the same problem —
+it already opens every note, so it is the cheapest place to notice — but its
+warnings print to stderr and do not affect its exit code, which is by design.
+This script is the one that fails.
+
+**Not in the commit guard**, and that is a decision rather than an omission. The
+guard reads the staged *diff*, and a wrapped span is a property of two adjacent
+lines: edit one of the pair and the diff shows a line with an odd backtick count
+and no way to tell whether its partner closes it. The guard's contract is *this
+write is aimed somewhere it should not go*; prose quality is not that.
+
+`practices/**` and `projects/**` are scanned. **Daily notes are not** — every
+note written before this check existed is full of prose nobody is going to
+re-wrap, and the vault's own rule for `#outcome/` tags applies unchanged: check
+what is being written, do not retrofit.
 
 ## Running it weekly in CI
 
