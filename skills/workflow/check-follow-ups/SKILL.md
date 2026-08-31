@@ -124,7 +124,7 @@ So when invoked from inside a git repo, the default is **this repo in full, ever
 other repo as a count**:
 
 1. **This repo** — every item, oldest first, in full
-2. **Elsewhere** — one line: `housemaster-ingestion 3 · vaitsi-psychology 3 ·
+2. **Elsewhere** — one line: `acme-ingestion 3 · globex-web 3 ·
    no repo identified 4`. Not one line *per item*: one line total.
 3. Expand any of those only when asked ("what's in the others?", "show
    everything").
