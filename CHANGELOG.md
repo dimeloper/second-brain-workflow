@@ -17,6 +17,39 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.43.1] - 2026-08-31
+
+### Fixed
+- **`update-second-brain` asks the vault which project a repo belongs to,
+  instead of guessing.** Step 4a said "find the file under
+  `projects/<project>/features/`" and gave no mechanism, so the write side was
+  left inferring a project from a directory name while the read side had
+  `project-for.py` for exactly that question — the same read/write gap v0.42.0
+  closed one direction of.
+
+  Guessing fails in the ordinary case, not an exotic one: a project is named for
+  the initiative and a repo is named for itself, and one initiative routinely
+  spans several repos, so most of them cannot match its name. A marketing site,
+  a backend and a mobile client can all belong to one project whose name matches
+  none of their directories. The `repos:` frontmatter decides it, and
+  `project-for` is what reads it.
+
+  The skill now runs `project-for.py --repo "$PWD"` at the start of Step 4a,
+  which answers "which project" and "which feature file" in one call, and treats
+  its clean "nothing here" as the signal to skip to Step 5.
+
+- **Shipped files name no real repo, product or client.** Five illustrative
+  names across three files were one machine's actual repositories — two of them
+  reading as clients rather than as the author's own products. Replaced with the
+  `acme` / `globex` placeholders the rest of the skills already use, and the
+  lost-update incident in `update-second-brain` Step 5 now describes what
+  happened without naming the two repos it happened in.
+
+  Same split as v0.42.0's roster removal, applied to examples rather than to a
+  claim: **the engine is public and ships the mechanism; what a machine actually
+  works on is personal.** An example does not get truer for being real, and a
+  third party's name in a public repository is not the author's to publish.
+
 ## [0.43.0] - 2026-08-31
 
 ### Added
@@ -3014,7 +3047,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.1...HEAD
+[0.43.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.43.0...v0.43.1
 [0.43.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.42.0...v0.43.0
 [0.42.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.41.0...v0.42.0
 [0.41.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.40.0...v0.41.0
