@@ -276,7 +276,14 @@ def render(notes, two_bars=True):
 # The layout itself — which file is the overview, where the features sit, and
 # that a flat projects/<name>.md is still a project — lives in lib/projects, so
 # the index and project-for.py cannot disagree about what a project is.
-PROJECT_STATUS_ORDER = {"active": 0, "paused": 1, "closed": 2}
+# `standing` is for work that recurs and never reaches an end: routine
+# dependency upkeep, a quarterly audit, an on-call rotation. It sorts beside
+# `active` because it is live, and it is exempt from the closed-with-no-outcome
+# check because it will never close. Without it such a duty reads `active`
+# forever and `last-reviewed` becomes the only field carrying information —
+# while being exactly the "state spans several notes, no single note answers
+# where this is now" case a project doc is for.
+PROJECT_STATUS_ORDER = {"active": 0, "standing": 1, "paused": 2, "closed": 3}
 
 
 def extract_tldr(text, limit=RULE_MAX, headings=("## tl;dr",)):
@@ -378,6 +385,19 @@ def collect_features(paths, project_slug, problems):
     return out
 
 
+def strays(project_dir):
+    """Names of .md files sitting directly in a project directory.
+
+    `_project.md` is the overview; everything else at that level is read by
+    nothing. Returns [] for a path that is not a directory, so the flat shape
+    passes straight through.
+    """
+    if not project_dir.is_dir():
+        return []
+    return [p.name for p in sorted(project_dir.glob("*.md"))
+            if p.name != PROJECT_FILE and p.name != "INDEX.md"]
+
+
 def collect_projects(vault):
     """(projects, problems), or (None, []) when the vault has no projects/ at all."""
     if not (vault / "projects").is_dir():
@@ -386,6 +406,15 @@ def collect_projects(vault):
     notes, problems = [], []
     for project in discover(vault):
         slug = project["slug"]
+        # A .md sitting directly in projects/<x>/ is either a misplaced feature
+        # or somebody reaching for projects/<repo>/<initiative>.md, which is not
+        # a supported shape. Either way the file is read by nothing — not the
+        # index, not project-for — and the silence is indistinguishable from an
+        # empty directory. Named here for the same reason lib/projects exists.
+        for stray in strays(vault / "projects" / slug):
+            problems.append((f"{slug}/{stray}",
+                             "not read: a project directory holds _project.md, "
+                             "features/ and context/ — move it into features/"))
         if project["flat"]:
             # The flat shape. Still read, still indexed, still linked by bare
             # slug — somebody's committed vault content does not stop being
@@ -530,6 +559,22 @@ def main():
 
     projects, project_problems = collect_projects(vault)
     problems = problems + [(f"projects/{rel}", p) for rel, p in project_problems]
+    # A vault can reach "projects/ holds documents, templates absent" by doing
+    # nothing unusual: create the directory by hand, write a doc into it. Both
+    # readers key off `repos:` frontmatter rather than layout, so a flat doc
+    # works and the gap never surfaces — until a wrap-up is asked to draft from
+    # two templates that are not there, reads the vault as flat, and entrenches
+    # the un-adopted layout. One command fixes it, and nothing said so.
+    if projects:
+        missing = [t for t in ("project.md", "feature.md")
+                   if not (vault / "_templates" / t).is_file()]
+        if missing:
+            problems.append((
+                "_templates",
+                "projects/ holds documents but %s %s missing — run "
+                "./scripts/init-vault.sh --path %s --id VAULT_ID --adopt"
+                % (", ".join(missing), "is" if len(missing) == 1 else "are",
+                   vault)))
 
     for rel, problem in problems:
         print(f"warning: {rel}: {problem}", file=sys.stderr)

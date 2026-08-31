@@ -48,6 +48,22 @@ writes a vault, so it arrives by running `init-vault.sh --adopt`. Skip every
 project step below in a vault that does not have one, and say so once — do not
 create the directory to have somewhere to write.
 
+**Before drafting anything into `projects/`, check the templates are there.**
+If `projects/` exists and either `_templates/project.md` or
+`_templates/feature.md` is absent, say so and stop:
+
+```
+This vault has projects/ but not its templates. One command adds them:
+  ./scripts/init-vault.sh --path <vault> --id <id> --adopt
+```
+
+That state is reachable by doing nothing unusual — create `projects/` by hand,
+write a doc into it — and nothing downstream complains, because both the index
+and `project-for` key off `repos:` frontmatter rather than layout. Reading "use
+the shape that vault has" as *flat* in that state entrenches an un-adopted
+layout when the real answer was one command. `build-vault-index.py` warns about
+it too, but a wrap-up should not need the warning to have been read.
+
 **A flat `projects/<name>.md` is still valid and still indexed.** Some vaults
 have them from before a project was a directory. Read and revise them in place
 as they are; do not move one into a directory as a side effect of a wrap-up —
@@ -259,6 +275,7 @@ fresh session actually reads got buried and then overwritten.
 | | `_project.md` | `features/<feature>.md` |
 |---|---|---|
 | Holds | what the initiative *is* — TL;DR, cast, constraints, direction, questions about the project | one slice of work — its state, dated decisions, its own questions, its outcome |
+| Never ends? | `status: standing` — for recurring duty that has no end state and never takes an `outcome:` | same |
 | Revised when | the **project** changed | the **work** moved |
 | How often | a handful of times over months | most sessions that touch the slice |
 
@@ -308,12 +325,19 @@ Then, in the feature file:
    `#outcome/superseded`, `#outcome/handed-off` plus `#owner/<name>`. When a
    question closes, it closes *here* as well as in that day's note. The day's
    note is where it happened; this is where the next session looks.
-5. **When the feature itself closes**, set `status: closed`, set the `outcome:`
+5. **Work that recurs and never ends takes `status: standing`.** Routine
+   dependency upkeep, a quarterly audit, an on-call rotation: it comes round
+   again, it is never "done", and it can be neither dropped nor handed off.
+   `standing` says so, takes no `outcome:`, and is never asked for one. Without
+   it such a duty reads `active` forever and `last-reviewed` becomes the only
+   field carrying information — while being exactly the "state spans several
+   notes, no single note answers where this is now" case that earns a document.
+6. **When the feature itself closes**, set `status: closed`, set the `outcome:`
    frontmatter field to `done | dropped | superseded | handed-off`, and write
    `## Outcome` — what actually happened, in a sentence. A closed feature with no
    outcome is the same gap a bare `- [x]` leaves on a follow-up: it says the work
    left the list and nothing about how.
-6. **Bump `last-reviewed`** to today.
+7. **Bump `last-reviewed`** to today.
 
 ### 4b. `_project.md`, only if the project itself changed
 
