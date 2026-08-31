@@ -168,7 +168,7 @@ working repo, matching how the vault's `repos:` frontmatter already spells it.
 
 ```markdown
 ## Follow-ups
-- [ ] Revoke the stale CRM key once the merge lands #repo/housemaster-ingestion
+- [ ] Revoke the stale CRM key once the merge lands #repo/acme-ingestion
 - [ ] Ask Stripe support to set `default_account_tax_ids`
 ```
 
@@ -356,8 +356,8 @@ yours to hold.
 
 A wrap-up that writes the note and then waits for approval can lose it outright:
 a later session committing the vault from a clean tree carries it off, or a
-concurrent one overwrites it. Saturday's `motion-site-kit` block was lost the
-first way and 2026-08-24's `echo-city-hotel` block the second. Committing here
+concurrent one overwrites it. Both have happened here: one block lost the first
+way, and another the second, two days apart. Committing here
 also gives the guard a committed baseline to diff the next write against, which
 is what makes the lost-update check in Step 8 able to see anything at all.
 

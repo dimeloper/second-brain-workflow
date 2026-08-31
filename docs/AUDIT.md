@@ -187,7 +187,7 @@ prose against the repo names the vault already uses, then a file path in the
 current repo, then the note's `## Built` context.
 
 ```bash
-./scripts/check-followups.py --repo housemaster-backend   # group as another repo
+./scripts/check-followups.py --repo acme-backend          # group as another repo
 ./scripts/check-followups.py --no-repo-grouping           # one flat list
 ./scripts/check-followups.py --recent                     # the skill's window instead
 ./scripts/check-followups.py --recent --brief             # this repo in full, others tallied
