@@ -17,6 +17,30 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`context-sources.py` reported a false empty tier on non-JS stacks.** The
+  tier-3 and tier-4 globs were JS/TS-shaped — `**/theme.*`, `**/locales/*.json`
+  — so a Flutter app with a complete light/dark palette in
+  `lib/shared/themes/app_colors.dart` reported `BRAND — (nothing)`.
+
+  That is the worst failure this tool can have. An empty tier is not neutral: it
+  triggers the disclosure telling the reader *"whatever those tiers would have
+  answered is not in this repo — ask for it, or record it as unestablished, do
+  not derive it"*. A **false** empty therefore instructs someone to record
+  "unestablished" while the answer sits in the repo, which is the
+  confident-plausible-answer failure the whole tool exists to prevent, produced
+  by the tool itself.
+
+  Widened to the ecosystems this engine actually meets: `**/l10n/*.arb`,
+  `**/*.lproj/*.strings`, `**/values*/strings.xml`, `**/locale/**/*.po` for
+  shipped surface; `**/*theme*.*`, `**/*colors*.*`, `**/*palette*.*` for brand.
+  `.dart_tool`, `Carthage`, `DerivedData`, `target` and `out` join the skip set
+  so the wider globs do not flood.
+
+  Found by running the tool against a second stack on the day it shipped, which
+  also turned up a palette source in an Expo repo that a `context/brand.md`
+  had already recorded as absent.
+
 ## [0.46.0] - 2026-08-31
 
 ### Added

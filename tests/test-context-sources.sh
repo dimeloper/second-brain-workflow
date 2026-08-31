@@ -81,6 +81,51 @@ case "${out_thin}" in
   *) fail "an empty tier prints (nothing)" "${out_thin}" ;;
 esac
 
+# --- a stack this engine meets must not report a false empty ----------------
+# The defect: tier-3 and tier-4 globs were JS/TS-shaped, so a Flutter app with
+# a complete light/dark palette reported "brand: (nothing)" — and an empty tier
+# instructs the reader to record the answer as unestablished. A false empty is
+# worse than no survey, because it is a confident wrong answer rather than a
+# missing one.
+DART="${SANDBOX}/dart-app"
+mkdir -p "${DART}/lib/shared/themes" "${DART}/lib/l10n" \
+         "${DART}/android/app/src/main/res/values"
+printf 'class AppColors { static const lightPrimary = Color(0xFF04AE66); }\n' \
+  > "${DART}/lib/shared/themes/app_colors.dart"
+printf 'class AppTheme {}\n' > "${DART}/lib/shared/themes/app_theme.dart"
+printf '{"@@locale":"en"}\n' > "${DART}/lib/l10n/app_en.arb"
+printf '<resources/>\n' > "${DART}/android/app/src/main/res/values/colors.xml"
+out_dart="$("${CS}" --repo "${DART}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_dart}" in
+  *app_colors.dart*) pass "a Dart palette is found, not reported as an empty brand tier" ;;
+  *) fail "a Dart palette is found" "${out_dart}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_dart}" in
+  *app_en.arb*) pass "an .arb locale file counts as shipped surface" ;;
+  *) fail "an .arb locale file counts as shipped surface" "${out_dart}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_dart}" in
+  *"EMPTY"*brand*) fail "brand is not reported empty when a palette exists" "${out_dart}" ;;
+  *) pass "brand is not reported empty when a palette exists" ;;
+esac
+
+# Android and Apple string catalogues are shipped surface too.
+NATIVE="${SANDBOX}/native-app"
+mkdir -p "${NATIVE}/app/src/main/res/values-el" "${NATIVE}/ios/el.lproj"
+printf '<resources><string name="a">x</string></resources>\n' \
+  > "${NATIVE}/app/src/main/res/values-el/strings.xml"
+printf '"a" = "x";\n' > "${NATIVE}/ios/el.lproj/Localizable.strings"
+out_native="$("${CS}" --repo "${NATIVE}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_native}" in
+  *strings.xml*Localizable.strings*|*Localizable.strings*strings.xml*)
+    pass "Android and Apple string catalogues count as shipped surface" ;;
+  *) fail "Android and Apple string catalogues count" "${out_native}" ;;
+esac
+
 # --- dependency directories are never a product's own statement -------------
 NOISY="${SANDBOX}/noisy-app"
 mkdir -p "${NOISY}/node_modules/somepkg/docs/features" \
