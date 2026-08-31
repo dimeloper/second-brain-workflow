@@ -21,6 +21,12 @@
 # purpose — "nothing to do" and "cannot tell you" are different answers and a
 # caller must be able to distinguish them.
 #
+# Each verdict carries the repo's render mode. `render.py <repo>` re-renders in
+# the mode the registry records, so the printed `fix:` preserves --local by
+# itself — but a reader handed a command still has to be able to see that it
+# does, and for three releases the mode was visible nowhere outside one clone's
+# .git/info/exclude.
+#
 # The broken case is reported under --scan only, and is not drift: it is a repo
 # whose rendered output stopped being readable, which both the registry and the
 # scan read as "not onboarded" and drop from every count. That is how five repos
@@ -73,7 +79,7 @@ fi
 targets="$(printf '%s\n%s\n' "${entries}" "${scan}" \
   | grep -v '^[[:space:]]*$' | LC_ALL=C sort -u || true)"
 
-drift=0 live=0 stale=0 unreg=0
+drift=0 live=0 stale=0 unreg=0 rmode='' mode_hint=''
 while IFS= read -r repo; do
   [ -n "${repo}" ] || continue
   label=""
@@ -97,13 +103,24 @@ ${repo}
     continue
   fi
 
+  # The mode travels with the verdict. Without it the `fix:` line below was a
+  # command whose effect on a --local repo the reader could not see: it re-renders
+  # in the recorded mode now, and saying which mode that is, is what makes the
+  # command legible rather than merely safe. `unknown` is a repo the registry has
+  # no mode for and that carries no exclusion block — the first render records it.
+  rmode="$(sbw_registry_mode_effective "${repo}")"
+  case "${rmode}" in
+    local)   mode_hint=" — stays local, so this repo's remote still never sees them" ;;
+    unknown) mode_hint=" — no mode recorded yet; this render records one" ;;
+    *)       mode_hint="" ;;
+  esac
   live=$((live + 1))
   if "${STANDARDS_DIR}/scripts/render.py" "${repo}" --check >/dev/null 2>&1; then
-    echo "  ok    up to date: ${repo}${label}"
+    echo "  ok    up to date: ${repo}${label}  [${rmode}]"
   else
     drift=$((drift + 1))
-    echo "  DRIFT ${repo}${label}"
-    echo "        fix: ${STANDARDS_DIR}/scripts/render.py ${repo}"
+    echo "  DRIFT ${repo}${label}  [${rmode}]"
+    echo "        fix: ${STANDARDS_DIR}/scripts/render.py ${repo}${mode_hint}"
   fi
 done <<EOF
 ${targets}

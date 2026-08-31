@@ -343,9 +343,12 @@ git -C "${TEAM_REPO}" -c user.email=t@example.com -c user.name=T commit -qm "tea
 out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${TEAM_REPO}" --local 2>&1)"
 rc=$?
 assert_exit 0 "${rc}" "--local proceeds when the tracked file is one the render skips"
+# Worded "local mode", not "--local": since the mode can be *preserved* from the
+# registry rather than asked for on this run, a message naming the flag would
+# name something the reader did not type.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"--local has nothing to hide"*"CLAUDE.md"*)
+  *"local mode has nothing to hide"*"CLAUDE.md"*)
     pass "and names it as tracked-and-left-alone rather than refusing" ;;
   *) fail "and names it as tracked-and-left-alone rather than refusing" "${out}" ;;
 esac
@@ -377,6 +380,142 @@ case "${out}" in
   *"cannot keep its promise"*"AGENTS.md"*) pass "naming it" ;;
   *) fail "naming it" "${out}" ;;
 esac
+
+# --- the render mode is recorded, and a plain re-render preserves it ---------
+# The failure: `make upgrade` reported drift and printed `fix: render.py <repo>`.
+# Running that verbatim re-rendered a --local repo in shared mode. The existing
+# exclude block survived, but rules added since onboarding landed outside it and
+# showed up untracked — and in a repo where those paths are tracked, or after a
+# `git add -A`, that is personal conventions committed to a shared remote.
+#
+# XDG_CONFIG_HOME is redirected for this block only: the registry is where the
+# mode now lives, and a test that wrote the developer's real one would record a
+# mode against their own repos.
+MODE_HOME="${SANDBOX}/mode-config-home"
+MODE_REPO="${SANDBOX}/mode-repo"
+make_target_repo "${MODE_REPO}"
+mrender() { XDG_CONFIG_HOME="${MODE_HOME}" "${ENGINE}/scripts/render.py" \
+  --rules-dir "${RULES_FIXTURES}" "$@"; }
+MODE_REGISTRY="${MODE_HOME}/second-brain-workflow/repos"
+mreal="$(cd "${MODE_REPO}" && pwd -P)"
+
+mrender "${MODE_REPO}" --local >/dev/null 2>&1
+assert_contains "${MODE_REGISTRY}" "^${mreal}	mode=local\$" \
+  "--local records mode=local beside the path"
+
+# The load-bearing one. No flag, and the mode must not change.
+out="$(mrender "${MODE_REPO}" 2>&1)"
+assert_exit 0 $? "a plain re-render of a local repo succeeds"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Mode: local (recorded)"*) pass "and stays local, from the recorded mode" ;;
+  *) fail "and stays local, from the recorded mode" "${out}" ;;
+esac
+# Checked against git rather than against the exclude file: the claim is that the
+# remote never sees these, and an exclude entry git disagrees with is worth
+# nothing. Before this fix, a rule added after onboarding failed exactly here.
+status="$(cd "${MODE_REPO}" && git status --porcelain --untracked-files=all)"
+mine="$(printf '%s\n' "${status}" \
+  | grep -c 'frontend-angular\|AGENTS.md\|CLAUDE.md\|sbw-version' || true)"
+assert_str "0" "${mine}" "and git still reports none of the rendered files"
+
+# Reporting modes say the mode and record nothing — the same contract
+# .sbw-version and the registry path already have. repos-check.sh calls
+# `render.py --check` on every repo, so a refusal here would break the report
+# this fix exists to make honest.
+cp "${MODE_REGISTRY}" "${SANDBOX}/mode-registry.before"
+out="$(mrender "${MODE_REPO}" --check 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "--check on a local repo is still a clean report, not a refusal"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Mode: local"*) pass "and names the mode it checked against" ;;
+  *) fail "and names the mode it checked against" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+if cmp -s "${SANDBOX}/mode-registry.before" "${MODE_REGISTRY}"; then
+  pass "and leaves the registry byte-identical"
+else
+  fail "and leaves the registry byte-identical" "$(cat "${MODE_REGISTRY}")"
+fi
+
+# --shared is the explicit switch, and it finishes the job: a block left behind
+# would keep hiding files the registry now calls shared, and the next reader
+# would have two sources disagreeing about one repo.
+out="$(mrender "${MODE_REPO}" --shared 2>&1)"
+assert_exit 0 $? "--shared renders"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"switching this repo from local"*) pass "and says it switched the mode" ;;
+  *) fail "and says it switched the mode" "${out}" ;;
+esac
+assert_contains "${MODE_REGISTRY}" "^${mreal}	mode=shared\$" "recording mode=shared"
+assert_not_contains "${MODE_REPO}/.git/info/exclude" "rendered locally" \
+  "and removing the exclusion block rather than leaving an empty one"
+status="$(cd "${MODE_REPO}" && git status --porcelain --untracked-files=all)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${status}" in
+  *AGENTS.md*) pass "so the rendered files are ordinary untracked files again" ;;
+  *) fail "so the rendered files are ordinary untracked files again" "${status}" ;;
+esac
+
+# "local and shared" is not a state, so the parser refuses it rather than
+# resolving it by precedence further down.
+mrender "${MODE_REPO}" --local --shared >/dev/null 2>&1
+assert_exit 2 $? "--local and --shared together is refused by the parser"
+
+# --- a registry line with no mode heals itself from the exclude block --------
+# Every line written before the field existed is in this state. Treated as
+# unknown, inferred once from the block adopt.sh already grepped for, and
+# recorded — no migration, no user decision.
+LEGACY_REPO="${SANDBOX}/legacy-mode-repo"
+make_target_repo "${LEGACY_REPO}"
+mrender "${LEGACY_REPO}" --local >/dev/null 2>&1
+lreal="$(cd "${LEGACY_REPO}" && pwd -P)"
+printf '%s\n' "${lreal}" > "${MODE_REGISTRY}"          # the pre-mode shape
+out="$(mrender "${LEGACY_REPO}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Mode: local (inferred from .git/info/exclude)"*)
+    pass "a mode-less line is inferred from the exclude block, not read as shared" ;;
+  *) fail "a mode-less line is inferred from the exclude block, not read as shared" "${out}" ;;
+esac
+assert_contains "${MODE_REGISTRY}" "^${lreal}	mode=local\$" \
+  "and the answer is recorded on that first render"
+
+# The other direction: registered, no mode, no block. That is shared, and saying
+# so is a determined answer rather than an unknown.
+SHARED_REPO="${SANDBOX}/legacy-shared-repo"
+make_target_repo "${SHARED_REPO}"
+mrender "${SHARED_REPO}" >/dev/null 2>&1
+sreal="$(cd "${SHARED_REPO}" && pwd -P)"
+printf '%s\n' "${sreal}" > "${MODE_REGISTRY}"
+out="$(mrender "${SHARED_REPO}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Mode: shared (inferred: registered, with no local-exclusion block)"*)
+    pass "a mode-less line with no block is shared, and says which it inferred from" ;;
+  *) fail "a mode-less line with no block is shared, and says which it inferred from" "${out}" ;;
+esac
+
+# --- a recorded mode this engine does not understand refuses -----------------
+# Fail closed, the same shape as the vault id: the mode decides who sees your
+# conventions, so an unreadable one is not resolved to a default.
+printf '%s\tmode=whatever\n' "${sreal}" > "${MODE_REGISTRY}"
+out="$(mrender "${SHARED_REPO}" 2>&1)"
+rc=$?
+assert_exit 1 "${rc}" "an unrecognised recorded mode refuses rather than guessing"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"does not understand"*"--local or --shared"*)
+    pass "naming the value and both ways to state one" ;;
+  *) fail "naming the value and both ways to state one" "${out}" ;;
+esac
+# ...but an explicit flag *is* the answer, so it must not be refused too — that
+# would leave no way to repair the line from the tool that wrote it.
+mrender "${SHARED_REPO}" --shared >/dev/null 2>&1
+assert_exit 0 $? "and an explicit --shared repairs it instead of being refused"
+assert_contains "${MODE_REGISTRY}" "^${sreal}	mode=shared\$" "recording the stated mode"
 
 # --- a hand-written AGENTS.md is skipped, not dropped from the plan ----------
 # v0.20.1 joined two questions into one flag: whether a source AGENTS.md exists,
