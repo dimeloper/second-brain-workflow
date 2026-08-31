@@ -36,9 +36,16 @@ tags: [x]
 EOF
 
 # alpha-service: 4 notes across 21 days — a long-running initiative.
+# gamma-tool: 3 notes across 8 days — dense and recent. Above the 7-day bar and
+#   below the 14-day one this shipped with, so it is the case that pins the
+#   default rather than passing at either setting.
 # beta-app: 2 notes, 1 day apart — one piece of work, not an initiative.
 for d in 2026-01-02 2026-01-09 2026-01-16 2026-01-23; do
   printf '# %s\n\n## Built (alpha-service: the vendor migration)\n- work\n\n## Follow-ups\n- [ ] more #repo/alpha-service\n' \
+    "${d}" > "${VAULT}/${d}.md"
+done
+for d in 2026-01-10 2026-01-14 2026-01-18; do
+  printf '# %s\n\n## Built\n- work\n\n## Follow-ups\n- [ ] more #repo/gamma-tool\n' \
     "${d}" > "${VAULT}/${d}.md"
 done
 printf '# 2026-01-24\n\n## Built (beta-app: a small fix)\n- work\n' > "${VAULT}/2026-01-24.md"
@@ -50,8 +57,27 @@ assert_exit 0 "${rc}" "always exits 0 — a list to consider, never a reason to 
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"Candidates with no project doc (1)"*) pass "one initiative clears the bar" ;;
-  *) fail "one initiative clears the bar" "${out}" ;;
+  *"Candidates with no project doc (2)"*) pass "two initiatives clear the bar" ;;
+  *) fail "two initiatives clear the bar" "${out}" ;;
+esac
+
+# The bar the tool shipped with was a fortnight, and it was wrong on the first
+# real vault it saw: it excluded an initiative running 8 notes over 7 days that
+# carried 17 of that vault's 37 open threads, while admitting repos that were
+# merely long-lived. Duration was standing in for depth. This is that case.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"gamma-tool: 3 notes, 2026-01-10..2026-01-18 (8 days)"*)
+    pass "a dense 8-day initiative clears the 7-day bar" ;;
+  *) fail "a dense 8-day initiative clears the 7-day bar" "${out}" ;;
+esac
+
+fortnight="$("${CAND}" --vault "${VAULT}" --as-of 2026-01-26 --min-span 14 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${fortnight}" in
+  *"Candidates with no project doc (1)"*"Below the bar (2)"*"gamma-tool 3"*)
+    pass "...and the old fortnight bar still excludes it, if you ask for one" ;;
+  *) fail "...and the old fortnight bar still excludes it, if you ask for one" "${fortnight}" ;;
 esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -66,8 +92,8 @@ esac
 # bar is an argument, and a reader who disagrees needs to see what it excluded.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"Below the bar (1)"*"beta-app 2"*) pass "a short-lived subject is below the bar, and counted" ;;
-  *) fail "a short-lived subject is below the bar, and counted" "${out}" ;;
+  *"Below the bar (1)"*"beta-app 2"*) pass "a two-day subject is below the bar, and counted" ;;
+  *) fail "a two-day subject is below the bar, and counted" "${out}" ;;
 esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -108,7 +134,7 @@ esac
 
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"Candidates with no project doc (0)"*) pass "...and drops out of the candidate list" ;;
+  *"Candidates with no project doc (1)"*) pass "...and drops out of the candidate list" ;;
   *) fail "...and drops out of the candidate list" "${out}" ;;
 esac
 

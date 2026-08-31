@@ -41,12 +41,21 @@ from lib.vault_state import classify  # noqa: E402
 
 DEFAULT_NOTES = 20
 # Thresholds, and why these. Three notes is the point where a subject stops
-# being one day's work; a fortnight is the point where "spans dozens of daily
-# notes" starts being true and a fresh session can no longer reconstruct the
-# state by reading yesterday. Both are arguments, because a vault written four
-# days a week is a different shape from one written every day.
+# being one day's work. A week is the point where a fresh session can no longer
+# reconstruct the state by reading yesterday — which is the question this asks,
+# and it is about density, not duration.
+#
+# The bar shipped at a fortnight and was wrong on the first real vault it saw.
+# It excluded an initiative running 8 notes over 7 days that carried 17 of the
+# vault's 37 open follow-up threads, a contested point with two live options, a
+# superseded plan and a stopgap — every shape the project-note template exists
+# for. Meanwhile it admitted five repos that were merely long-lived. Duration
+# was standing in for depth and is not a good proxy for it: an initiative that
+# takes over a week of consecutive days is exactly the one whose state no
+# longer fits in any single note. Both stay arguments, because a vault written
+# four days a week is a different shape from one written every day.
 DEFAULT_MIN_NOTES = 3
-DEFAULT_MIN_SPAN = 14
+DEFAULT_MIN_SPAN = 7
 
 
 def parse_date(value):
