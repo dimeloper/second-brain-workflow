@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.47.0] - 2026-08-31
+
 ### Added
 - **`status: standing`, for work that never reaches an end.** Routine dependency
   upkeep, a quarterly audit, an on-call rotation: it recurs, it is never "done",
@@ -3195,7 +3197,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.47.0...HEAD
+[0.47.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.1...v0.47.0
 [0.46.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.0...v0.46.1
 [0.46.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.45.0...v0.46.0
 [0.45.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.44.0...v0.45.0
