@@ -17,6 +17,37 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`extract-product-context` and `context-sources.py` — read the repo, not the
+  marketing copy.** A product defines itself in its repo; everything else
+  describes it. This closes a specific, repeatable mistake: the first `context/`
+  written for an app claimed the product ended at birth, inferred from the
+  vocabulary of its store listing and labelled `[verified]`. The repo held a
+  `ROADMAP.md` with a phase named *Post-Birth Retention*, install and conversion
+  figures, and a written boundary against a sibling product. None of it was
+  read, because the two sources that *talk about* a product — daily notes and
+  store copy — are the two that come to mind, and nothing said to look further.
+
+  `context-sources.py --repo PATH` (or `make context-sources REPO=...`)
+  enumerates where a repo states itself, in four tiers of authority: product
+  docs, store metadata, shipped surface, brand. It **names the tiers that are
+  empty**, which is the half that matters — an empty tier means the answer is
+  not in this repo and must be asked for, rather than derived from a tier that
+  happens to be full. It reports paths and never opens a file: a tool that
+  summarised these would be one more thing between a reader and the source.
+
+  **Tier 1 before tier 2, always.** A roadmap states intent; a listing states a
+  pitch, and they disagree often enough that reading them in the wrong order
+  produces a confident wrong answer. **When the shipped surface contradicts the
+  listing, the surface wins and the contradiction is the finding** — the first
+  real run turned up an app shipping six locales at full parity behind an
+  English-only store listing.
+
+  The skill carries three rules: quote rather than characterise; `[verified]`
+  means read on disk today and never covers a whole section; and name what you
+  could not find, because a `context/` that says "no source states this" can be
+  fixed by asking and a plausible invention cannot be detected.
+
 ## [0.44.0] - 2026-08-31
 
 ### Added

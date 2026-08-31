@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index adopt \
-        vault-index-check sync-skills fetch-skills skills-for practices-for project-for project-candidates uninstall upgrade explain render repos-check guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for practices-for project-for context-sources project-candidates uninstall upgrade explain render repos-check guard doctor audit \
         init \
         verify-claude check release-check
 
@@ -34,6 +34,7 @@ help:
 	@echo "make skills-for REPO=... which skills apply to a repo, adopted and candidate"
 	@echo "make practices-for REPO=... vault notes that govern a repo but were never applied"
 	@echo "make project-for REPO=... the vault's context for this repo's initiative"
+	@echo "make context-sources REPO=... where a repo states its own audience, voice and brand"
 	@echo "make project-candidates  which long-running initiatives the daily notes evidence"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
@@ -97,7 +98,7 @@ lint-python:
 	  scripts/lib/repo_match.py scripts/lib/promotion.py scripts/practices-for.py \
 	  scripts/lib/followups.py scripts/lib/followup_threads.py scripts/lib/landed.py \
 	  scripts/project-candidates.py scripts/project-for.py scripts/lib/projects.py \
-  scripts/check-markdown.py scripts/lib/markdown.py \
+  scripts/check-markdown.py scripts/lib/markdown.py scripts/context-sources.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -203,6 +204,15 @@ practices-for:
 project-for:
 	@if [ -z "$(REPO)" ]; then echo "usage: make project-for REPO=/path/to/repo" >&2; exit 2; fi
 	@./scripts/project-for.py --repo "$(REPO)" --vault "$(VAULT)"
+
+# Where a product repo already states what it is, who it is for and how it
+# talks — in four tiers of authority, naming the ones that are empty. Reports
+# paths and never opens a file: the reading is the extract-product-context
+# skill's job, and a tool that summarised these would be one more thing between
+# a reader and the source.
+context-sources:
+	@if [ -z "$(REPO)" ]; then echo "usage: make context-sources REPO=/path/to/repo" >&2; exit 2; fi
+	@./scripts/context-sources.py --repo "$(REPO)"
 
 # Which long-running initiatives the daily notes already evidence, and which of
 # those have no project doc. Read-only, and deliberately not a writer: drafting

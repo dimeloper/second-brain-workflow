@@ -232,7 +232,7 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   quietly sharing what you kept private — `--shared` is the explicit way back.
   See
   [Rendering into a repo you do not own](docs/REFERENCE.md#rendering-into-a-repo-you-do-not-own).
-- **Bring your own skills.** The engine ships five of its own and no roster of
+- **Bring your own skills.** The engine ships six of its own and no roster of
   other people's. Declare the ones you want in a `skills.json`, pinned by sha
   and allowlisted per source, so two machines reading the same manifest install
   the same thing. See
