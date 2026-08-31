@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-08-31
+
 ### Added
 - **A project is a directory, not one file.** `projects/<project>/_project.md`
   is the stable overview — what the initiative is, who is involved, what
@@ -2915,7 +2917,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.40.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.41.0...HEAD
+[0.41.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.40.0...v0.41.0
 [0.40.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.39.0...v0.40.0
 [0.39.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.2...v0.39.0
 [0.38.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.38.1...v0.38.2
