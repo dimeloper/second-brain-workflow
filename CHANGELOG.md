@@ -69,7 +69,7 @@ write release notes, not two to keep in sync by hand.
   the two silently merging.
 
   **A pointer, not containment**, the same shape as `repos:`. Nesting
-  (`projects/housemaster/{context/,backend/,ingestion/}`) was the first idea and
+  (`projects/widgets/{context/,backend/,ingestion/}`) was the first idea and
   was rejected: it forces a hierarchy onto projects that have none, and conflates
   "shares context with" and "is contained by".
 

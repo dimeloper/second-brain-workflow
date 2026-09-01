@@ -153,9 +153,9 @@ set. Naming a `product:` in a project's frontmatter attaches the shared files:
 
 ```
 projects/
-  _products/housemaster/context/{audience,brand,voice}.md
-  housemaster-backend/_project.md      product: housemaster
-  housemaster-ingestion/_project.md    product: housemaster
+  _products/widgets/context/{audience,brand,voice}.md
+  widgets-backend/_project.md      product: widgets
+  widgets-ingestion/_project.md    product: widgets
 ```
 
 `project-for` prints the product's context first and the project's own second —
