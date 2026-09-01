@@ -181,6 +181,67 @@ case "${out}" in
   *) pass "file contents are never printed, only paths" ;;
 esac
 
+# --- a tool cache is never brand --------------------------------------------
+# v0.46.1 broadened the brand tier to catch a Flutter palette, and broadening
+# the net without widening the exclusions let a library's type-check cache into
+# the tier that says where the product's palette lives. A wrong pointer is worse
+# than an empty tier: the empty one at least says it found nothing.
+CACHED="${SANDBOX}/cached-api"
+mkdir -p "${CACHED}/.mypy_cache/3.11/rich" "${CACHED}/.pytest_cache" "${CACHED}/.ruff_cache"
+printf '# Readme\n' > "${CACHED}/README.md"
+: > "${CACHED}/.mypy_cache/3.11/rich/theme.data.json"
+: > "${CACHED}/.mypy_cache/3.11/rich/palette.data.json"
+: > "${CACHED}/.mypy_cache/3.11/colorsys.data.json"
+: > "${CACHED}/.pytest_cache/theme.json"
+: > "${CACHED}/.ruff_cache/colors.json"
+
+out="$("${CS}" --repo "${CACHED}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *mypy_cache*|*pytest_cache*|*ruff_cache*) fail "a tool cache never appears in any tier" "${out}" ;;
+  *) pass "a tool cache never appears in any tier" ;;
+esac
+# And with the cache pruned the tier is honestly empty, not quietly populated.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"EMPTY"*"brand"*) pass "a repo whose only theme-shaped files are cache reports brand empty" ;;
+  *) fail "a repo whose only theme-shaped files are cache reports brand empty" "${out}" ;;
+esac
+
+# --- a CSS-first theme and a public/ mark are brand -------------------------
+# Tailwind v4 has no config file — the theme is an `@theme` block in the app's
+# stylesheet — and the web convention puts marks in public/, not assets/. Both
+# were missed, so a Next.js repo with a palette, a font and a logo reported an
+# empty brand tier and fired the record-it-as-unestablished disclosure.
+WEB="${SANDBOX}/web-app"
+mkdir -p "${WEB}/src/app" "${WEB}/public/svg" "${WEB}/public/images"
+printf '# Readme\n' > "${WEB}/README.md"
+printf '@import "tailwindcss";\n\n@theme {\n  --color-brand: #123456;\n}\n' > "${WEB}/src/app/globals.css"
+: > "${WEB}/public/svg/logo.svg"
+: > "${WEB}/public/favicon.ico"
+: > "${WEB}/public/images/landing-hero.png"
+
+out="$("${CS}" --repo "${WEB}" 2>&1)"
+brand="$(printf '%s\n' "${out}" | sed -n "/^BRAND/,/^$/p")"
+for want in "globals.css" "logo.svg" "favicon.ico"; do
+  TESTS_RUN=$((TESTS_RUN + 1))
+  case "${brand}" in
+    *"${want}"*) pass "brand finds ${want}" ;;
+    *) fail "brand finds ${want}" "${brand}" ;;
+  esac
+done
+# Narrow to the mark: every image in public/ would bury the pointer.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${brand}" in
+  *landing-hero*) fail "brand does not list every image in public/" "${brand}" ;;
+  *) pass "brand does not list every image in public/" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"EMPTY"*"brand"*) fail "a repo with a CSS-first theme is not reported as brandless" "${out}" ;;
+  *) pass "a repo with a CSS-first theme is not reported as brandless" ;;
+esac
+
 # --- errors -----------------------------------------------------------------
 "${CS}" --repo "${SANDBOX}/nope" >/dev/null 2>&1
 assert_exit 1 $? "a missing repo is an error"

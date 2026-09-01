@@ -89,15 +89,39 @@ TIERS = (
         ("glob", "**/*colors*.*"),
         ("glob", "**/*palette*.*"),
         ("glob", "**/tailwind.config.*"),
+        # Tailwind v4 has no config file: the theme moved into CSS, as an
+        # `@theme` block in the app's main stylesheet. Globbing for the config
+        # reported an empty brand tier on a Next.js repo whose palette, font
+        # and mark were all present — the same false empty v0.46.1 fixed for
+        # Flutter, one stack later. A glob cannot see `@theme`, so this matches
+        # the file the convention puts it in.
+        ("glob", "**/globals.css"),
+        ("glob", "**/app.css"),
         ("glob", "assets/*.png"),
         ("glob", "assets/*.svg"),
+        # `assets/` is the Flutter and Expo convention; the web ones put marks
+        # in `public/`. Narrow to the mark itself rather than every image, or
+        # the tier fills with hero shots and screenshots and stops pointing at
+        # anything.
+        ("glob", "public/**/logo.*"),
+        ("glob", "public/favicon.*"),
     )),
 )
 
 # Directories whose contents are never a product's own statement of itself.
+#
+# The tool-cache entries are not hypothetical tidiness. v0.46.1 broadened the
+# brand tier to `**/*theme*.*`, `**/*colors*.*` and `**/*palette*.*` so a
+# Flutter palette would be found — and broadening the net without widening the
+# exclusions let a *library's* type-check cache into the tier that is supposed
+# to say where the product's palette lives. A Python repo reported
+# `.mypy_cache/3.11/rich/palette.data.json` as brand, with `colorsys` matching
+# `*colors*`. A wrong pointer is worse than an empty tier, because the empty
+# one at least says it found nothing.
 SKIP = {"node_modules", ".git", "dist", "build", ".next", ".expo", "vendor",
         "Pods", ".venv", "venv", "__pycache__", "coverage", ".turbo",
-        ".dart_tool", "Carthage", "DerivedData", "target", "out"}
+        ".dart_tool", "Carthage", "DerivedData", "target", "out",
+        ".mypy_cache", ".pytest_cache", ".ruff_cache", ".tox", "htmlcov"}
 
 MAX_PER_PATTERN = 12
 
