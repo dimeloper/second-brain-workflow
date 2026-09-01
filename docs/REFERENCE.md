@@ -146,6 +146,19 @@ projects/
   INDEX.md                          generated
 ```
 
+`context/` files carry frontmatter — `kind: context`, `last-reviewed`, `repos:`,
+`tags:` — and `last-reviewed` is what `check-context-freshness.py` compares
+against the last commit touching that repo's tier-1..4 sources. **Git dates, not
+mtimes:** a clone or a branch switch rewrites an mtime and changes nothing about
+the product. It runs in `make audit`, reports and never edits, and calls a repo
+it cannot reach `undetermined` rather than fresh.
+
+That check exists because `context/` is the one part of a project doc a wrap-up
+does not touch on its own. A feature moves when the work moves and
+`update-second-brain` revises it; `context/` moves when the repo's *statement of
+itself* moves — a `PRODUCT.md`, a README, a locale set, a theme — which no
+session is otherwise looking for.
+
 `context/` is optional and holds whatever topics a product needs — the filename
 set is not fixed. It is surfaced by `project-for` and deliberately **not** by
 `projects/INDEX.md`, which is one row per project and one per feature; context

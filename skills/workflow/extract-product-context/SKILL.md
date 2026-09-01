@@ -107,4 +107,5 @@ the result back.
 | "Who is this product for?" | Tier 1, then tier 3. The listing is the last place to look, not the first |
 | Before writing anything public — marketing, ASO, social, release notes | `voice.md`'s pointer, then the artifact it points at |
 | A `context/` file older than the last few releases | Re-run and diff: a roadmap written against v1.0.1 is evidence about v1.0.1 |
+| `check-context-freshness.py` reports one `STALE` | The same re-run, and bump `last-reviewed` only after re-reading — dating a file you did not re-check turns "unverified" into a false "verified" |
 | Asked to infer audience or positioning with no repo to hand | Say the repo is where the answer lives, and that you have not read it |

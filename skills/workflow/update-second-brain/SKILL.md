@@ -35,6 +35,9 @@ practices *during* work. It does not write.
     direction, open questions about the project itself
   - `features/<feature>.md` — one file per slice of work: current state,
     dated decisions, open questions, and an outcome when it closes
+  - `context/<topic>.md` — product-scoped and optional: audience, voice, brand.
+    Written by `extract-product-context`, re-checked by
+    `check-context-freshness.py` (Step 4a-ii)
 - Templates: `_templates/{practice-note,daily-note,project,feature}.md`
 - Which project a repo belongs to: `scripts/project-for.py --repo <path>`
   (read-only; matches on the `repos:` frontmatter, never on the directory name)
@@ -357,6 +360,46 @@ Then, in the feature file:
    outcome is the same gap a bare `- [x]` leaves on a follow-up: it says the work
    left the list and nothing about how.
 7. **Bump `last-reviewed`** to today.
+
+### 4a-ii. `context/`, when the session moved what it describes
+
+`context/` is product-scoped — audience, voice, brand — so it does not move when
+a feature does. **It moves when the repo's own statement of itself moves**: a
+`PRODUCT.md`, a README, a locale set, a theme, a store listing.
+
+This step exists because for its first weeks the skill had no step for `context/`
+at all, and the cost showed up on 2026-09-01: a `context/` written that morning
+carried four claims that were wrong rather than stale, found only because another
+session happened to re-source them while retiring a repo. Nothing in the wrap-up
+would have caught it.
+
+So: **if this session changed a tier-1..4 source, re-check the context.**
+
+```bash
+~/second-brain-workflow/scripts/check-context-freshness.py --project <slug>
+```
+
+It compares each context file's `last-reviewed` against the last *commit* touching
+that repo's tier sources — git dates, not mtimes, because a clone or a branch
+switch rewrites an mtime and changes nothing about the product. A repo it cannot
+reach is reported `undetermined`, never fresh.
+
+`STALE` is not "wrong", it is "unverified against a repo that has moved". Re-run
+`extract-product-context` for that repo, diff what it finds against what the file
+says, correct what actually changed, and bump `last-reviewed:`. **Bumping the date
+without re-reading the repo is the one move that makes this worse than no check**,
+because it converts an honest "unverified" into a false "verified".
+
+Frontmatter, which is easy to omit because the drafting skill does not show it:
+
+```yaml
+---
+kind: context
+last-reviewed: 2026-09-01
+repos: ["acme-frontend", "acme-backend"]
+tags: [audience, positioning]
+---
+```
 
 ### 4b. `_project.md`, only if the project itself changed
 

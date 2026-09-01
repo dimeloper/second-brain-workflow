@@ -17,6 +17,55 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`check-context-freshness.py`, and a wrap-up step to go with it — `context/`
+  was the one project document nothing watched.** `update-second-brain` revises
+  the feature a session moved and `_project.md` when the project changed, and the
+  string `context/` appeared in that skill **zero times**. So a repo whose
+  `PRODUCT.md`, README, locales or theme changed left its audience, voice and
+  brand files untouched with nothing saying so.
+
+  Not hypothetical. On 2026-09-01 a `context/` written that morning carried four
+  claims that were **wrong rather than stale**, and they were found only because
+  another session happened to re-source them while retiring a repo. The same day
+  a `PRODUCT.md` was found asserting a CMS its repo had migrated off.
+
+  The check compares each context file's `last-reviewed` against the last commit
+  touching that repo's tier-1..4 sources. **Git dates, not mtimes** — every repo
+  here is a checkout, and a clone, branch switch or stash pop rewrites an mtime
+  without changing anything about the product. Runs in `make audit`, reports and
+  never edits: which claim moved is a judgement, and re-running
+  `extract-product-context` is how it gets made.
+
+  **A repo it cannot reach is `undetermined`, never fresh.** Not on this machine,
+  not a checkout, no commits touching any tier source, no `last-reviewed` to
+  compare — each is its own reported state and none counts as up to date. Same
+  argument that makes an empty tier a finding rather than a pass.
+
+  Repos are located through `lib.landed`'s resolver — cache, then the render
+  registry, then one bounded walk of `SBW_SCAN_ROOTS` — so a repo that was never
+  onboarded still resolves. Calling it unreachable for want of a registry line
+  would report a fact about the registry as a fact about the context file.
+
+  `update-second-brain` gains Step 4a-ii and `extract-product-context` now shows
+  the frontmatter it always required, including `last-reviewed` — which was easy
+  to omit precisely because no skill displayed it.
+
+### Changed
+- **The tier definitions moved to `lib/context_sources.py`.** `context-sources.py`
+  and the new check both need the same answer about which files carry a product's
+  statement of itself, and a second copy of those globs would drift invisibly —
+  one side reporting a source the other never looks at. Same argument as
+  `lib/followups.py` and `lib/projects.discover()`.
+
+### Fixed
+- **Agent-skill directories are no longer mistaken for brand.** `.claude/`,
+  `.cursor/`, `.gemini/`, `.windsurf/` and `.aider/` join `SKIP`. One vendored
+  skill ships a 55 KB `palette.mjs`, which `**/*palette*.*` reported as a personal
+  site's brand three times over, once per assistant — while the site's actual
+  tokens sat in a file the tier does not match. Same class as the type-check cache
+  fixed in v0.48.2, and the fourth instance of it.
+
 ## [0.48.2] - 2026-09-01
 
 ### Fixed
