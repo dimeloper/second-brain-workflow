@@ -32,21 +32,47 @@ Three further properties, each of which was a real defect before it was one:
   same number of times, and refuses to write if not (exit 5). A rewriter that
   verifies its own rewrite is the only kind that can be trusted with a file it
   did not fully parse.
+  `--close` is the exception and says so: it substitutes lines in place, and is
+  checked against a stricter rule instead — same line count, every untouched
+  line byte-identical, every touched line still starting with what it said.
 - **A short lock** (in the system temp dir, never in the vault) serialises the
   read-merge-write, so two invocations landing in the same millisecond cannot
   both pass the hash check.
 
+**Closing an item is the one write here that does not add a line**, and it gets
+its own proof rather than a weakened one. `--close` ticks an open `## Follow-ups`
+item and records *why* in the same stroke:
+
+    append-daily-block.py --expect "$stamp" \\
+      --close 'done :: Merge the barcode PR' \\
+      --close 'dropped :: Rewrite the importer :: the CSV path was fast enough'
+
+The outcome is part of the flag because a bare `- [x]` is an incomplete write —
+a month later it cannot say whether the work was finished or abandoned, and the
+two lead to opposite actions when the question comes back. Several items close
+against one hash, which is the whole point: ticking six of them one at a time
+means six stamps, and the read-modify-write returns by the back door.
+
+An item is found by a substring of its text, matched against the *joined* item
+so a phrase that straddles a wrap still finds it. Matching none, or more than
+one, is refused (exit 6) with the candidates printed. Guessing is the one thing
+this must not do: the wrong item ticked reads exactly like the right one, and
+the item that was actually finished stays on the list looking undone.
+
 Usage:
   append-daily-block.py [--vault PATH] [--date YYYY-MM-DD] --stamp [--quiet]
-  append-daily-block.py [--vault PATH] [--date YYYY-MM-DD] \\
-                        --expect HASH --block FILE [--dry-run]
+  append-daily-block.py [--vault PATH] [--date YYYY-MM-DD] --expect HASH \\
+                        [--block FILE] [--close SPEC ...] [--link DAY] [--dry-run]
 
   --block -     read the block from stdin
   --expect      the hash printed by --stamp, or `absent` if there was no note
+  --close       OUTCOME[/OWNER] :: MATCH [:: WHY], repeatable. OUTCOME is one of
+                done, superseded, dropped, handed-off; OWNER only on handed-off.
   --dry-run     print the merged note to stdout, write nothing
 
 Exit codes: 0 written, 2 usage, 3 stale (someone else wrote), 4 malformed
-block, 5 the merge would have lost a line (a bug here; nothing is written).
+block, 5 the write would have lost or altered a line (a bug here; nothing is
+written), 6 a --close matched no open item, or several.
 
 Vault resolution: --vault, else $SBW_VAULT, else ~/vaults/second-brain
 Stdlib only, by design: this must run on a machine with nothing installed.
@@ -65,6 +91,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
+from lib.followups import FOLLOWUP_ITEM_RE, OUTCOMES, collect_spans  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
 # The daily note's shape, in the order a note lays it out. `## Built` may repeat
@@ -271,6 +298,167 @@ def merge(note_text, block_text):
     return render(preamble, sections), touched
 
 
+# `--close` splits on `::` rather than taking three flags, because the three
+# fields have to stay welded to each other: a list of matches and a list of
+# outcomes paired by position is a data structure a shell loop gets wrong
+# silently, and the failure — the right item ticked with someone else's reason —
+# is invisible in the note afterwards. `::` because a match is prose, and prose
+# contains commas, pipes and colons.
+#
+#   done :: Merge the barcode PR
+#   dropped :: Rewrite the importer :: the CSV path was fast enough
+#   handed-off/ops-team :: Rotate the CRM key
+CLOSE_SEP = "::"
+CLOSE_SYNTAX = "OUTCOME[/OWNER] :: MATCH [:: WHY]"
+
+
+class CloseError(Exception):
+    pass
+
+
+class Close:
+    """One `--close` spec: which item, and the outcome to record against it."""
+
+    def __init__(self, outcome, owner, match, why):
+        self.outcome = outcome
+        self.owner = owner
+        self.match = match
+        self.why = why
+
+    @property
+    def suffix(self):
+        """What gets appended to the item's last line.
+
+        `#outcome/` after whatever `#repo/` tag the item already ends with, and
+        the reason after both — which is the order the notes already use, and
+        the order that reads as a sentence.
+        """
+        out = f" #outcome/{self.outcome}"
+        if self.owner:
+            out += f" #owner/{self.owner}"
+        if self.why:
+            out += f" — {self.why}"
+        return out
+
+
+def parse_close(spec):
+    fields = [f.strip() for f in spec.split(CLOSE_SEP)]
+    if len(fields) < 2 or len(fields) > 3:
+        raise CloseError(
+            f"--close needs `{CLOSE_SYNTAX}`, got: {spec!r}"
+        )
+    head, match = fields[0], fields[1]
+    why = fields[2] if len(fields) == 3 else ""
+    outcome, _, owner = head.partition("/")
+    if outcome not in OUTCOMES:
+        raise CloseError(
+            f"unknown outcome {outcome!r}. One of: " + ", ".join(sorted(OUTCOMES)) + ".\n"
+            "       A tick with no outcome is the state this flag exists to prevent:\n"
+            "       a month later it cannot say whether the work was done or abandoned."
+        )
+    if owner and outcome != "handed-off":
+        raise CloseError(f"#owner/ means nothing on #outcome/{outcome} — drop the `/{owner}`")
+    if not match:
+        raise CloseError(f"--close has no text to match on: {spec!r}")
+    return Close(outcome, owner, match, why)
+
+
+def normalise(text):
+    return " ".join(text.split()).casefold()
+
+
+def resolve_closes(note_text, closes):
+    """[(Close, first_line, last_line)] — refusing anything ambiguous.
+
+    Matched against the *joined* item, so a phrase that straddles a wrap still
+    finds it, and reported as a failure when it hits none or several. Guessing
+    which of two items was meant is the one thing this must not do: the wrong
+    item ticked reads exactly like the right one, and the item that was actually
+    finished stays on the list looking undone.
+    """
+    spans = collect_spans(note_text, FOLLOWUP_ITEM_RE)
+    resolved = []
+    taken = {}
+    for close in closes:
+        want = normalise(close.match)
+        hits = [s for s in spans if want in normalise(s[0])]
+        if not hits:
+            raise CloseError(
+                f"no open follow-up matches {close.match!r}.\n"
+                + _open_listing(spans)
+            )
+        if len(hits) > 1:
+            raise CloseError(
+                f"{len(hits)} open follow-ups match {close.match!r} — be more specific:\n"
+                + "\n".join(f"       - {display_line(h[0])}" for h in hits)
+            )
+        text, first, last = hits[0]
+        if first in taken:
+            raise CloseError(
+                f"two --close specs both match the same item:\n"
+                f"       {display_line(text)}"
+            )
+        taken[first] = close
+        resolved.append((close, first, last))
+    return resolved
+
+
+def _open_listing(spans):
+    if not spans:
+        return "       Nothing is open under `## Follow-ups` in this note."
+    return "       Open in this note:\n" + "\n".join(
+        f"       - {display_line(s[0])}" for s in spans
+    )
+
+
+def display_line(text, width=76):
+    one = " ".join(text.split())
+    return one if len(one) <= width else one[: width - 1] + "…"
+
+
+def apply_closes(note_text, resolved):
+    """Tick each item in place. Substitutes lines; never adds or removes one."""
+    lines = note_text.splitlines()
+    edits = {}
+    for close, first, last in resolved:
+        head = lines[first]
+        if last == first:
+            edits[first] = head.replace("- [ ]", "- [x]", 1) + close.suffix
+        else:
+            edits[first] = head.replace("- [ ]", "- [x]", 1)
+            edits[last] = lines[last] + close.suffix
+    for n, line in edits.items():
+        lines[n] = line
+    trailing = "\n" if note_text.endswith("\n") else ""
+    return "\n".join(lines) + trailing, edits
+
+
+def close_damage(before, after, edits):
+    """Lines the close changed that it had no business changing.
+
+    The append path proves itself with lost_lines(); this one cannot, because
+    closing an item is the one write here that *alters* a line rather than
+    adding one. So it proves the narrower thing instead: the note has the same
+    number of lines, every line it did not mean to touch is byte-identical, and
+    every line it did touch still starts with what it said before — checkbox
+    aside, only appended to.
+    """
+    b = before.splitlines()
+    a = after.splitlines()
+    if len(a) != len(b):
+        return [f"line count changed: {len(b)} → {len(a)}"]
+    damage = []
+    for n, (was, now) in enumerate(zip(b, a)):
+        if n not in edits:
+            if was != now:
+                damage.append(f"line {n + 1} changed but was not being closed: {was.strip()!r}")
+            continue
+        kept = was.replace("- [ ]", "- [x]", 1) if was.lstrip().startswith("- [ ]") else was
+        if not now.startswith(kept):
+            damage.append(f"line {n + 1} lost its own text: {was.strip()!r}")
+    return damage
+
+
 class Malformed(Exception):
     pass
 
@@ -404,6 +592,10 @@ def main():
     ap.add_argument("--link", metavar="YYYY-MM-DD",
                     help="cross-link this note to another day's, above the first header "
                          "(for a session that ran past midnight). Idempotent.")
+    ap.add_argument("--close", action="append", default=[], metavar="SPEC",
+                    help="tick one open follow-up and record why, as "
+                         f"`{CLOSE_SYNTAX}`. Repeatable — several items close in "
+                         "one write, against one hash.")
     ap.add_argument("--dry-run", action="store_true", help="print the merged note, write nothing")
     args = ap.parse_args()
 
@@ -411,10 +603,27 @@ def main():
         ap.error("--date must be YYYY-MM-DD")
     if args.link and not DATE_RE.match(args.link):
         ap.error("--link must be YYYY-MM-DD")
-    if not args.stamp and not args.block and not args.link:
-        ap.error("need --stamp, or --block/--link with --expect")
+    if not args.stamp and not args.block and not args.link and not args.close:
+        ap.error("need --stamp, or --block/--link/--close with --expect")
     if args.link and not args.expect:
         ap.error("--link needs --expect, for the same reason --block does")
+    if args.close and not args.expect:
+        ap.error("--close needs --expect, for the same reason --block does")
+
+    closes = []
+    for spec in args.close:
+        try:
+            closes.append(parse_close(spec))
+        except CloseError as exc:
+            ap.error(str(exc).replace("\n       ", " "))
+    for close in closes:
+        if close.outcome == "handed-off" and not close.owner:
+            print(
+                f"warning: #outcome/handed-off with no #owner/ on {display_line(close.match)!r} — "
+                "the reader reports that as an item nobody is watching. "
+                "`handed-off/<name> :: …` records who.",
+                file=sys.stderr,
+            )
     if args.block and not args.expect:
         ap.error(
             "--block needs --expect: run --stamp when you read the note and pass "
@@ -481,6 +690,35 @@ def main():
                 file=sys.stderr,
             )
             return 5
+
+        # After the merge, so a block and a tick can ride one hash: the closes
+        # are resolved against the text as it will be written, and an item the
+        # block itself just added is closeable in the same call.
+        if closes:
+            if current == "absent":
+                print(
+                    "append-daily-block: --close needs a note to close something in, "
+                    f"and {note.name} does not exist yet.",
+                    file=sys.stderr,
+                )
+                return 6
+            try:
+                resolved = resolve_closes(merged, closes)
+            except CloseError as exc:
+                print(f"append-daily-block: {exc}", file=sys.stderr)
+                return 6
+            closed_from = merged
+            merged, edits = apply_closes(merged, resolved)
+            damage = close_damage(closed_from, merged, edits)
+            if damage:
+                print(
+                    "append-daily-block: closing would have altered "
+                    f"{len(damage)} line(s) it does not own — refusing to write.\n"
+                    + "\n".join(f"       - {d}" for d in damage[:5]),
+                    file=sys.stderr,
+                )
+                return 5
+            touched = touched + [f"closed {len(resolved)}"]
 
         if args.dry_run:
             sys.stdout.write(merged)

@@ -402,6 +402,38 @@ The date comes off the clock inside the script rather than from the caller,
 which is what stops a session that began yesterday filing today's work under
 yesterday's note.
 
+**Ticking an item goes through the same door**, because it is the one write into
+a daily note that alters a line rather than adding one — and doing it by hand
+means read-modify-write, which is what the rest of this section exists to
+prevent:
+
+```bash
+./scripts/append-daily-block.py --expect "${STAMP}" \
+  --close 'done :: Merge the barcode PR' \
+  --close 'handed-off/ops-team :: Rotate the CRM key' \
+  --close 'dropped :: Rewrite the importer :: the CSV path was fast enough'
+```
+
+The outcome is part of the flag rather than something the caller remembers,
+because a bare `- [x]` is an incomplete write. `--close` is repeatable and every
+item closes against one stamp: ticking six of them one at a time would mean six
+stamps and six chances to lose someone's block. It takes `--block` in the same
+call, so a wrap-up that adds today's work and closes yesterday's item is one
+write.
+
+An item is named by a substring, matched against the item **as joined across its
+wrapped lines**, so a phrase on the third line still finds it. Matching nothing,
+or more than one, is refused (exit 6) with the candidates printed — the wrong
+item ticked reads exactly like the right one, and the item that was actually
+finished stays on the list looking undone. The checkbox is flipped on the item's
+first line and the tags land at the end of its last, which is where the notes
+already put them.
+
+Closing cannot use the added-lines check the merge uses, so it proves a stricter
+thing instead: the note keeps its line count, every line not being closed is
+byte-identical afterwards, and every line that was still starts with what it
+said before.
+
 The note is also committed the moment it is written, before practice notes are
 proposed — a capture waiting on approval is one another session can carry off.
 The commit guard's [daily-note check](GUARD.md#daily-notes-only-ever-grow) is the

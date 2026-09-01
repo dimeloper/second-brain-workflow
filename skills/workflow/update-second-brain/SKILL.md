@@ -229,6 +229,25 @@ watching it, and the tick is what stopped anyone looking.
   the open list, and keeps `dropped` and `handed-off` visible as unresolved risk
   or a named owner — not as finished work.
 
+**Tick through the appender, never by hand.** Editing the note yourself to flip
+a checkbox is the read-modify-write this skill is forbidden from doing anywhere
+else, and it is no safer for being one character:
+
+```bash
+STAMP="$(~/second-brain-workflow/scripts/append-daily-block.py --stamp --quiet)"
+~/second-brain-workflow/scripts/append-daily-block.py --expect "${STAMP}" \
+  --close 'done :: Merge the barcode PR' \
+  --close 'handed-off/ops-team :: Rotate the CRM key' \
+  --close 'dropped :: Rewrite the importer :: the CSV path was fast enough'
+```
+
+`OUTCOME[/OWNER] :: MATCH [:: WHY]`, repeatable, and every item closes against
+one stamp. It takes `--block` in the same call, so today's block and yesterday's
+tick are one write. The match is a substring of the item as joined across its
+wrapped lines; matching nothing or several is refused (exit 6) with the
+candidates printed, rather than guessed at. Closing an item in an **older**
+note is the same command with `--date` and that note's own stamp.
+
 Rules:
 
 - **The repo the item is about, not the repo you were invoked from.** A session

@@ -17,6 +17,50 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`append-daily-block.py --close`: the one write path into a daily note can
+  now perform the one edit the outcome convention requires.** Closing a
+  follow-up was the only daily-note write the appender could not do, so ticking
+  six of them meant a hand-rolled read-modify-write with its own hash check —
+  the exact thing this script exists to replace, reintroduced by the side door
+  on the day the outcome convention landed.
+
+  ```bash
+  append-daily-block.py --expect "${STAMP}" \
+    --close 'done :: Merge the barcode PR' \
+    --close 'handed-off/ops-team :: Rotate the CRM key' \
+    --close 'dropped :: Rewrite the importer :: the CSV path was fast enough'
+  ```
+
+  `OUTCOME[/OWNER] :: MATCH [:: WHY]`, repeatable, every item against one stamp
+  — ticking them one at a time would mean one stamp each and one chance each to
+  lose another session's block. Combines with `--block`, so a wrap-up that adds
+  today's work and closes yesterday's item is a single write.
+
+  **The outcome is part of the flag, not a thing the caller remembers.** An
+  outcome outside the four is a usage error and `#owner/` on anything but
+  `handed-off` is refused, because a bare `- [x]` is the state that makes
+  "finished" and "abandoned" indistinguishable a month later.
+
+  **It refuses to guess.** An item is named by a substring matched against the
+  item *as joined across its wrapped lines*; matching nothing or several exits 6
+  with the candidates printed. A wrong item ticked reads exactly like a right
+  one, and the item actually finished stays on the list looking undone.
+
+  Closing is the one write here that alters a line rather than adding one, so it
+  cannot use the merge's added-lines check and gets a stricter one instead: same
+  line count, every untouched line byte-identical, every touched line still
+  starting with what it said. The checkbox flips on the item's first line and
+  the tags land at the end of its last, which is where the notes already put
+  them.
+
+### Changed
+- `lib/followups.py` grew `collect_spans()` — item text with the line numbers it
+  occupies — and `_collect()` is now the text-only view of it. The write side
+  has to edit the exact lines an item spans, and a second parser for that is how
+  the two sides drift: an item one joined across four lines and the other read
+  as one would be ticked in the wrong place.
+
 ## [0.47.0] - 2026-08-31
 
 ### Added
