@@ -17,6 +17,31 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.48.2] - 2026-09-01
+
+### Fixed
+- **The brand tier no longer reports a tool cache, and no longer misses a
+  CSS-first theme.** Both found surveying a four-repo product before writing its
+  `context/`, and one was caused by the fix before it.
+
+  v0.46.1 broadened this tier to `**/*theme*.*`, `**/*colors*.*` and
+  `**/*palette*.*` so a Flutter palette would be found. Broadening the net
+  without widening the exclusions let a *library's* type-check cache in —
+  `.mypy_cache/3.11/rich/palette.data.json`, with `colorsys` matching
+  `*colors*`. A wrong pointer is worse than an empty tier, because the empty one
+  at least says it found nothing. `SKIP` now covers `.mypy_cache`,
+  `.pytest_cache`, `.ruff_cache`, `.tox` and `htmlcov`.
+
+  The other direction is v0.46.1's own defect one stack later: a Next.js repo
+  with a palette, a font and a mark reported **no brand at all**. Tailwind v4 has
+  no config file — the theme is an `@theme` block in the app's stylesheet — and
+  the web convention puts marks in `public/`, not `assets/`. An empty tier fires
+  the disclosure telling the reader to record the answer as *unestablished*, so
+  the survey would have asserted a product had no brand while its logo sat in
+  plain sight. Added `**/globals.css`, `**/app.css`, `public/**/logo.*` and
+  `public/favicon.*` — narrow to the mark, since every image in `public/` would
+  bury the pointer under hero shots.
+
 ## [0.48.1] - 2026-09-01
 
 ### Fixed
@@ -3255,7 +3280,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.2...HEAD
+[0.48.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.1...v0.47.0
