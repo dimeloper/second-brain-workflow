@@ -579,7 +579,7 @@ def main():
         if args.repo:
             repo, basis = args.repo, "the --repo flag"
         else:
-            repo, basis = current_repo()
+            repo, basis = current_repo(known=known)
 
     window = None
     if args.recent is not None:

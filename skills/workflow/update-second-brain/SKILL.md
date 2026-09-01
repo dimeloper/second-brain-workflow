@@ -184,9 +184,17 @@ Omit empty sections — leave them out of the block and they are never created.
 
 ### Tag every follow-up with its repo
 
-End each new `- [ ]` item with `#repo/<name>`, where `<name>` is the repo the
-item belongs to — the last path segment of `git remote get-url origin` in the
-working repo, matching how the vault's `repos:` frontmatter already spells it.
+End each new `- [ ]` item with `#repo/<name>`, where `<name>` is **the name the
+vault already uses for that repo** — check `repos:` in a project doc, or a
+`#repo/` tag already written.
+
+Usually that is the last path segment of `git remote get-url origin`, and the
+checkout directory carries the same name, so the question does not arise. When
+they differ, **the vault's spelling wins**: a checkout named `babytrack` whose
+origin is `babytrack-app` is `#repo/babytrack` if that is what the vault files it
+under. The name is a place a reader looks, not an identifier, and four items once
+went under `#repo/babytrack-app` in a vault that had never used it. `check-follow-ups`
+resolves it the same way and says which basis it matched on.
 
 ```markdown
 ## Follow-ups

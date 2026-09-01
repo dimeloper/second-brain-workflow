@@ -17,6 +17,29 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **A repo answers to its directory name and its origin name, not just one.**
+  The engine contradicted itself in three places, each asserting it matched the
+  vault: `project-for` and `practices-for` key off the checkout's directory
+  basename ("as the vault does"), while `lib/followups.current_repo()` and
+  `lib/landed._is_repo()` keyed off the git origin ("because that is what the
+  vault records"). The `update-second-brain` skill split the same way inside one
+  sentence, assuming the two never differ.
+
+  They differ for one repo in twenty-five here — a checkout named `babytrack`
+  whose origin is `babytrack-app` — and that was enough to file four follow-ups
+  under a name the vault had never used, and to make `check-context-freshness.py`
+  report a context file as `undetermined` while `project-for` resolved the same
+  repo without trouble.
+
+  `_is_repo` now accepts either name: both are evidence of identity, and
+  demanding agreement is stricter than reality — a repo cloned into a
+  differently named directory is still that repo, and so is one whose remote was
+  renamed. `current_repo()` takes an optional `known` set and prefers a directory
+  basename the vault recognises over an origin name it does not, because the name
+  is a place a reader looks rather than an identifier. With no vault vocabulary to
+  consult, origin still wins.
+
 ## [0.49.0] - 2026-09-01
 
 ### Added

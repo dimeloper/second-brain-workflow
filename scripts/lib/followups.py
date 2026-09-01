@@ -337,14 +337,24 @@ def note_context_repo(text, known_repos):
     return hits.pop() if len(hits) == 1 else None
 
 
-def current_repo(start=None):
+def current_repo(start=None, known=None):
     """(name, basis) for the repo a caller is standing in, or (None, reason).
 
-    Name is the origin URL's final path segment when there is an origin, else
-    the toplevel directory's name — origin first because that is what the vault
-    records, and a local checkout is routinely cloned into a differently named
-    directory. `basis` is returned so a report can say what it matched on
-    instead of leaving a surprising grouping unexplained.
+    Origin URL's final path segment, else the toplevel directory's name — origin
+    first because a checkout is routinely cloned into a differently named
+    directory, and the remote is the more stable identifier.
+
+    **Except when the vault already spells it the other way.** Pass `known` (the
+    names the vault records) and a directory basename it recognises beats an
+    origin name it does not. The two disagree rarely — one repo in twenty-five
+    here — and when they do, the name a reader will look under is the one the
+    vault has been using, not the one the remote happens to carry. Writing the
+    other produced four `#repo/babytrack-app` tags against a vault that files
+    everything under `babytrack`, which grouped those items where nobody would
+    look for them.
+
+    `basis` is returned so a report can say what it matched on instead of
+    leaving a surprising grouping unexplained.
     """
     cwd = str(start) if start else None
 
@@ -359,17 +369,21 @@ def current_repo(start=None):
     if git("rev-parse", "--is-inside-work-tree") != "true":
         return None, "not inside a git repository"
 
+    top = git("rev-parse", "--show-toplevel")
+    directory = Path(top).name if top else None
+
     url = git("remote", "get-url", "origin")
     if url:
         name = url.rstrip("/").rsplit("/", 1)[-1].rsplit(":", 1)[-1]
         if name.endswith(".git"):
             name = name[:-4]
         if name:
+            if known and directory in known and name not in known:
+                return directory, "checkout directory name (the vault spells it that way)"
             return name, "origin URL"
 
-    top = git("rev-parse", "--show-toplevel")
-    if top:
-        return Path(top).name, "checkout directory name (no origin)"
+    if directory:
+        return directory, "checkout directory name (no origin)"
     return None, "not inside a git repository"
 
 

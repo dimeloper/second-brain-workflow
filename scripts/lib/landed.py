@@ -203,8 +203,15 @@ def _is_repo(path, name):
     path = Path(path)
     if not (path / ".git").exists():
         return False
+    # Either name identifies the checkout. Requiring the origin to match and
+    # ignoring the directory when an origin exists is stricter than reality: a
+    # repo cloned into a differently named directory is still that repo, and so
+    # is one whose remote was renamed. Demanding agreement rejected `babytrack`,
+    # whose origin is `babytrack-app`, from every check that resolves a name to
+    # a path — while `project-for` and `practices-for`, which key off the
+    # directory basename, found it fine. Both are evidence; neither is proof.
     found = origin_name(path)
-    return found == name if found else path.name == name
+    return name in (found, path.name)
 
 
 def scan_roots(cfg=None):
