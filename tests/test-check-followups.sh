@@ -912,4 +912,45 @@ case "${plain}" in
   *) pass "a vault recording no outcomes is told nothing about them" ;;
 esac
 
+# --- the vault's spelling of a repo name beats the remote's ------------------
+# One repo in this vault is checked out as `babytrack` and has origin
+# `babytrack-app`. Two halves of the engine disagreed about which is its name:
+# project-for and practices-for key off the directory, current_repo and
+# landed._is_repo off the origin. Tagging with the origin filed four items under
+# a name the vault has never used, where nobody would look for them.
+NAMEREPO="${SANDBOX}/naming/babytrack"
+mkdir -p "${NAMEREPO}"
+git -C "${NAMEREPO}" init -q
+git -C "${NAMEREPO}" remote add origin "git@github.com:acme/babytrack-app.git"
+
+got="$(cd "${NAMEREPO}" && python3 -c "
+import sys; sys.path.insert(0, '${ENGINE}/scripts')
+from lib.followups import current_repo
+print('%s|%s' % current_repo(known={'babytrack'}))")"
+assert_str "babytrack|checkout directory name (the vault spells it that way)" "${got}" \
+  "a directory name the vault records beats an origin name it does not"
+
+got="$(cd "${NAMEREPO}" && python3 -c "
+import sys; sys.path.insert(0, '${ENGINE}/scripts')
+from lib.followups import current_repo
+print('%s|%s' % current_repo())")"
+assert_str "babytrack-app|origin URL" "${got}" \
+  "with no vault vocabulary to consult, origin still wins"
+
+got="$(cd "${NAMEREPO}" && python3 -c "
+import sys; sys.path.insert(0, '${ENGINE}/scripts')
+from lib.followups import current_repo
+print('%s|%s' % current_repo(known={'babytrack-app'}))")"
+assert_str "babytrack-app|origin URL" "${got}" \
+  "and a vault that records the origin name keeps it"
+
+# The reader half: either name identifies the checkout, because both are
+# evidence and requiring agreement rejects a repo that is plainly itself.
+got="$(python3 -c "
+import sys; sys.path.insert(0, '${ENGINE}/scripts')
+from lib.landed import _is_repo
+print(int(_is_repo('${NAMEREPO}', 'babytrack')), int(_is_repo('${NAMEREPO}', 'babytrack-app')), int(_is_repo('${NAMEREPO}', 'something-else')))")"
+assert_str "1 1 0" "${got}" \
+  "a checkout answers to its directory name and its origin name, and to nothing else"
+
 finish
