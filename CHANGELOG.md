@@ -17,6 +17,18 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.48.1] - 2026-09-01
+
+### Fixed
+- **`--close`'s reason field can contain `::`.** The spec split on every
+  separator, so `WHY` — the one free-text field — was the one place the
+  delimiter could not appear. Found writing the changelog entry for `--close`
+  itself: the reason quoted the flag's own syntax and was refused as a
+  four-field spec. It failed safe rather than mangling anything, but any prose
+  reason would have hit it eventually. `WHY` is now the rest of the string,
+  taken verbatim; `OUTCOME` and `MATCH` are still fields, so a spec with no
+  separator at all is still a usage error.
+
 ## [0.48.0] - 2026-09-01
 
 ### Added
@@ -3243,7 +3255,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.1...HEAD
+[0.48.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.1...v0.47.0
 [0.46.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.0...v0.46.1
