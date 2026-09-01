@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.49.0] - 2026-09-01
+
 ### Added
 - **`check-context-freshness.py`, and a wrap-up step to go with it — `context/`
   was the one project document nothing watched.** `update-second-brain` revises
@@ -3329,7 +3331,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.0...HEAD
+[0.49.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.2...v0.49.0
 [0.48.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.0...v0.48.1
 [0.48.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.47.0...v0.48.0
