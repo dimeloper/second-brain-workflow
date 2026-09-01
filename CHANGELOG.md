@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.48.0] - 2026-09-01
+
 ### Added
 - **`append-daily-block.py --close`: the one write path into a daily note can
   now perform the one edit the outcome convention requires.** Closing a
@@ -3241,7 +3243,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.47.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.0...HEAD
+[0.48.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.47.0...v0.48.0
 [0.47.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.1...v0.47.0
 [0.46.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.46.0...v0.46.1
 [0.46.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.45.0...v0.46.0
