@@ -285,17 +285,37 @@ tool's.
    appears-exactly-once contract in practice.
 5. If nothing is unchecked anywhere in the window, say so plainly rather than
    printing an empty report.
-6. If the user confirms an item is closed during the conversation, edit that
-   item's checkbox to `- [x]` in place in that day's note **and record the
-   outcome with it** — `#outcome/done`, `#outcome/dropped`,
+6. If the user confirms an item is closed during the conversation, tick it
+   **and record the outcome with it** — `#outcome/done`, `#outcome/dropped`,
    `#outcome/superseded`, or `#outcome/handed-off` plus `#owner/<name>`. A bare
    tick is an incomplete write: it is the state that makes "finished" and
    "abandoned" indistinguishable a month later. Ask which of the four it was
    rather than assuming `done` — that is one short question, and a wrong
-   `#outcome/done` closes the item *and* asserts something false about it. This
-   is the only write this skill makes — a mechanical edit of existing content,
-   not new material — and it still rides on the normal `update-second-brain`
-   commit, not a commit of its own.
+   `#outcome/done` closes the item *and* asserts something false about it.
+
+   **Write it through the appender, not by hand.** Editing the note directly is
+   a read-modify-write on the one file two sessions write at once, and a
+   one-character edit loses another session's block exactly as a whole-file
+   write does:
+
+   ```bash
+   A=~/second-brain-workflow/scripts/append-daily-block.py
+   STAMP="$("$A" --date 2026-08-28 --stamp --quiet)"
+   "$A" --date 2026-08-28 --expect "${STAMP}" \
+     --close 'done :: Merge the barcode PR' \
+     --close 'dropped :: Rewrite the importer :: the CSV path was fast enough'
+   ```
+
+   `--date` is the note the item lives in — which for a restated thread is the
+   note it was restated in, not the one it started in. Every item in one note
+   closes in one call; a thread spanning two notes needs one call per note, each
+   with its own stamp. Matching nothing or several is refused with the
+   candidates printed, so a match that fails is a prompt to be specific, never
+   a reason to fall back to editing the file.
+
+   This is the only write this skill makes — a mechanical edit of existing
+   content, not new material — and it still rides on the normal
+   `update-second-brain` commit, not a commit of its own.
 
 ## What this does not do
 

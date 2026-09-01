@@ -282,4 +282,145 @@ assert_exit 2 $? "a --date that isn't YYYY-MM-DD is rejected"
 "${APPEND}" --vault "${SANDBOX}/no-such-vault" --stamp >/dev/null 2>&1
 assert_exit 1 $? "a missing vault is an error, not an empty stamp"
 
+# --- --close: ticking an item, with the reason ------------------------------
+# The write side of the outcome convention. A bare `- [x]` is an incomplete
+# write — a month later it cannot say whether the work was done or abandoned —
+# so the outcome is part of the flag rather than something a caller remembers.
+CDAY="2026-08-26"
+CNOTE="${VAULT}/${CDAY}.md"
+cstamp() { "${APPEND}" --vault "${VAULT}" --date "${CDAY}" --stamp --quiet; }
+close() { "${APPEND}" --vault "${VAULT}" --date "${CDAY}" "$@"; }
+
+seed_closable() {
+  cat > "${CNOTE}" <<'EOF'
+# 2026-08-26
+
+## Follow-ups
+- [ ] Merge the barcode PR and ship a build #repo/acme-app
+- [ ] Merge the docs PR #repo/acme-app
+- [ ] Rotate the CRM key #repo/acme-backend
+- [ ] Rewrite the importer in Rust — nobody has measured the CSV path,
+      and it may already be fast enough. #repo/globex-web
+EOF
+}
+
+seed_closable
+lines_before="$(wc -l < "${CNOTE}")"
+close --expect "$(cstamp)" \
+  --close 'done :: barcode PR' \
+  --close 'handed-off/ops-team :: Rotate the CRM key' \
+  --close 'dropped :: Rewrite the importer :: the CSV path was fast enough' >/dev/null 2>&1
+assert_exit 0 $? "several items close against one hash"
+assert_contains "${CNOTE}" '\- \[x\] Merge the barcode PR and ship a build #repo/acme-app #outcome/done' \
+  "the tick keeps the item's own text and its #repo/ tag, and appends the outcome"
+assert_contains "${CNOTE}" '#outcome/handed-off #owner/ops-team' \
+  "handed-off records the owner beside the outcome"
+assert_contains "${CNOTE}" '#outcome/dropped — the CSV path was fast enough' \
+  "the reason is written while it is still known"
+assert_contains "${CNOTE}" '\- \[ \] Merge the docs PR' \
+  "an item nobody closed is left alone"
+assert_str "${lines_before}" "$(wc -l < "${CNOTE}")" \
+  "closing changes no line count — it substitutes, it never adds"
+
+# A wrapped item is one item: the checkbox is on its first line and the outcome
+# belongs at the end of its last, or the tags land in the middle of a sentence.
+assert_contains "${CNOTE}" '\- \[x\] Rewrite the importer in Rust' \
+  "a wrapped item is ticked on its first line"
+assert_contains "${CNOTE}" 'fast enough\. #repo/globex-web #outcome/dropped' \
+  "and tagged at the end of its last, not mid-sentence"
+
+# --- --close refuses to guess ------------------------------------------------
+# The wrong item ticked reads exactly like the right one, and the item that was
+# actually finished stays on the list looking undone. So ambiguity is an error.
+seed_closable
+h="$(cstamp)"
+out="$(close --expect "${h}" --close 'done :: Merge the' 2>&1)"
+assert_exit 6 $? "a match hitting two items is refused"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Merge the barcode PR"*"Merge the docs PR"*) pass "and prints both candidates" ;;
+  *) fail "and prints both candidates" "${out}" ;;
+esac
+assert_str "${h}" "$(cstamp)" "and writes nothing"
+
+out="$(close --expect "$(cstamp)" --close 'done :: no such item' 2>&1)"
+assert_exit 6 $? "a match hitting nothing is refused"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Open in this note"*"Merge the docs PR"*) pass "and lists what is open, so the typo is visible" ;;
+  *) fail "and lists what is open, so the typo is visible" "${out}" ;;
+esac
+
+close --expect "$(cstamp)" --close 'done :: docs PR' --close 'dropped :: docs PR' >/dev/null 2>&1
+assert_exit 6 $? "two specs matching the same item are refused, not applied twice"
+
+close --vault "${VAULT}" --date "2026-12-31" --expect absent --close 'done :: anything' >/dev/null 2>&1
+assert_exit 6 $? "--close on a note that does not exist is an error, not a created note"
+
+# --- the outcome is not optional, and not free-form -------------------------
+close --expect "$(cstamp)" --close 'finished :: docs PR' >/dev/null 2>&1
+assert_exit 2 $? "an outcome outside the four is a usage error"
+close --expect "$(cstamp)" --close 'docs PR' >/dev/null 2>&1
+assert_exit 2 $? "a --close with no outcome field is a usage error"
+close --expect "$(cstamp)" --close 'done/bob :: docs PR' >/dev/null 2>&1
+assert_exit 2 $? "#owner/ on an outcome that cannot have one is a usage error"
+close --close 'done :: docs PR' >/dev/null 2>&1
+assert_exit 2 $? "--close without --expect is the read-modify-write, and is refused"
+
+# handed-off with nobody named is legal — the reader reports it as an item
+# nobody is watching, which is a finding — but it is said out loud on the way in.
+err="$(close --expect "$(cstamp)" --dry-run --close 'handed-off :: docs PR' 2>&1 >/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${err}" in
+  *"no #owner/"*) pass "handed-off with no owner writes, but warns" ;;
+  *) fail "handed-off with no owner writes, but warns" "${err}" ;;
+esac
+
+# --- --close is compare-and-swap too ----------------------------------------
+seed_closable
+close --expect deadbeef --close 'done :: docs PR' >/dev/null 2>&1
+assert_exit 3 $? "a close from a stale read is refused like any other write"
+
+before="$(cstamp)"
+close --expect "${before}" --dry-run --close 'done :: docs PR' >/dev/null 2>&1
+assert_str "${before}" "$(cstamp)" "--dry-run closes nothing"
+
+# --- a block and a close ride one hash --------------------------------------
+# The point of the flag: ticking six items one at a time means six stamps, and
+# the read-modify-write this script exists to replace returns by the back door.
+printf '## Follow-ups\n- [ ] An item this very block added\n' > "${SANDBOX}/newitem.md"
+close --expect "$(cstamp)" --block "${SANDBOX}/newitem.md" \
+  --close 'superseded :: Merge the docs PR :: folded into the barcode PR' \
+  --close 'done :: this very block added' >/dev/null 2>&1
+assert_exit 0 $? "a block and two closes write together, against one hash"
+assert_contains "${CNOTE}" '#outcome/superseded — folded into the barcode PR' \
+  "the existing item closed"
+assert_contains "${CNOTE}" '\- \[x\] An item this very block added #outcome/done' \
+  "and an item the block itself added closes in the same call"
+
+# --- the reader agrees with the writer --------------------------------------
+# One parser, two sides. If they disagree about what an item is, an item ticked
+# here reads as open there — which is the whole failure this convention closes.
+seed_closable
+close --expect "$(cstamp)" \
+  --close 'done :: barcode PR' \
+  --close 'handed-off/ops-team :: Rotate the CRM key' >/dev/null 2>&1
+# A vault of its own: the sandbox above has newer notes from earlier tests, and
+# --recent reads the four most recent, which would drop this one out of the
+# window and pass the assertions below on an empty report.
+RVAULT="${SANDBOX}/reader-vault"
+mkdir -p "${RVAULT}"
+cp "${CNOTE}" "${RVAULT}/"
+out="$(SBW_VAULT="${RVAULT}" "${ENGINE}/scripts/check-followups.py" --recent --no-landed 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"barcode PR"*) fail "an item closed #outcome/done leaves the open list" "${out}" ;;
+  *) pass "an item closed #outcome/done leaves the open list" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"handed off → ops-team"*) pass "and a handed-off one is reported with its owner" ;;
+  *) fail "and a handed-off one is reported with its owner" "${out}" ;;
+esac
+
 finish

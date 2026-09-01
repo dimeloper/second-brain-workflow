@@ -159,6 +159,53 @@ def flag_for(item):
 FILE_REF_RE = re.compile(r'`([^`\s]*[\w-]+\.[A-Za-z0-9]{1,6}|[^`\s]*/[^`\s]+)`')
 
 
+def collect_spans(text, want):
+    """[(item_text, first_line, last_line), ...] — `_collect` with line numbers.
+
+    The write side has to edit the exact lines an item occupies, and deriving
+    those from a second parser is how the two sides drift: an item this one
+    joined across four lines and that one read as one would be ticked in the
+    wrong place. So the joining lives here once, and `_collect` below is the
+    text-only view of it.
+
+    `last_line` is the item's last *content* line — a trailing blank belongs to
+    the section, not to the item above it.
+    """
+    items = []
+    current = None
+    first = last = None
+
+    def flush():
+        nonlocal current, first, last
+        if current is not None:
+            items.append((" ".join(current).strip(), first, last))
+            current = None
+            first = last = None
+
+    in_section = False
+    for n, line in enumerate(text.splitlines()):
+        if line.startswith("## "):
+            flush()
+            in_section = line.strip() == "## Follow-ups"
+            continue
+        if not in_section:
+            continue
+
+        if want.match(line):
+            flush()
+            current = [want.match(line).group(1).strip()]
+            first = last = n
+        elif line[:1] == "-":
+            flush()  # any other top-level bullet, ticked or not: ends this one
+        elif current is not None and line[:1].isspace() and line.strip():
+            current.append(line.strip())
+            last = n
+        elif not line.strip():
+            flush()  # a blank line closes the item; wrapped lines never contain one
+    flush()
+    return items
+
+
 def _collect(text, want):
     """Text of every item under `## Follow-ups` matching `want`, in order.
 
@@ -172,35 +219,7 @@ def _collect(text, want):
     line under an item — including an indented sub-bullet, which belongs to the
     item above it rather than being an item of its own.
     """
-    items = []
-    current = None
-
-    def flush():
-        nonlocal current
-        if current is not None:
-            items.append(" ".join(current).strip())
-            current = None
-
-    in_section = False
-    for line in text.splitlines():
-        if line.startswith("## "):
-            flush()
-            in_section = line.strip() == "## Follow-ups"
-            continue
-        if not in_section:
-            continue
-
-        if want.match(line):
-            flush()
-            current = [want.match(line).group(1).strip()]
-        elif line[:1] == "-":
-            flush()  # any other top-level bullet, ticked or not: ends this one
-        elif current is not None and line[:1].isspace() and line.strip():
-            current.append(line.strip())
-        elif not line.strip():
-            flush()  # a blank line closes the item; wrapped lines never contain one
-    flush()
-    return items
+    return [text_ for text_, _, _ in collect_spans(text, want)]
 
 
 def open_followups(text):
