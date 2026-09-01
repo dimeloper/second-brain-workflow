@@ -68,6 +68,7 @@ Usage:
   --expect      the hash printed by --stamp, or `absent` if there was no note
   --close       OUTCOME[/OWNER] :: MATCH [:: WHY], repeatable. OUTCOME is one of
                 done, superseded, dropped, handed-off; OWNER only on handed-off.
+                WHY is the rest of the string, so it may itself contain `::`.
   --dry-run     print the merged note to stdout, write nothing
 
 Exit codes: 0 written, 2 usage, 3 stale (someone else wrote), 4 malformed
@@ -342,8 +343,13 @@ class Close:
 
 
 def parse_close(spec):
-    fields = [f.strip() for f in spec.split(CLOSE_SEP)]
-    if len(fields) < 2 or len(fields) > 3:
+    # maxsplit=2, so WHY is everything after the second separator, verbatim.
+    # Splitting on every `::` made the reason the one field that could not
+    # contain the delimiter — found writing the changelog entry for this very
+    # flag, whose reason quoted its own syntax and was refused as a four-field
+    # spec. A free-text tail is not a field; it is the rest of the string.
+    fields = [f.strip() for f in spec.split(CLOSE_SEP, 2)]
+    if len(fields) < 2:
         raise CloseError(
             f"--close needs `{CLOSE_SYNTAX}`, got: {spec!r}"
         )

@@ -376,6 +376,21 @@ case "${err}" in
   *) fail "handed-off with no owner writes, but warns" "${err}" ;;
 esac
 
+# --- WHY is the rest of the string, separators and all ----------------------
+# The reason field was the one place that could not contain the delimiter, found
+# writing the changelog entry for --close itself: its reason quoted the flag's
+# own syntax and the spec was refused as four fields.
+seed_closable
+close --expect "$(cstamp)" \
+  --close 'done :: Merge the docs PR :: shipped as --close OUTCOME[/OWNER] :: MATCH [:: WHY]' >/dev/null 2>&1
+assert_exit 0 $? "a WHY containing the separator is accepted, not refused as extra fields"
+assert_contains "${CNOTE}" 'MATCH \[:: WHY\]' \
+  "and the reason is written through verbatim, separators intact"
+
+# The outcome and the match are still fields, so a spec with neither is refused.
+close --expect "$(cstamp)" --close 'just some text' >/dev/null 2>&1
+assert_exit 2 $? "a --close with no separator at all is still a usage error"
+
 # --- --close is compare-and-swap too ----------------------------------------
 seed_closable
 close --expect deadbeef --close 'done :: docs PR' >/dev/null 2>&1
