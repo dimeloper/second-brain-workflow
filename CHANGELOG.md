@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.49.2] - 2026-09-02
+
 ### Fixed
 - **The brand tier matches the theme's marker, not its filename — and the survey
   got ~30x faster on the way.** Tailwind v4 moved the theme into CSS under
@@ -3385,7 +3387,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.1...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.2...HEAD
+[0.49.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.1...v0.49.2
 [0.49.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.0...v0.49.1
 [0.49.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.2...v0.49.0
 [0.48.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.1...v0.48.2
