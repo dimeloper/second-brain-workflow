@@ -242,6 +242,91 @@ case "${out}" in
   *) pass "a repo with a CSS-first theme is not reported as brandless" ;;
 esac
 
+# --- the theme marker beats the filename ------------------------------------
+# Tailwind v4 moved the theme into CSS under whatever name the project already
+# used. Two rounds of adding filenames (globals.css in v0.48.2, app.css with it)
+# still missed a third repo the same afternoon, so the tier matches the marker.
+MARKED="${SANDBOX}/marked-app"
+mkdir -p "${MARKED}/src/styles" "${MARKED}/src/app" "${MARKED}/node_modules/pkg"
+printf '# Readme\n' > "${MARKED}/README.md"
+printf '@import "tailwindcss";\n\n@theme {\n  --color-brand: #123456;\n}\n' \
+  > "${MARKED}/src/styles/tailwind.css"
+# A stylesheet that only *uses* a token is not where the token is decided.
+printf '.card { background: var(--color-brand); padding: 1rem; }\n' \
+  > "${MARKED}/src/app/consumer.css"
+# And a dependency's stylesheet is never the product's brand.
+printf '@theme { --color-x: #fff; }\n' > "${MARKED}/node_modules/pkg/theme.css"
+
+brand="$("${CS}" --repo "${MARKED}" 2>&1 | sed -n "/^BRAND/,/^$/p")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${brand}" in
+  *"src/styles/tailwind.css"*) pass "brand finds an @theme block under any filename" ;;
+  *) fail "brand finds an @theme block under any filename" "${brand}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${brand}" in
+  *consumer.css*) fail "a stylesheet that only reads a token is not brand" "${brand}" ;;
+  *) pass "a stylesheet that only reads a token is not brand" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${brand}" in
+  *node_modules*) fail "a dependency's theme is never the product's brand" "${brand}" ;;
+  *) pass "a dependency's theme is never the product's brand" ;;
+esac
+
+# --- a hand-written token file with no @theme at all ------------------------
+# An Astro site kept its palette as plain custom properties in .scss. Assigned a
+# literal colour, which is what a token file looks like in any stack.
+SCSS="${SANDBOX}/scss-app"
+mkdir -p "${SCSS}/src/styles"
+printf '# Readme\n' > "${SCSS}/README.md"
+printf ':root {\n\t--navy: #051923;\n\t--cyan: #0582ca;\n}\n' > "${SCSS}/src/styles/polish.scss"
+printf '.hero { color: var(--navy); }\n' > "${SCSS}/src/styles/hero.scss"
+
+brand="$("${CS}" --repo "${SCSS}" 2>&1 | sed -n "/^BRAND/,/^$/p")"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${brand}" in
+  *polish.scss*) pass "brand finds a token file with no @theme, by the colours it assigns" ;;
+  *) fail "brand finds a token file with no @theme" "${brand}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${brand}" in
+  *hero.scss*) fail "a stylesheet that only reads a token is not brand (scss)" "${brand}" ;;
+  *) pass "a stylesheet that only reads a token is not brand (scss)" ;;
+esac
+
+# --- the walk is pruned during descent, not filtered after ------------------
+# Path.glob walks the whole tree before skipped() sees anything: one `**/*.css`
+# on a real Next.js checkout took 50 seconds against node_modules, once per
+# pattern, against thirty-odd patterns. This asserts the shape rather than a
+# duration — a deep excluded tree must not be traversed.
+DEEP="${SANDBOX}/deep-app"
+mkdir -p "${DEEP}"
+printf '# Readme\n' > "${DEEP}/README.md"
+python3 - "${DEEP}" <<'PYEOF'
+import sys, pathlib
+root = pathlib.Path(sys.argv[1]) / "node_modules"
+for i in range(40):
+    d = root / f"pkg{i}" / "dist" / "nested"
+    d.mkdir(parents=True, exist_ok=True)
+    for j in range(20):
+        (d / f"s{j}.css").write_text("@theme { --color-a: #fff; }")
+PYEOF
+start="$(date +%s)"
+out="$("${CS}" --repo "${DEEP}" 2>&1)"
+elapsed=$(( $(date +%s) - start ))
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "${elapsed}" -lt 10 ]; then
+  pass "800 files under node_modules are pruned, not walked (${elapsed}s)"
+else
+  fail "an excluded tree is pruned during descent" "took ${elapsed}s"
+fi
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *node_modules*) fail "and none of them appear in any tier" "${out}" ;;
+  *) pass "and none of them appear in any tier" ;;
+esac
+
 # --- errors -----------------------------------------------------------------
 "${CS}" --repo "${SANDBOX}/nope" >/dev/null 2>&1
 assert_exit 1 $? "a missing repo is an error"

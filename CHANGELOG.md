@@ -17,6 +17,35 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **The brand tier matches the theme's marker, not its filename — and the survey
+  got ~30x faster on the way.** Tailwind v4 moved the theme into CSS under
+  whatever name the project already used, so filename globs were whack-a-mole:
+  `globals.css` and `app.css` were added in v0.48.2 and a third repo
+  (`src/styles/tailwind.css`) was still missed the same afternoon. Two markers
+  now do the work — `@theme`, and a custom property **assigned** a literal
+  colour, which is what a hand-written token file looks like in any stack and
+  which found an Astro site's `polish.scss` that has no `@theme` at all.
+  Assigned, not merely referenced: a stylesheet that *uses* `var(--navy)` is not
+  where `--navy` is decided.
+
+  Content matching exposed a pre-existing performance fault rather than causing
+  one. `Path.glob` walks the whole tree before `skipped()` can prune anything, so
+  a single `**/*.css` on one Next.js checkout took **50 seconds** against
+  `node_modules` — once per pattern, against thirty-odd patterns. The tree is now
+  walked **once per repo** with `SKIP` pruned during descent, and each pattern is
+  matched against that. The same survey went from minutes to **1.4 seconds**.
+
+  The glob-to-regex translation was verified against `Path.glob` on all 30 real
+  patterns before being trusted: zero disagreements.
+
+### Changed
+- `context-sources.py`'s docstring said it "never opens a file", which greping
+  for a marker supersedes. Amended in the same change, per
+  `amend-the-rule-you-just-superseded-in-the-same-change`: it now says it never
+  *interprets* one. The line that matters is unchanged — it decides whether a
+  file belongs in a tier, never what the file means.
+
 ## [0.49.1] - 2026-09-02
 
 ### Fixed
