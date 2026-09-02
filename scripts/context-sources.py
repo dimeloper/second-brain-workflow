@@ -25,10 +25,18 @@ must be asked for, rather than inferred from a tier that happens to be full.
                        when one exists; its absence is why some `context/`
                        files must hold prose instead.
 
-Reports only, and never opens a file: this says *where to read*, and the reading
-is the `extract-product-context` skill's job. Keeping the judgement out of a
-script is deliberate — a tool that summarised these files would be one more
+Reports only, and never *interprets* a file: this says where to read, and the
+reading is the `extract-product-context` skill's job. Keeping the judgement out
+of a script is deliberate — a tool that summarised these files would be one more
 thing between a reader and the source, and the source is the whole point.
+
+**It used to say "never opens a file", and that changed in v0.49.2.** The brand
+tier now greps stylesheets for `@theme`, because Tailwind v4 moved the theme into
+CSS under whatever filename the project already had — `globals.css`, `app.css`,
+`tailwind.css` — and two rounds of adding filenames still missed a third repo the
+same afternoon. A marker cannot be missed by being somewhere new. The line that
+matters is unchanged: it decides whether a file belongs in a tier, and never what
+the file means.
 
 Stdlib only. Read-only. Exit 0 unless the repo cannot be read.
 """
@@ -38,7 +46,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from lib.context_sources import TIERS, find  # noqa: E402
+from lib.context_sources import TIERS, find, walk  # noqa: E402
 
 # Filenames are matched case-insensitively against the repo root; globs are
 # matched anywhere. Ordered within each tier by how much they usually carry.
@@ -54,11 +62,15 @@ def main():
     print("context sources in %s" % repo)
     print()
 
+    # One walk for every pattern in every tier. Per-pattern globbing walked
+    # node_modules once per pattern, which on a Next.js checkout was 50 seconds
+    # each against thirty-odd patterns.
+    tree = walk(repo)
     empty = []
     for name, why, patterns in TIERS:
         hits = []
         for kind, pattern in patterns:
-            for path in find(repo, kind, pattern):
+            for path in find(repo, kind, pattern, tree=tree):
                 rel = path.relative_to(repo)
                 if rel not in [h[0] for h in hits]:
                     hits.append((rel, pattern))

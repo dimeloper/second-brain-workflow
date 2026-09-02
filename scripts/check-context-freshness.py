@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lib.config import load as load_config  # noqa: E402
 from lib.config import origin_describe  # noqa: E402
-from lib.context_sources import TIERS, find  # noqa: E402
+from lib.context_sources import TIERS, find, walk  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
 from lib.projects import discover  # noqa: E402
 from lib.landed import Resolver  # noqa: E402
@@ -80,9 +80,10 @@ def last_source_commit(repo):
         return None, "not a git checkout", 0
 
     paths = []
+    tree = walk(repo)
     for _, _, patterns in TIERS:
         for kind, pattern in patterns:
-            paths.extend(find(repo, kind, pattern))
+            paths.extend(find(repo, kind, pattern, tree=tree))
     if not paths:
         return None, "no tier-1..4 source files in this repo", 0
 
