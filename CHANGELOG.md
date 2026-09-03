@@ -17,6 +17,32 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`practices-for.py --tag <subject>`: retrieval by subject, not only by repo.**
+  The repo report excludes every cross-cutting note whose `applies-to` glob
+  matches nothing there — around 190 of them on one real vault — for a sound
+  reason: process rules apply everywhere, so listing them would bury the
+  repo-specific ones. The cost was that those notes stayed reachable only by
+  deciding to go and look.
+
+  On 2026-09-02 that cost something concrete. `a-path-name-is-not-a-framework`
+  says to measure a path pattern against every repo you have before writing it
+  down; two filenames went into a glob list without that, and a repo already on
+  disk was missed the same afternoon. The note was tagged `globs` and `scoping`
+  the whole time, and `--tag globs` now returns it first.
+
+  Needs no `--repo`, because the question is what is known about a subject rather
+  than what applies in a directory. Repeatable and **AND**, since a second tag is
+  there to narrow. It prints each note's `**Rule:**` rather than its slug — a
+  list of filenames to open one at a time is the thing that does not get read —
+  sorted `enforced` first. A tag nothing carries names the close tags that do
+  exist; a word no tag contains says the subject may simply not be named yet,
+  rather than implying it is covered.
+
+  `make practices-for TAG=globs`. The `--repo` report now points at it on the
+  same line that reports the exclusion, and `obsidian-knowledge-base` says to
+  query a subject before working on it.
+
 ## [0.49.2] - 2026-09-02
 
 ### Fixed
