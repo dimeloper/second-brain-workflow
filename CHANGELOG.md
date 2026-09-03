@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.50.0] - 2026-09-03
+
 ### Added
 - **`practices-for.py --tag <subject>`: retrieval by subject, not only by repo.**
   The repo report excludes every cross-cutting note whose `applies-to` glob
@@ -3413,7 +3415,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.50.0...HEAD
+[0.50.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.2...v0.50.0
 [0.49.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.1...v0.49.2
 [0.49.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.0...v0.49.1
 [0.49.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.48.2...v0.49.0
