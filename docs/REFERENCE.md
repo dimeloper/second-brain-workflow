@@ -1039,6 +1039,32 @@ in the `repos:` of, in two tiers:
   alone. **No promotion claim**, because a guess that said "clears ENFORCED"
   would invite adding a `repos:` entry for a note that does not govern this repo.
 
+#### What the vault knows about a subject
+
+```bash
+make practices-for TAG=globs        # no REPO needed
+```
+
+The report above answers "what applies *here*", and to stay readable it excludes
+every cross-cutting note whose `applies-to` glob matches nothing in the repo —
+around 190 of them on this vault. That exclusion is right: process rules apply
+everywhere, so listing them would bury the repo-specific ones. Its cost is that
+those notes were reachable only by deciding to go and look.
+
+On 2026-09-02 that cost something concrete. `a-path-name-is-not-a-framework` says
+to measure a path pattern against every repo you have before writing it down; two
+filenames went into a glob list without that, and a repo already on disk was
+missed the same afternoon. The note was tagged `globs` and `scoping` the whole
+time.
+
+So `--tag` retrieves by subject instead, using the `tags:` every note already
+carries. Repeatable and **AND**, because the second tag is there to narrow. It
+prints each note's `**Rule:**` rather than its slug — a list of filenames to open
+one at a time is the thing that does not get read — sorted `enforced` first. A
+tag nothing carries names the close tags that do exist, and a word no tag
+contains says the subject may simply not be named yet, rather than implying it is
+covered.
+
 The delta is the point: promotion runs on `length(repos)` for a scoped note (and
 `length(applications)` for a process one), so one deliberate application is
 often the single act that clears a rung — and knowing which note is one short

@@ -85,6 +85,23 @@ speculatively to find out what they contain — that is what the index is for. F
 back to `grep` over `practices/**` only when the index shows nothing plausible and
 you have reason to think a note exists anyway.
 
+**When you are about to work on a subject, query it rather than scan for it.**
+
+```bash
+~/second-brain-workflow/scripts/practices-for.py --tag globs   # no --repo needed
+```
+
+The index carries the tags already, so this reads nothing the index does not
+have — but scanning 340 rows for a tag and asking for the tag are not the same
+act, and the second one happens. It prints each matching note's rule, sorted
+`enforced` first, and a near miss names the close tags that do exist.
+
+Reach for it when the session is about to touch a *kind* of thing — a glob, a
+migration, a deploy trigger, a store listing — as opposed to a repo. On
+2026-09-02 a note tagged `globs` that would have prevented a defect went unread
+while a glob list was being edited: it was excluded from the `--repo` report for
+want of a matching glob, which is correct, and nothing else asked for it.
+
 If `INDEX.md` is missing or looks stale, regenerate it with
 `second-brain-workflow/scripts/build-vault-index.py` (or `make vault-index`) rather than
 working around it.

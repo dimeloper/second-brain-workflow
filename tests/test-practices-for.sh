@@ -236,4 +236,90 @@ case "${agree}" in
   *) fail "promotion.py and check-lineage.py read the same enforced bar" "${agree:-no output}" ;;
 esac
 
+\n
+# --- --tag: retrieval by subject, not by repo -------------------------------
+# The repo report excludes every cross-cutting note with no matching glob --
+# ~190 of them in the real vault -- for a sound reason: listing process rules
+# that apply everywhere would bury the repo-specific ones. That left them
+# reachable only by deciding to go and look, and on 2026-09-02 a note tagged
+# `globs` that would have prevented a defect went unread while its own subject
+# was being worked on.
+tagged() {  # tagged <domain> <slug> <maturity> <tags-json> <rule>
+  cat > "${V}/practices/$1/$2.md" <<EOF
+---
+domain: $1
+applies-to: ""
+maturity: $3
+last-reviewed: 2026-08-01
+repos: []
+tags: $4
+---
+
+# $2
+
+**Rule:** $5
+EOF
+}
+
+tagged cross-cutting glob-scoping-rule trialing '[globs, scoping]' 'Measure a path pattern against every repo you have.'
+tagged cross-cutting glob-promotion-rule idea '[globs, promotion]' 'Key a glob on the project type.'
+tagged backend unrelated-rule enforced '[migrations]' 'Never hand-write a migration.'
+
+out="$("${PF}" --vault "${V}" --tag globs 2>&1)"
+assert_exit 0 $? "--tag needs no --repo and exits 0"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *glob-scoping-rule*glob-promotion-rule*) pass "--tag finds every note carrying the tag" ;;
+  *) fail "--tag finds every note carrying the tag" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *unrelated-rule*) fail "--tag does not report notes without the tag" "${out}" ;;
+  *) pass "--tag does not report notes without the tag" ;;
+esac
+# The rule itself, or the lookup is a list of slugs to go and open one at a time.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Measure a path pattern against every repo"*) pass "--tag prints the rule, not just the slug" ;;
+  *) fail "--tag prints the rule, not just the slug" "${out}" ;;
+esac
+# Best-evidenced first: a reader scanning for authority reads down, not around.
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ "$(printf '%s\n' "${out}" | grep -n 'glob-scoping-rule' | cut -d: -f1)" -lt \
+     "$(printf '%s\n' "${out}" | grep -n 'glob-promotion-rule' | cut -d: -f1)" ]; then
+  pass "trialing sorts above idea"
+else
+  fail "trialing sorts above idea" "${out}"
+fi
+
+# Two tags narrow, so AND rather than OR.
+out="$("${PF}" --vault "${V}" --tag globs --tag promotion 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *glob-scoping-rule*) fail "two tags AND rather than OR" "${out}" ;;
+  *glob-promotion-rule*) pass "two tags AND rather than OR" ;;
+  *) fail "two tags AND rather than OR" "${out}" ;;
+esac
+
+# A near miss names the tag that does exist, or the reader guesses again.
+out="$("${PF}" --vault "${V}" --tag glob 2>&1)"
+assert_exit 0 $? "a tag nothing carries is a report, not an error"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Close tags that do exist"*globs*) pass "and names the close tag that does exist" ;;
+  *) fail "a near miss names the close tag" "${out}" ;;
+esac
+
+# And a word no tag contains says so, rather than implying the subject is covered.
+out="$("${PF}" --vault "${V}" --tag zzzznope 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"may simply not be named yet"*) pass "an unknown word says the subject may be unnamed" ;;
+  *) fail "an unknown word says the subject may be unnamed" "${out}" ;;
+esac
+
+# Neither flag is a usage error: there is no sensible default question.
+"${PF}" --vault "${V}" >/dev/null 2>&1
+assert_exit 2 $? "neither --repo nor --tag is a usage error"
+
 finish

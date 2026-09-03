@@ -27,6 +27,12 @@ authority is worse than none:
                     (frontend / backend / app) and every note in that domain is
                     a candidate. Genuinely fuzzy: it says "worth reading", not
                     "applies".
+`--tag <subject>` is the other question this answers, and it needs no `--repo`:
+what does the vault know about globs, about migrations, about deploys. It exists
+because the exclusion below leaves ~190 process notes reachable only by choosing
+to go and look, and on 2026-09-02 a note tagged `globs` that would have stopped a
+defect went unread while its subject was being worked on.
+
   cross-cutting     EXCLUDED from the domain fallback, and the count of what was
                     excluded is printed. Those notes are process rules that
                     apply everywhere, so including them would bury the
@@ -107,7 +113,10 @@ def load_notes(vault):
     for path in sorted(practices.rglob("*.md")):
         if path.name == "INDEX.md":
             continue
-        fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        # parse_frontmatter returns (data, warnings) -- the second value is not
+        # the body, so the rule line is read from the text directly.
+        fm, _ = parse_frontmatter(text)
         fm = fm or {}
         repos = fm.get("repos") or []
         if not isinstance(repos, list):
@@ -115,7 +124,19 @@ def load_notes(vault):
         applies = fm.get("applies-to") or ""
         if isinstance(applies, list):
             applies = ", ".join(applies)
+        tags = fm.get("tags") or []
+        if not isinstance(tags, list):
+            tags = [tags]
+        # The rule itself, so a subject lookup returns substance rather than a
+        # list of slugs to go and open one at a time.
+        rule = ""
+        for line in text.splitlines():
+            if line.startswith("**Rule:**"):
+                rule = line[len("**Rule:**"):].strip()
+                break
         notes.append({
+            "tags": [str(x).strip().lower() for x in tags if str(x).strip()],
+            "rule": rule,
             "slug": path.stem,
             "domain": (fm.get("domain") or "").strip(),
             "maturity": (fm.get("maturity") or "?").strip(),
@@ -140,11 +161,66 @@ def next_rung(note, trialing_bar, enforced_bar):
     return None
 
 
+def report_by_tag(notes, wanted):
+    """Notes carrying every wanted tag, whatever repo they belong to.
+
+    Why this exists. The repo report below excludes every cross-cutting note
+    with no matching glob — 190 of them here — and the reasoning is sound:
+    listing process rules that apply everywhere would bury the repo-specific
+    ones. But it left those notes reachable only by deciding to go and look,
+    and on 2026-09-02 that cost something concrete. `a-path-name-is-not-a-
+    framework` says "measure a path pattern against every repo you have before
+    writing it down"; two filenames were added to a glob list without doing
+    that, and a third repo already on disk was missed the same afternoon. The
+    note was tagged `globs` and `scoping` throughout.
+
+    So: retrieval by subject, using the tags every note already carries.
+    Matching is AND across the tags given, because the second tag is there to
+    narrow.
+    """
+    hits = [n for n in notes if wanted <= set(n["tags"])]
+    label = ", ".join(sorted(wanted))
+    print("practice notes tagged %s" % label)
+    print()
+    if not hits:
+        print("Nothing carries all of: %s" % label)
+        near = sorted({tag for n in notes for tag in n["tags"]
+                       if any(w in tag or tag in w for w in wanted)})
+        if near:
+            print()
+            print("Close tags that do exist: %s" % ", ".join(near))
+        else:
+            print()
+            print("No tag here contains any of those words either. `tags:` is a")
+            print("free vocabulary, so a subject may simply not be named yet.")
+        return 0
+
+    order = {"enforced": 0, "trialing": 1, "idea": 2}
+    for note in sorted(hits, key=lambda n: (order.get(n["maturity"], 3), n["slug"])):
+        print("  [%s] %s" % (note["maturity"], note["slug"]))
+        if note["domain"]:
+            print("      %s · tags: %s" % (note["domain"], ", ".join(note["tags"])))
+        if note["rule"]:
+            rule = note["rule"]
+            print("      %s" % (rule if len(rule) <= 300 else rule[:299] + "…"))
+        print()
+    print("%d note(s). Maturity is how well evidenced the rule is, not how" % len(hits))
+    print("relevant it is here — read an `idea` before dismissing it.")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--repo", required=True, help="repo to report against")
+    ap.add_argument("--repo", help="repo to report against")
+    ap.add_argument("--tag", action="append", default=[], metavar="TAG",
+                    help="report notes carrying this tag, whatever repo they belong "
+                         "to. Repeatable, and matching is AND. Needs no --repo: the "
+                         "question is what is known about a subject, not what applies "
+                         "in a directory.")
     ap.add_argument("--vault", help="vault path (default: $SBW_VAULT)")
     args = ap.parse_args()
+    if not args.repo and not args.tag:
+        ap.error("need --repo, or --tag to look a subject up")
 
     cfg = load_config(warn=lambda m: print("warning: %s" % m, file=sys.stderr))
     vault = Path(args.vault).expanduser() if args.vault \
@@ -153,6 +229,9 @@ def main():
         vault, "the --vault flag" if args.vault else origin_describe("SBW_VAULT"))
     if state == "missing":
         sys.exit(message)
+
+    if args.tag:
+        return report_by_tag(load_notes(vault), {t.strip().lower() for t in args.tag})
 
     repo = Path(args.repo).expanduser()
     if not repo.is_dir():
@@ -252,6 +331,7 @@ def main():
     print()
     print("Already applied here (this repo is in their repos:): %d" % already)
     # Named, never silently dropped — the count is the whole disclosure.
+    print("Look one up by subject instead: --tag globs (no --repo needed).")
     print("Excluded: %d cross-cutting note(s) with no matching glob. They are"
           % excluded_cross)
     print("process rules that apply everywhere, so listing them would bury the")

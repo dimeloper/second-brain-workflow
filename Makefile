@@ -195,8 +195,11 @@ skills-for:
 # an applier: the vault's bar counts deliberate re-application, so a batch would
 # manufacture the evidence it exists to measure.
 practices-for:
-	@if [ -z "$(REPO)" ]; then echo "usage: make practices-for REPO=/path/to/repo" >&2; exit 2; fi
-	@./scripts/practices-for.py --repo "$(REPO)" --vault "$(VAULT)"
+	@if [ -z "$(REPO)" ] && [ -z "$(TAG)" ]; then \
+	  echo "usage: make practices-for REPO=/path/to/repo   # what applies here" >&2; \
+	  echo "       make practices-for TAG=globs            # what is known about a subject" >&2; \
+	  exit 2; fi
+	@./scripts/practices-for.py $(if $(REPO),--repo "$(REPO)",) $(if $(TAG),--tag "$(TAG)",) --vault "$(VAULT)"
 
 # The read path for projects/, and practices-for's sibling: what the vault
 # already knows about this repo's initiative, so a session does not re-derive
