@@ -25,6 +25,20 @@ case "${out}" in
   *) fail "preview says it wrote nothing" "${out}" ;;
 esac
 
+# Codex-only and mixed installs are discovered without changing explicit config.
+mkdir -p "${HOME}/.codex"
+codex_out="$("${INIT}" 2>&1)"
+check  "$(case "${codex_out}" in *"SKILLS_DIRS=~/.agents/skills"*) echo 0;; *) echo 1;; esac)" "Codex-only setup discovers its skill directory" "${codex_out}"
+check "$(case "${codex_out}" in *"RENDER_TARGETS=agents"*) echo 0;; *) echo 1;; esac)" "Codex-only setup selects portable rules" "${codex_out}"
+rmdir "${HOME}/.codex"
+mkdir -p "${HOME}/.agents/skills"
+shared_out="$("${INIT}" 2>&1)"
+check "$(case "${shared_out}" in *"SKILLS_DIRS=~/.agents/skills"*) echo 0;; *) echo 1;; esac)" "existing shared skills directory enables Codex discovery" "${shared_out}"
+mkdir -p "${HOME}/.cursor" "${HOME}/.claude"
+mixed_out="$("${INIT}" 2>&1)"
+check "$(case "${mixed_out}" in *"SKILLS_DIRS=~/.cursor/skills:~/.claude/skills:~/.agents/skills"*) echo 0;; *) echo 1;; esac)" "mixed setup discovers all three skill directories" "${mixed_out}"
+rmdir "${HOME}/.cursor" "${HOME}/.claude" "${HOME}/.agents/skills" "${HOME}/.agents"
+
 # --- the orientation a first-time reader gets -------------------------------
 # The ask this was built for: someone running it should learn what the engine
 # does and what it can be configured to do, not just get a file written.

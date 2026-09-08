@@ -17,6 +17,18 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- First-class Codex skill discovery through `~/.agents/skills`: default sync,
+  setup detection, doctor coverage, and uninstall handling use the same skill
+  sources as Cursor and Claude Code. Codex-only setup selects the portable
+  `agents` render target. Existing explicit `SKILLS_DIRS` values are preserved;
+  append `:~/.agents/skills` and run `make sync-skills` to opt them in.
+
+
+### Fixed
+- Expand `~` in every colon-separated `SKILLS_DIRS` entry, so appending the
+  Codex directory in a config file resolves to the user's home directory.
+
 ## [0.50.0] - 2026-09-03
 
 ### Added

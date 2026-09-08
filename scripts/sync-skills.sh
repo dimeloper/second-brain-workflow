@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install skills from this repo into every configured agent skills directory.
-# Both Cursor and Claude Code discover skills only as flat directories, so each
+# Cursor, Claude Code, and Codex discover the flat install directories, so each
 # skill is symlinked in by name; categories live in this repo for organization.
 #
 # Usage:
@@ -9,7 +9,7 @@
 #
 # Config:
 #   SKILLS_DIRS          colon-separated install targets
-#                        (default: ~/.cursor/skills:~/.claude/skills)
+#                        (default: ~/.cursor/skills:~/.claude/skills:~/.agents/skills)
 #   VENDOR_SKILLS        space-separated allowlist from vendor/obsidian-skills
 #   SBW_SKILLS_MANIFEST  path to a skills.json declaring third-party sources
 #                        (default: none — workflow skills only)
@@ -72,7 +72,7 @@ case "${SKILLS_DIRS_ORIGIN:-}" in
     ;;
   *)
     echo "!! No SKILLS_DIRS configured, so this is installing into the built-in"
-    echo "   default — BOTH of these directories:"
+    echo "   default — all three of these directories:"
     echo "     ${SKILLS_DIRS//:/$'\n     '}"
     echo "   If you later set SKILLS_DIRS to fewer, what landed in the others"
     echo "   stays there. 'make doctor' reports it; ./scripts/uninstall.sh removes it."

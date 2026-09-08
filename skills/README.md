@@ -1,7 +1,7 @@
 # Local skills
 
-Source of truth for the skills this repo owns. Both Cursor and Claude Code
-discover skills as a **flat** list in their own directory; the categories here
+Source of truth for the skills this repo owns. Cursor, Claude Code, and Codex
+discover skills from the **flat** install directories; the categories here
 are for humans and for sync.
 
 ## What belongs here
@@ -60,9 +60,9 @@ directory name in each install directory after sync.
 ```
 
 Symlinks each skill into every directory in `SKILLS_DIRS` (default
-`~/.cursor/skills` and `~/.claude/skills`), so edits here apply immediately in
-both agents. The sync never touches a real directory or a symlink owned by
-another tool — that is what keeps a vendor's own install safe.
+`~/.cursor/skills`, `~/.claude/skills`, and `~/.agents/skills`), so edits here
+apply from the same source in all three agents. The sync never touches a real
+directory or a symlink owned by another tool — that is what keeps a vendor's own install safe.
 
 Do **not** put product secrets in skills. Do **not** copy Cursor's built-in
 skills from `~/.cursor/skills-cursor/` into this tree — those are managed by

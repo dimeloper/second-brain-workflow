@@ -15,7 +15,7 @@ from pathlib import Path
 DEFAULTS = {
     "SBW_VAULT": "~/vaults/second-brain",
     "RENDER_TARGETS": "cursor,claude-code,agents",
-    "SKILLS_DIRS": "~/.cursor/skills:~/.claude/skills",
+    "SKILLS_DIRS": "~/.cursor/skills:~/.claude/skills:~/.agents/skills",
     "VENDOR_SKILLS": "obsidian-bases obsidian-markdown",
     # Empty means "no third-party skill sources declared". The roster belongs to
     # the person, not to this repo — same split as SBW_RULES_DIR below, and for
@@ -107,4 +107,7 @@ def load(warn=None):
             cfg[key] = _expand(env)
         elif key not in cfg:
             cfg[key] = _expand(default)
+    cfg["SKILLS_DIRS"] = ":".join(
+        _expand(part) for part in cfg["SKILLS_DIRS"].split(":") if part
+    )
     return cfg

@@ -93,8 +93,8 @@ ds_config_load() {
   [ -n "${RENDER_TARGETS+set}" ]      || RENDER_TARGETS="cursor,claude-code,agents"
   # Named, not inlined: uninstall.sh and doctor.sh have to union the configured
   # value against this to see installs that predate a narrowed config, and a
-  # second copy of the pair is exactly the drift that would reopen the hole.
-  SBW_SKILLS_DIRS_DEFAULT="$HOME/.cursor/skills:$HOME/.claude/skills"
+  # second copy of the defaults is exactly the drift that would reopen the hole.
+  SBW_SKILLS_DIRS_DEFAULT="$HOME/.cursor/skills:$HOME/.claude/skills:$HOME/.agents/skills"
   [ -n "${SKILLS_DIRS+set}" ]         || SKILLS_DIRS="${SBW_SKILLS_DIRS_DEFAULT}"
   [ -n "${VENDOR_SKILLS+set}" ]       || VENDOR_SKILLS="obsidian-bases obsidian-markdown"
   # Empty means "no third-party skill sources declared", which is the state the
@@ -118,6 +118,15 @@ ds_config_load() {
   [ -n "${SBW_SCAN_DEPTH+set}" ] || SBW_SCAN_DEPTH="5"
   # all | relevant — see DEFAULTS in lib/config.py for why `all` is the default.
   [ -n "${SBW_RENDER_SCOPE+set}" ] || SBW_RENDER_SCOPE="all"
+  # Expand each install target, including tildes after a colon in config files.
+  local skills_path expanded_skills=""
+  local -a skills_paths
+  IFS=':' read -r -a skills_paths <<< "${SKILLS_DIRS}"
+  for skills_path in "${skills_paths[@]}"; do
+    [ -n "${skills_path}" ] || continue
+    expanded_skills="${expanded_skills}${expanded_skills:+:}$(ds_expand_tilde "${skills_path}")"
+  done
+  SKILLS_DIRS="${expanded_skills}"
   export SBW_VAULT RENDER_TARGETS SKILLS_DIRS VENDOR_SKILLS SBW_RULES_DIR SBW_EXPECTED_VAULT_ID SBW_RENDER_SCOPE
   export SBW_SKILLS_MANIFEST
   export SBW_SCAN_ROOTS SBW_SCAN_DEPTH

@@ -845,7 +845,8 @@ not — and prints the exact `ln -s` to fix it. Detection only; it never links
 anything itself.
 
 Skills install into **every** directory in `SKILLS_DIRS`, defaulting to
-`~/.cursor/skills` and `~/.claude/skills`, so Cursor and Claude Code resolve the
+`~/.cursor/skills`, `~/.claude/skills`, and `~/.agents/skills`, so Cursor,
+Claude Code, and Codex resolve the
 same skills from one source. A local skill shadows a vendored one of the same
 name. The sync never overwrites a real directory or a symlink owned by another
 tool — it reports the conflict and exits non-zero.
@@ -856,6 +857,23 @@ Adjust what gets installed:
 SKILLS_DIRS=~/.claude/skills ./scripts/sync-skills.sh
 VENDOR_SKILLS="obsidian-bases obsidian-markdown obsidian-cli" ./scripts/sync-skills.sh
 ```
+
+### Codex discovery
+
+Codex follows the skill symlinks in `~/.agents/skills`. `make init` detects
+`~/.codex` or an existing `~/.agents/skills` directory and includes that target.
+A Codex-only machine selects `RENDER_TARGETS=agents`; this renders the existing
+portable always-on rules, not Cursor/Claude scoped rules.
+
+For an existing setup with an explicit `SKILLS_DIRS`, append `:~/.agents/skills`
+to that value in the machine config, keeping the other directories you use.
+Then run `make sync-skills` and `make doctor`. Existing explicit configuration
+is preserved, so an upgrade alone does not add a target to that list.
+
+Codex detects skill changes automatically; restart it if a skill does not
+appear. See [Codex skill discovery](https://learn.chatgpt.com/docs/build-skills).
+The vault continues to resolve through the same machine configuration and
+filesystem scripts; it needs no Codex-specific copy or Obsidian MCP server.
 
 ### Bringing your own skills
 
@@ -1095,8 +1113,8 @@ repo-specific ones.
 
 **Narrowing `SKILLS_DIRS` later does not uninstall anything.** The Quickstart
 runs `sync-skills.sh` before a machine config exists, so the default applies and
-both directories get the links; a config written afterwards naming only one
-leaves the other install in place. `make doctor` reports links of ours found
+all three directories get the links; a config written afterwards naming only one
+leaves the other installs in place. `make doctor` reports links of ours found
 outside `SKILLS_DIRS`, and `make uninstall` looks there too — marking them, so
 what `YES=1` widens to reach is visible before it acts.
 
