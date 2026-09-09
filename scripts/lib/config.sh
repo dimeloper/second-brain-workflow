@@ -122,7 +122,7 @@ ds_config_load() {
   local skills_path expanded_skills=""
   local -a skills_paths
   IFS=':' read -r -a skills_paths <<< "${SKILLS_DIRS}"
-  for skills_path in "${skills_paths[@]}"; do
+  for skills_path in ${skills_paths[@]+"${skills_paths[@]}"}; do
     [ -n "${skills_path}" ] || continue
     expanded_skills="${expanded_skills}${expanded_skills:+:}$(ds_expand_tilde "${skills_path}")"
   done

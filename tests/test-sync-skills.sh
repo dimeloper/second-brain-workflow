@@ -112,4 +112,12 @@ assert_symlink "${HOME}/.agents/skills/check-follow-ups" "configured Codex direc
 configured_dirs="$(env -u SKILLS_DIRS SBW_CONFIG_FILE="${SANDBOX}/tilde-config" PYTHONPATH="${ENGINE}/scripts" python3 -c 'from lib.config import load; print(load()["SKILLS_DIRS"])')"
 assert_str "${HOME}/.cursor/skills:${HOME}/.agents/skills" "${configured_dirs}" "Python expands each configured directory too"
 
+# An explicitly empty SKILLS_DIRS must load, not abort. Expanding an empty array
+# under `set -u` is an unbound-variable error on bash 3.2, and this loader is
+# sourced by every script — so the abort would reach doctor, init and uninstall,
+# not just the sync that reads the value.
+rc=0
+( set -u; SKILLS_DIRS=""; . "${ENGINE}/scripts/lib/config.sh"; ds_config_load ) >/dev/null 2>&1 || rc=$?
+assert_exit 0 "${rc}" "an empty SKILLS_DIRS loads instead of aborting"
+
 finish
