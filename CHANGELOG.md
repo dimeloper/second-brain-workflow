@@ -17,6 +17,39 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`render.py --unrender <repo>`: the inverse of a render, in one act.** It
+  removes the generated rule files, `AGENTS.md` and `CLAUDE.md` when they carry
+  the provenance marker, `.sbw-version`, the `--local` exclusion block, and the
+  repo's registry entry. Preview unless `--yes`, the shape `uninstall` and
+  `upgrade` already use — it deletes files in a repo this engine does not own.
+  `make unrender REPO=... [YES=1]`.
+
+  Until now there was no way to retire a repo, and both hand-rolled halves
+  leave a state doctor reports on every run: delete the rendered files (or the
+  whole directory) and the registry still names it, so the registry checks call
+  it stale or drifted; remove the registry line and the scan calls the repo
+  rendered but not registered. `REFERENCE.md` said to delete five paths by hand
+  and left the registry entry unmentioned.
+
+  Only the paths `render.py` itself writes are ever candidates — never a search
+  of the repo for the marker. That is not theoretical: this engine's own landing
+  page quotes the provenance header as product copy, and a grep would have
+  offered to delete it. Files without the marker are hand-written and survive,
+  the same rule the write path follows, and a directory still holding one stays.
+
+- **`unrender-repo` skill**, so "retire this repo" routes to the command rather
+  than to an agent deleting paths it inferred. `onboard-repo` gains a **quiet
+  onboarding** section for `--local` — rendering into a repo you do not own, so
+  the rules work locally and the remote never sees them — and points at
+  `unrender-repo` for the way back out. The flag existed and no skill mentioned
+  it, which made it findable only by reading `--help`.
+
+- `registry.forget()`, the inverse of `register()`. A repo leaves the registry
+  when someone says so and never because a scan could not find it — absence from
+  disk and absence of intent are different states, which is why every check
+  reports a stale entry rather than pruning it.
+
 ### Fixed
 - **doctor's skill-parity check no longer treats another installer's directory
   as a gap to fill.** v0.51.0 added `~/.agents/skills` to the default

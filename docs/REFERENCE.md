@@ -877,7 +877,7 @@ filesystem scripts; it needs no Codex-specific copy or Obsidian MCP server.
 
 ### Bringing your own skills
 
-The engine ships six skills of its own and tracks one pinned upstream set. It
+The engine ships seven skills of its own and tracks one pinned upstream set. It
 does **not** ship a roster of other people's skills, for the same reason
 [`rules/`](#one-rule-set-every-agent) ships empty: a curated selection of someone
 else's craft skills is an opinion, and the engine's job is the mechanism.
@@ -1142,8 +1142,10 @@ Never touched: a real directory (a hand-maintained skill), a link resolving
 anywhere outside this checkout (another tool's install, such as Railway's
 `use-railway`), the skills directories themselves, and a broken link that isn't
 ours. **It also does not remove your vault, your machine config, or the rendered
-rules in repos you onboarded** — delete `.cursor/rules`, `.claude/rules`,
-`AGENTS.md`, `CLAUDE.md` and `.sbw-version` per repo if you want those gone. The
+rules in repos you onboarded** — that last one is
+[`--unrender`](#unrendering-a-repo), per repo, and deliberately not part of a
+machine-wide uninstall: which repos should stop carrying your conventions is a
+decision per repo, not a consequence of removing skills from a laptop. The
 [repo registry](#the-repo-registry) stays too, so a reinstall still knows where
 this machine has rendered.
 
@@ -1158,6 +1160,35 @@ Or manually:
 ./scripts/sync-rules.sh /path/to/target-repo
 ./scripts/sync-skills.sh   # once per machine, or after pulling skill changes
 ```
+
+### Unrendering a repo
+
+Say **unrender**. The agent follows `unrender-repo`. Or:
+
+```bash
+make unrender REPO=/path/to/repo          # preview
+make unrender REPO=/path/to/repo YES=1    # act
+./scripts/render.py --unrender [--yes] /path/to/repo
+```
+
+It removes the generated rule files, `AGENTS.md` and `CLAUDE.md` **when they
+carry the provenance marker**, `.sbw-version`, the `--local` exclusion block,
+and the repo's [registry](#the-repo-registry) entry. A directory it empties goes
+with it; one still holding a hand-written rule stays. Preview unless `--yes`,
+the shape [`uninstall`](#removing-them-again) and [`upgrade`](#upgrading-a-set-up-machine) already use —
+it deletes files in a repo this engine does not own.
+
+Only the paths `render.py` itself writes are ever candidates; it never searches
+the repo for the marker. A repo can carry that string as content — this engine's
+own landing page quotes the provenance header as copy — and a grep-based
+implementation would offer to delete the product.
+
+Both halves matter. Removing the files without forgetting the repo leaves the
+registry naming it, which the registry checks then report as a repo that
+drifted; removing the registry line without the files leaves the scan reporting
+it as rendered but not registered. Unrendering a repo you are about to delete
+has to come **first** — once the directory is gone there is nothing to run
+against, and only a hand-edit of the registry is left.
 
 ### The repo registry
 
