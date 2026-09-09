@@ -223,9 +223,14 @@ rc=$?
 assert_exit 1 "${rc}" "exits 1 when a foreign skill is missing from one dir"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"foreign-tool: in ${EMPTY1} but not ${EMPTY2} — fix: ln -s ${EMPTY1}/foreign-tool ${EMPTY2}/foreign-tool"*)
-    pass "prints the exact ln -s fix for a foreign skill" ;;
-  *) fail "prints the exact ln -s fix for a foreign skill" "${out}" ;;
+  *"1 skill(s) in ${EMPTY1} but not ${EMPTY2}"*"ln -s ${EMPTY1}/\$s ${EMPTY2}/\$s"*)
+    pass "prints a copy-pastable ln -s fix for a foreign skill" ;;
+  *) fail "prints a copy-pastable ln -s fix for a foreign skill" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"foreign-tool"*) pass "and names it" ;;
+  *) fail "and names it" "${out}" ;;
 esac
 rm -rf "${EMPTY1}/foreign-tool"
 
@@ -263,11 +268,52 @@ rc=$?
 assert_exit 1 "${rc}" "exits 1 when one of our own skills is missing from one dir"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"mcp-per-project: not installed in every configured skills dir — run ./scripts/sync-skills.sh"*)
+  *"1 of our skill(s) are not installed in every configured skills dir"*"./scripts/sync-skills.sh"*"mcp-per-project"*)
     pass "recommends sync-skills.sh for one of our own skills, not a manual ln -s" ;;
   *) fail "recommends sync-skills.sh for one of our own skills, not a manual ln -s" "${out}" ;;
 esac
 rm -f "${EMPTY1}/mcp-per-project"
+
+# --- check_skills(): a directory another installer owns ---------------------
+# v0.51.0 put ~/.agents/skills in the default set, and Codex fills it with 25
+# bundled skills of its own. Every one was reported as missing from Cursor and
+# from Claude Code — 50 warnings, each carrying an `ln -s` that would spread
+# Codex-only skills into two hosts that cannot use them. The .skill-lock.json
+# an installer keeps beside its directory is what tells the two cases apart.
+# Laid out the way Codex really does it: the lockfile one level up from the
+# skills directory, not inside it. A dedicated tree, because a lockfile dropped
+# beside EMPTY1 sits beside EMPTY2 too — both are children of the sandbox — and
+# would exempt the whole fixture instead of the one directory under test.
+HOSTDIR="${SANDBOX}/host/skills"
+mkdir -p "${HOSTDIR}/bundled-a" "${HOSTDIR}/bundled-b"
+echo "theirs" > "${HOSTDIR}/bundled-a/SKILL.md"
+echo "theirs" > "${HOSTDIR}/bundled-b/SKILL.md"
+echo '{"version":3,"skills":{}}' > "${SANDBOX}/host/.skill-lock.json"
+out="$(SKILLS_DIRS="${HOSTDIR}:${EMPTY2}" "${DOCTOR}" --vault "${V}" 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "an installer's own bundled skills are not a finding"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"2 skill(s) in ${HOSTDIR} are that installer's own"*)
+    pass "reports them once, by the directory that owns them" ;;
+  *) fail "reports them once, by the directory that owns them" "${out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"ln -s"*) fail "and proposes no ln -s for them" "${out}" ;;
+  *) pass "and proposes no ln -s for them" ;;
+esac
+# A lockfile does not exempt the whole directory: one of ours installed in there
+# is still ours, and sync-skills.sh is still the answer.
+ln -s "${OURS}" "${HOSTDIR}/mcp-per-project"
+out="$(SKILLS_DIRS="${HOSTDIR}:${EMPTY2}" "${DOCTOR}" --vault "${V}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"1 of our skill(s) are not installed in every configured skills dir"*)
+    pass "one of ours in a host-managed dir is still reported as ours" ;;
+  *) fail "one of ours in a host-managed dir is still reported as ours" "${out}" ;;
+esac
+rm -rf "${SANDBOX}/host"
 
 # --- check_submodules(): drift after a tag switch ---------------------------
 # STANDARDS_DIR is derived from doctor.sh's own script path, so exercising

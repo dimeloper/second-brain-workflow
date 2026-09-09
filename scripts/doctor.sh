@@ -211,7 +211,6 @@ check_author() {
     *) err "${AI_ERROR}" ;;
   esac
 }
-
 # Not vault-specific — SKILLS_DIRS is a machine-wide setting, so this runs
 # regardless of --vault. Detection only: a real directory or a symlink to
 # another tool's install (e.g. Railway's use-railway, which its own
@@ -220,8 +219,24 @@ check_author() {
 # for it from the missing side. One of ours (a symlink into this repo) gets
 # a simpler fix — re-run sync-skills.sh — since that command alone would
 # already propagate it everywhere; anything else gets the exact `ln -s`.
+#
+# Two things changed after v0.51.0 put ~/.agents/skills in the default set.
+#
+# A directory another installer owns is not a gap to fill. Codex ships 25
+# bundled skills into ~/.agents/skills; every one of them was reported as
+# missing from Cursor and from Claude Code, with an `ln -s` that would spread
+# skills named "create Codex Automations" into two hosts that cannot use them.
+# Those are reported as that host's own and counted, not warned about — a
+# finding nothing can ever resolve is one that trains a reader to skip the
+# whole report. skills_dir_host_managed() draws the line.
+#
+# And findings group. One warning per (skill × missing dir) meant 25 skills in
+# one host directory printed 50 lines, which on a real machine was 48 of the 53
+# things doctor had to say. The information is the same either way; what a
+# grouped line preserves is the four findings that were underneath it.
 check_skills() {
-  local dir name entry names missing_dirs first_dir target clean=1
+  local dir name entry names first_dir target
+  local gaps="" listed n klass kdir mdir found=0
   local -a dirs
 
   IFS=':' read -r -a dirs <<< "${SKILLS_DIRS}"
@@ -242,38 +257,85 @@ check_skills() {
   names="$(printf '%s' "${names}" | sort -u)"
   [ -n "${names}" ] || { ok "no skills installed anywhere yet"; return; }
 
+  # One tab-separated row per gap: class, the dir that has it, the dir that
+  # doesn't, the name. Rows rather than an associative array — bash 3.2 is a
+  # supported target and has none, which the bash32 CI job would catch anyway.
   while IFS= read -r name; do
     [ -n "${name}" ] || continue
-    missing_dirs=""
     first_dir=""
     for dir in "${dirs[@]}"; do
-      if [ -e "${dir}/${name}" ]; then
-        [ -n "${first_dir}" ] || first_dir="${dir}"
-      else
-        missing_dirs="${missing_dirs}${dir}
-"
-      fi
+      [ -e "${dir}/${name}" ] || continue
+      [ -n "${first_dir}" ] || first_dir="${dir}"
     done
-    [ -n "${missing_dirs}" ] || continue
+    [ -n "${first_dir}" ] || continue
 
-    clean=0
     target=""
     [ -L "${first_dir}/${name}" ] && target="$(readlink "${first_dir}/${name}")"
-
     case "${target}" in
-      "${STANDARDS_DIR}"/*)
-        warn "${name}: not installed in every configured skills dir — run $(say_remediation 'make sync-skills' './scripts/sync-skills.sh')"
-        ;;
-      *)
-        while IFS= read -r dir; do
-          [ -n "${dir}" ] || continue
-          warn "${name}: in ${first_dir} but not ${dir} — fix: ln -s ${first_dir}/${name} ${dir}/${name}"
-        done <<< "${missing_dirs}"
-        ;;
+      "${STANDARDS_DIR}"/*) klass="ours" ;;
+      *) if skills_dir_host_managed "${first_dir}"; then klass="bundled"; else klass="foreign"; fi ;;
     esac
+
+    for dir in "${dirs[@]}"; do
+      [ -e "${dir}/${name}" ] && continue
+      gaps="${gaps}${klass}	${first_dir}	${dir}	${name}
+"
+    done
   done <<< "${names}"
 
-  [ "${clean}" -eq 1 ] && ok "every installed skill is present in all configured skills directories"
+  if [ -z "${gaps}" ]; then
+    ok "every installed skill is present in all configured skills directories"
+    return 0
+  fi
+
+  # Ours: not grouped by directory pair, because the remedy does not vary by
+  # one. sync-skills.sh propagates every one of them to every configured dir in
+  # a single run, so naming the pairs separately would be three lines asking
+  # for the same command.
+  listed="$(printf '%s' "${gaps}" | awk -F'\t' '$1 == "ours" { print $4 }' | sort -u)"
+  if [ -n "${listed}" ]; then
+    found=1
+    n="$(printf '%s\n' "${listed}" | wc -l | tr -d ' ')"
+    warn "${n} of our skill(s) are not installed in every configured skills dir —
+        run $(say_remediation 'make sync-skills' './scripts/sync-skills.sh')
+        $(printf '%s' "${listed}" | tr '\n' ' ')"
+  fi
+
+  # Bundled: grouped by the directory that owns them, not by the pair. The
+  # missing dirs are every other configured one by definition — an installer's
+  # bundled set is exactly what nothing else has — so a line per pair is the
+  # same sentence twice with the last word changed.
+  listed="$(printf '%s' "${gaps}" | awk -F'\t' '$1 == "bundled" { print $2 }' | sort -u)"
+  while IFS= read -r kdir; do
+    [ -n "${kdir}" ] || continue
+    n="$(printf '%s' "${gaps}" | awk -F'\t' -v a="${kdir}" \
+      '$1 == "bundled" && $2 == a { print $4 }' | sort -u | wc -l | tr -d ' ')"
+    # Counted, not warned. These belong to the installer that owns kdir and only
+    # ever appear there, so there is nothing to finish: a warning here would sit
+    # in every future run of doctor on this machine, and a report that can never
+    # reach zero is one a reader learns to skim past.
+    ok "${n} skill(s) in ${kdir} are that installer's own (a .skill-lock.json
+        sits with them) — not compared across the other skills dirs"
+  done <<EOF
+${listed}
+EOF
+
+  while IFS="	" read -r kdir mdir; do
+    [ -n "${kdir}" ] || continue
+    listed="$(printf '%s' "${gaps}" | awk -F'\t' -v a="${kdir}" -v b="${mdir}" \
+      '$1 == "foreign" && $2 == a && $3 == b { print $4 }' | sort -u)"
+    [ -n "${listed}" ] || continue
+    found=1
+    n="$(printf '%s\n' "${listed}" | wc -l | tr -d ' ')"
+    warn "${n} skill(s) in ${kdir} but not ${mdir}
+        $(printf '%s' "${listed}" | tr '\n' ' ')
+        fix, for the ones you want there:
+          for s in $(printf '%s' "${listed}" | tr '\n' ' '); do ln -s ${kdir}/\$s ${mdir}/\$s; done"
+  done <<EOF
+$(printf '%s' "${gaps}" | awk -F'\t' '$1 == "foreign" { print $2"\t"$3 }' | sort -u)
+EOF
+
+  [ "${found}" -eq 1 ] || ok "every installed skill is present in all configured skills directories"
   # `return 0`, for the same reason check_author has one: the test above is this
   # function's last command, so with a finding to report it returned 1 — and
   # under `set -e` that aborted the whole run, silently dropping every later
