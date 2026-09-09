@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.51.0] - 2026-09-09
+
 ### Added
 - First-class Codex skill discovery through `~/.agents/skills`: default sync,
   setup detection, doctor coverage, and uninstall handling use the same skill
@@ -3426,7 +3428,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.50.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.51.0...HEAD
+[0.51.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.50.0...v0.51.0
 [0.50.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.2...v0.50.0
 [0.49.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.1...v0.49.2
 [0.49.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.0...v0.49.1
