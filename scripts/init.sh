@@ -138,7 +138,11 @@ detect_targets() {
   local t=""
   [ -d "${HOME}/.cursor" ] && t="cursor"
   [ -d "${HOME}/.claude" ] && t="${t}${t:+,}claude-code"
-  [ -n "$t" ] && t="${t},agents"
+  if [ -n "$t" ]; then
+    t="${t},agents"
+  elif [ -d "${HOME}/.codex" ] || [ -d "${HOME}/.agents/skills" ]; then
+    t="agents"
+  fi
   echo "${t:-cursor,claude-code,agents}"
 }
 
@@ -151,8 +155,12 @@ detect_skills_dirs() {
   [ -d "${HOME}/.cursor" ] && d="~/.cursor/skills"
   # shellcheck disable=SC2088
   [ -d "${HOME}/.claude" ] && d="${d}${d:+:}~/.claude/skills"
+  if [ -d "${HOME}/.codex" ] || [ -d "${HOME}/.agents/skills" ]; then
+    # shellcheck disable=SC2088
+    d="${d}${d:+:}~/.agents/skills"
+  fi
   # shellcheck disable=SC2088
-  echo "${d:-~/.cursor/skills:~/.claude/skills}"
+  echo "${d:-~/.cursor/skills:~/.claude/skills:~/.agents/skills}"
 }
 
 detect_rules_dir() {

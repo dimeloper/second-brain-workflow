@@ -142,6 +142,11 @@ at a separate private rules repo, giving the machine the right git identity, and
 a troubleshooting table built from real first-setup failures. Every refusal this
 tooling can produce is explained there.
 
+Codex skills are installed into `~/.agents/skills` alongside the Cursor and
+Claude Code targets. Existing installations with an explicit `SKILLS_DIRS`
+should add that directory and re-run `make sync-skills`; see
+[Codex discovery](docs/REFERENCE.md#codex-discovery).
+
 ## Your first session
 
 The first useful moment is the end of the *next* session, not the end of setup.

@@ -290,7 +290,7 @@ check_skills() {
 #
 # How it happens is ordinary. sync-skills.sh runs during the Quickstart before
 # a machine config exists, so it installs into the built-in default, meaning
-# both directories; the config written afterwards narrows SKILLS_DIRS to one.
+# all default directories; the config written afterwards narrows SKILLS_DIRS to one.
 # From then on the wider install is invisible to every tool that reads the
 # config — including `make uninstall`, which is the documented way out of the
 # dangling-link state a deleted checkout leaves. A warning, not an error:

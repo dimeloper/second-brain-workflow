@@ -200,7 +200,7 @@ fi
 # ===== installed wide, configured narrow ====================================
 # The state a real first-time setup produced, and the one nothing could see.
 # sync-skills.sh runs during the Quickstart before a machine config exists, so
-# it installs into the built-in default — both directories. The config written
+# it installs into the built-in default — all three directories. The config written
 # afterwards names one. Everything in the other is then invisible to every tool
 # that reads the config, `make uninstall` included, which is the documented way
 # out of the dangling-link state a deleted checkout leaves behind.
@@ -211,12 +211,14 @@ E4="${SANDBOX}/engine4"
 make_fake_engine "${E4}"
 WIDE_C="${HOME}/.cursor/skills"
 WIDE_K="${HOME}/.claude/skills"
+WIDE_X="${HOME}/.agents/skills"
 mkdir -p "${WIDE_C}" "${WIDE_K}"
 
 # Install with no SKILLS_DIRS at all: the default does the choosing.
 ( unset SKILLS_DIRS; VENDOR_SKILLS="" "${E4}/scripts/sync-skills.sh" >/dev/null 2>&1 )
 assert_symlink "${WIDE_C}/alpha" "installing with no config reaches the first default dir"
 assert_symlink "${WIDE_K}/alpha" "and the second"
+assert_symlink "${WIDE_X}/alpha" "and the Codex directory"
 
 # Now narrow the config to one of them, exactly as a Claude-Code-only machine
 # would. SKILLS_DIRS via the environment stands in for the config file: both
@@ -231,18 +233,18 @@ case "${out}" in
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"4 link(s) to remove"*) pass "and finds every link of ours across both, not just the configured one" ;;
-  *) fail "and finds every link of ours across both, not just the configured one" "${out}" ;;
+  *"6 link(s) to remove"*) pass "and finds every link of ours across all three, not just the configured one" ;;
+  *) fail "and finds every link of ours across all three, not just the configured one" "${out}" ;;
 esac
 # Widening what --yes deletes is only acceptable if the preview says so first.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"not in SKILLS_DIRS"*"2 of those are outside the configured SKILLS_DIRS"*)
+  *"not in SKILLS_DIRS"*"4 of those are outside the configured SKILLS_DIRS"*)
     pass "and marks the ones outside SKILLS_DIRS, in the listing and in the count" ;;
   *) fail "and marks the ones outside SKILLS_DIRS, in the listing and in the count" "${out}" ;;
 esac
 
-# doctor must not be blind to the same directory.
+# doctor must not be blind to the same directories.
 out="$("${E4}/scripts/doctor.sh" --vault "${SANDBOX}/no-vault" 2>&1 || true)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
@@ -251,9 +253,17 @@ case "${out}" in
   *) fail "doctor warns about our links outside SKILLS_DIRS, and names the directory" "${out}" ;;
 esac
 
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"2 of our skill link(s) in ${WIDE_X}"*)
+    pass "doctor reports Codex links outside configured directories" ;;
+  *) fail "doctor reports Codex links outside configured directories" "${out}" ;;
+esac
+
 "${E4}/scripts/uninstall.sh" --yes >/dev/null 2>&1
 assert_no_file "${WIDE_C}/alpha" "--yes removes the orphaned links it previewed"
 assert_no_file "${WIDE_K}/alpha" "and the configured ones in the same pass"
+assert_no_file "${WIDE_X}/alpha" "and the Codex links in the same pass"
 
 # With nothing orphaned left, doctor says so rather than staying silent.
 out="$("${E4}/scripts/doctor.sh" --vault "${SANDBOX}/no-vault" 2>&1 || true)"

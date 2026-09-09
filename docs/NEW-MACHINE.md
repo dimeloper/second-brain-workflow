@@ -186,8 +186,8 @@ valid starting state — not a failure to fix now.
 ./scripts/sync-skills.sh
 ```
 
-Installs into every directory in `SKILLS_DIRS` — by default both
-`~/.cursor/skills` and `~/.claude/skills`. It never overwrites a real directory
+Installs into every directory in `SKILLS_DIRS` — by default
+`~/.cursor/skills`, `~/.claude/skills`, and `~/.agents/skills` (Codex). It never overwrites a real directory
 or a symlink owned by another tool; it reports those and exits non-zero.
 
 To undo it — including starting this setup over — `make uninstall` previews and
@@ -431,7 +431,7 @@ second-brain-workflow doctor — vault: ~/vaults/work-brain
 
 **That `warn` is produced by this walkthrough**, and it is correct. Step 3 ran
 `sync-skills.sh` before any config existed, so it installed into the built-in
-default — *both* `~/.cursor/skills` and `~/.claude/skills`. Narrowing
+default — `~/.cursor/skills`, `~/.claude/skills`, and `~/.agents/skills`. Narrowing
 `SKILLS_DIRS` above does not uninstall anything; it stops the tooling looking at
 the other directory, and this check exists to say so rather than let an install
 go quietly unmanaged. Either widen `SKILLS_DIRS` again, or run
