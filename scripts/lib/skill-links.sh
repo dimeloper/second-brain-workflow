@@ -171,3 +171,29 @@ skill_links_ours_in() {
   done
   printf '%s' "${n}"
 }
+
+# Is this a directory some other skill installer owns and fills on its own?
+#
+# The question did not exist while SKILLS_DIRS held only ~/.cursor/skills and
+# ~/.claude/skills: both are places *we* install into, so a skill in one and
+# not the other is an oversight, and saying so is useful. v0.51.0 added
+# ~/.agents/skills, which is not that. Codex ships its own bundled skills there
+# — automate, origin, update-cursor-settings and twenty-odd more — and a
+# separate installer records what it fetched in a .skill-lock.json beside them.
+# Those skills are that host's, they are meaningless to Cursor and Claude Code,
+# and they are never going away, so reporting each one as a gap to fill is a
+# permanent finding with a wrong remedy attached.
+#
+# Detected rather than listed. Hard-coding ~/.agents/skills would be wrong on a
+# machine that points SKILLS_DIRS at a second installer's directory, and right
+# for the wrong reason on one where Codex was never installed — the lockfile is
+# what actually distinguishes "an installer owns this" from "a directory we
+# fill". Beside the directory or inside it: the vercel-labs `skills` CLI writes
+# ~/.agents/.skill-lock.json for ~/.agents/skills, one level up.
+skills_dir_host_managed() {
+  local dir="$1"
+  dir="$(skills_dir_normalize "${dir}")"
+  [ -e "${dir}/.skill-lock.json" ] && return 0
+  [ -e "$(dirname "${dir}")/.skill-lock.json" ] && return 0
+  return 1
+}

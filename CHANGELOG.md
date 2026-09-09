@@ -17,6 +17,28 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **doctor's skill-parity check no longer treats another installer's directory
+  as a gap to fill.** v0.51.0 added `~/.agents/skills` to the default
+  `SKILLS_DIRS`, which is not a directory this engine fills: Codex ships 25
+  bundled skills there and a separate installer records what it fetched in a
+  `.skill-lock.json` beside them. Every one of those was reported as missing
+  from Cursor and from Claude Code, each with an `ln -s` that would have spread
+  Codex-only skills (`automate`, `origin`, `update-cursor-settings`) into two
+  hosts that cannot use them. On one real machine that was 48 of the 53 things
+  doctor had to say, and the four that mattered were underneath them.
+
+  A directory with a lockfile beside it is now reported as that installer's
+  own — counted on one `ok` line, not warned about. Detected rather than
+  listed: hard-coding `~/.agents/skills` would be wrong on a machine pointing
+  `SKILLS_DIRS` at a second installer, and right for the wrong reason on one
+  where Codex was never installed. A skill of ours *inside* such a directory is
+  still ours, and still says to run `sync-skills`.
+
+  Findings also group. One warning per (skill × missing dir) is the same
+  sentence repeated with the last word changed; one line per directory pair,
+  naming the skills and carrying a loop you can paste, says as much.
+
 ## [0.51.0] - 2026-09-09
 
 ### Added
