@@ -28,15 +28,32 @@ esac
 # Codex-only and mixed installs are discovered without changing explicit config.
 mkdir -p "${HOME}/.codex"
 codex_out="$("${INIT}" 2>&1)"
-check  "$(case "${codex_out}" in *"SKILLS_DIRS=~/.agents/skills"*) echo 0;; *) echo 1;; esac)" "Codex-only setup discovers its skill directory" "${codex_out}"
-check "$(case "${codex_out}" in *"RENDER_TARGETS=agents"*) echo 0;; *) echo 1;; esac)" "Codex-only setup selects portable rules" "${codex_out}"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${codex_out}" in
+  *"SKILLS_DIRS=~/.agents/skills"*) pass "Codex-only setup discovers its skill directory" ;;
+  *) fail "Codex-only setup discovers its skill directory" "${codex_out}" ;;
+esac
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${codex_out}" in
+  *"RENDER_TARGETS=agents"*) pass "Codex-only setup selects portable rules" ;;
+  *) fail "Codex-only setup selects portable rules" "${codex_out}" ;;
+esac
 rmdir "${HOME}/.codex"
 mkdir -p "${HOME}/.agents/skills"
 shared_out="$("${INIT}" 2>&1)"
-check "$(case "${shared_out}" in *"SKILLS_DIRS=~/.agents/skills"*) echo 0;; *) echo 1;; esac)" "existing shared skills directory enables Codex discovery" "${shared_out}"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${shared_out}" in
+  *"SKILLS_DIRS=~/.agents/skills"*) pass "existing shared skills directory enables Codex discovery" ;;
+  *) fail "existing shared skills directory enables Codex discovery" "${shared_out}" ;;
+esac
 mkdir -p "${HOME}/.cursor" "${HOME}/.claude"
 mixed_out="$("${INIT}" 2>&1)"
-check "$(case "${mixed_out}" in *"SKILLS_DIRS=~/.cursor/skills:~/.claude/skills:~/.agents/skills"*) echo 0;; *) echo 1;; esac)" "mixed setup discovers all three skill directories" "${mixed_out}"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${mixed_out}" in
+  *"SKILLS_DIRS=~/.cursor/skills:~/.claude/skills:~/.agents/skills"*)
+    pass "mixed setup discovers all three skill directories" ;;
+  *) fail "mixed setup discovers all three skill directories" "${mixed_out}" ;;
+esac
 rmdir "${HOME}/.cursor" "${HOME}/.claude" "${HOME}/.agents/skills" "${HOME}/.agents"
 
 # --- the orientation a first-time reader gets -------------------------------

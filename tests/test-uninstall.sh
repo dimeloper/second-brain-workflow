@@ -253,7 +253,12 @@ case "${out}" in
   *) fail "doctor warns about our links outside SKILLS_DIRS, and names the directory" "${out}" ;;
 esac
 
-check "$(case "${out}" in *"2 of our skill link(s) in ${WIDE_X}"*) echo 0;; *) echo 1;; esac)" "doctor reports Codex links outside configured directories" "${out}"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"2 of our skill link(s) in ${WIDE_X}"*)
+    pass "doctor reports Codex links outside configured directories" ;;
+  *) fail "doctor reports Codex links outside configured directories" "${out}" ;;
+esac
 
 "${E4}/scripts/uninstall.sh" --yes >/dev/null 2>&1
 assert_no_file "${WIDE_C}/alpha" "--yes removes the orphaned links it previewed"
