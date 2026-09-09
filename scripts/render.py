@@ -60,6 +60,7 @@ from lib.registry import MODES as REGISTRY_MODES  # noqa: E402
 from lib.registry import mode_of as recorded_mode  # noqa: E402
 from lib.registry import read as registry_read  # noqa: E402
 from lib.registry import register as register_repo  # noqa: E402
+from lib.registry import forget as registry_forget  # noqa: E402
 from lib.registry import registry_path as registry_file  # noqa: E402
 from lib.repo_match import repo_files, path_matches  # noqa: E402
 
@@ -617,6 +618,94 @@ def strip_marker(text):
     return "\n".join(l for l in text.splitlines() if MARKER not in l)
 
 
+def unrender_plan(repo):
+    """What render.py put into `repo`, as (files, dirs, exclude, registered).
+
+    Only the paths render.py itself writes are ever considered — the two owned
+    rule directories, the two always-on files, and .sbw-version. Never a search
+    of the repo for the marker string.
+
+    That distinction is not theoretical. The repo this was first run against is
+    a landing page *for this engine*, and its src/content/landing.ts quotes the
+    provenance header as copy. A marker grep would have offered to delete the
+    product. `is_generated()` still guards every candidate, so a hand-written
+    AGENTS.md — which render.py leaves alone by design — is left alone here too:
+    unrender removes what render wrote, which is a smaller set than what looks
+    like ours.
+    """
+    files, dirs = [], []
+    for rel, ext in owned_dirs(ALL_TARGETS):
+        d = repo / rel
+        if not d.is_dir():
+            continue
+        found = sorted(f for f in d.glob("*" + ext) if is_generated(f))
+        files.extend(found)
+        if found:
+            dirs.append(d)
+    for rel in ("AGENTS.md", "CLAUDE.md"):
+        f = repo / rel
+        if f.is_file() and is_generated(f):
+            files.append(f)
+    for rel in HEADERLESS_OWNED:
+        f = repo / rel
+        if f.is_file():
+            files.append(f)
+    registered = os.path.realpath(str(repo)) in [
+        os.path.realpath(r) for r in registry_read()
+    ]
+    return sorted(files), dirs, exclude_block_present(repo), registered
+
+
+def unrender(repo, apply):
+    """Undo a render: remove the generated files, and forget the repo. -> rc.
+
+    Preview unless `apply`, the shape `make uninstall` and `make upgrade`
+    already use — this deletes files in a repo that is not ours, so the default
+    has to be to say what would happen.
+
+    Forgetting is the half that deleting the directory cannot do. A repo removed
+    from disk stays in the registry, where doctor reports it as a stale entry
+    forever; a repo whose rendered files are deleted by hand stays there too,
+    and reads as rendered-but-drifted. Both are the same unfinished thought, and
+    this is where it finishes.
+    """
+    files, dirs, excluded, registered = unrender_plan(repo)
+    if not files and not excluded and not registered:
+        print("Nothing to unrender: {} carries no rendered files, no local "
+              "exclusion block, and the registry does not name it.".format(repo))
+        return 0
+
+    print("unrender {}{}".format(
+        repo, "" if apply else "  (preview — nothing will be changed)"))
+    for f in files:
+        print("  remove  {}".format(f.relative_to(repo)))
+    if excluded:
+        print("  remove  the .git/info/exclude block that hid them from the remote")
+    if registered:
+        print("  forget  this repo, in {}".format(registry_file()))
+    if not apply:
+        print("")
+        print("Re-run with --yes to do it.")
+        return 0
+
+    for f in files:
+        f.unlink()
+    # Only when we emptied it. A .cursor/rules holding one hand-written rule is
+    # still someone's directory, and so is a .claude holding settings.json — the
+    # parent goes only when taking the rules directory out of it left nothing.
+    for d in dirs:
+        for candidate in (d, d.parent):
+            if candidate.is_dir() and not any(candidate.iterdir()):
+                candidate.rmdir()
+    if excluded:
+        write_exclude(repo, [])
+    if registered:
+        registry_forget(repo, warn=lambda m: print("warning: " + m, file=sys.stderr))
+    print("")
+    print("Done. Re-onboard it any time with: render.py {}".format(repo))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("target_repo", nargs="?", help="repo to render into")
@@ -639,7 +728,26 @@ def main():
                     help="render without recording the repo as onboarded "
                          "(throwaway fixtures, probes)")
     ap.add_argument("--explain", action="store_true", help="print resolution and exit")
+    ap.add_argument("--unrender", action="store_true",
+                    help="remove what a render put into the repo and forget it "
+                         "— preview unless --yes is given")
+    ap.add_argument("--yes", action="store_true",
+                    help="with --unrender, actually remove the files")
     args = ap.parse_args()
+
+    # Answered before the config is read and long before a rule is loaded: the
+    # question is what this repo already carries, and none of that comes from
+    # here. A machine whose SBW_RULES_DIR points nowhere can still undo a
+    # render — which is the state someone unrendering is most likely to be in.
+    if args.unrender:
+        if not args.target_repo:
+            ap.error("--unrender needs a repo")
+        repo = Path(args.target_repo).expanduser().resolve()
+        if not repo.is_dir():
+            sys.exit("Target repo not found: {}".format(repo))
+        return unrender(repo, args.yes)
+    if args.yes:
+        ap.error("--yes means something only with --unrender")
 
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
     targets_raw = args.targets or cfg["RENDER_TARGETS"]

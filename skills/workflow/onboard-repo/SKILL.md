@@ -6,7 +6,11 @@ description: >-
   relevant second-brain practices, and wire project-scoped MCP (Railway /
   Postgres / Logfire / PostHog) — never global mcp.json. Use when the user
   says onboard repo, onboard this repo, set up cursor standards, sync rules
-  into this project, or wire best practices into a new codebase.
+  into this project, or wire best practices into a new codebase. Covers quiet
+  onboarding too — rendering into a repo you do not own, so the rules work
+  locally and the remote never sees them: use when the user says render this
+  quietly, keep it out of the remote, don't commit the rules, onboard someone
+  else's repo, or local only.
 ---
 
 # Onboard repo
@@ -72,6 +76,39 @@ a pre-commit hook. `render.py --explain` shows how each rule resolves per target
 Set `RENDER_TARGETS` per machine (e.g. `cursor,agents` where only Cursor runs).
 Each target prunes only its own generated files, so a repo shared with someone
 using the other agent keeps working.
+
+#### Quiet onboarding — a repo whose remote must never see the rules
+
+Not every repo is yours to add conventions to: a client's, a team's that has
+not adopted them, an upstream you only contribute to. `--local` renders the
+same files and adds them to `.git/info/exclude`, which is per-clone and is
+itself never committed. The rules work for the agent; the remote never learns
+they exist.
+
+```bash
+~/second-brain-workflow/scripts/render.py "<TARGET>" --local
+```
+
+Or `make render REPO=<TARGET> LOCAL=1`.
+
+Three things to know before using it:
+
+- **The mode is recorded, not re-guessed.** After the first `--local`, a plain
+  re-render stays local. `--shared` is the explicit way back, and it stops the
+  exclusion as well as re-rendering. Passing both is refused rather than
+  resolved.
+- **It refuses rather than half-works.** If git already tracks a path the render
+  would write, `.git/info/exclude` has no effect on it — it would show up as an
+  ordinary modification, one `git commit -a` from being shared. The render
+  stops and writes nothing rather than making a promise it cannot keep. It also
+  needs a git work tree; there is nothing to keep out of a remote without one.
+- **It is local to the clone.** A fresh clone of the same repo elsewhere has
+  neither the rendered files nor the exclusion. Re-render there.
+
+Prefer `--local` whenever the user is not the owner of the repo, or says
+anything about not wanting the rules committed. When in doubt on a repo with a
+remote you do not control, ask which one they want — the two differ in what
+other people end up seeing, which is not a detail to guess at.
 
 If `AGENTS.md` already existed and differed, the copy overwrites — that is
 intentional for the shared portable file. Repo-specific agent guidance goes in
@@ -316,5 +353,13 @@ Short status:
 7. MCP action (backend wired / sibling pointed at `<backend>` / skipped) + server
    name suffixes + whether tokens are SET/EMPTY / live check if possible
 8. Daily-note path updated
+9. Render mode — shared, or **local** with the reason, since that is the line
+   that tells the user whether anyone else will see these files
 
 Do not commit, push, or open extra PRs unless asked.
+
+## Undoing this
+
+Retiring a repo is the **`unrender-repo`** skill, not a hand-cleanup. Removing
+the rendered files without forgetting the repo — or the reverse — leaves a
+state doctor reports on every run.

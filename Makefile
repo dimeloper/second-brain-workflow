@@ -1,5 +1,5 @@
 .PHONY: help lint require-shellcheck lint-shell lint-python test vault-index adopt \
-        vault-index-check sync-skills fetch-skills skills-for practices-for project-for context-sources project-candidates uninstall upgrade explain render repos-check guard doctor audit \
+        vault-index-check sync-skills fetch-skills skills-for practices-for project-for context-sources project-candidates uninstall upgrade explain render unrender repos-check guard doctor audit \
         init \
         verify-claude check release-check
 
@@ -44,6 +44,8 @@ help:
 	@echo "                         LOCAL=1 also excludes them from that repo's git"
 	@echo "                         SHARED=1 moves a LOCAL repo back; without either,"
 	@echo "                         a re-render keeps the mode the registry recorded"
+	@echo "make unrender REPO=...   remove what a render put there, and forget the repo"
+	@echo "                         (preview; YES=1 to act)"
 	@echo "make repos-check         which onboarded repos are behind; reports, never renders"
 	@echo "make guard               run the vault commit guard against VAULT"
 	@echo "make init              explain this engine, detect the machine, preview a config"
@@ -121,6 +123,14 @@ explain:
 render:
 	@if [ -z "$(REPO)" ]; then echo "usage: make render REPO=/path/to/repo" >&2; exit 2; fi
 	@./scripts/render.py "$(REPO)" $(if $(LOCAL),--local,) $(if $(SHARED),--shared,)
+
+# The inverse of render, and preview-by-default like uninstall and upgrade —
+# it deletes files in a repo this engine does not own. Both halves or neither:
+# removing the files without forgetting the repo leaves the registry naming it,
+# which every check here then reports as a repo that drifted.
+unrender:
+	@if [ -z "$(REPO)" ]; then echo "usage: make unrender REPO=/path/to/repo" >&2; exit 2; fi
+	@./scripts/render.py --unrender "$(REPO)" $(if $(YES),--yes,)
 
 # The same question `make upgrade` asks in step 7, asked at the other moment it
 # matters: after editing a rule, when every rendered copy on the machine has

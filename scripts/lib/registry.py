@@ -157,3 +157,40 @@ def register(repo, mode=None, warn=None):
                 "doctor reports the onboarded repo set as undetermined."
             )
         return False
+
+
+def forget(repo, warn=None):
+    """Drop `repo` from the registry. -> True when the registry no longer names it.
+
+    The inverse of `register`, and deliberately the only one: a repo leaves this
+    list when someone says so, never because a scan could not find it. Absence
+    from disk and absence of intent are different states, which is why every
+    check here reports a stale entry rather than pruning it.
+
+    realpath and the same atomic temp-and-replace as `register`, for the same
+    reasons. A repo the registry never named is already forgotten, so that is
+    True rather than an error — `--unrender` on a repo rendered before the
+    registry existed has nothing to remove here and has still done its job.
+    """
+    path = registry_path()
+    entry = os.path.realpath(str(repo))
+    try:
+        entries = dict(read_entries(path))
+        if entry not in entries:
+            return True
+        del entries[entry]
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(
+            "".join(_format(p, entries[p]) + "\n" for p in sorted(entries)),
+            encoding="utf-8",
+        )
+        os.replace(tmp, path)
+        return True
+    except OSError as exc:
+        if warn:
+            warn(
+                f"removed the rendered files, but could not update {path}: "
+                f"{exc.strerror or exc}. The registry still names this repo, so "
+                "doctor will report it as registered but no longer rendered."
+            )
+        return False
