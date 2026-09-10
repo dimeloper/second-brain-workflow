@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.53.0] - 2026-09-10
+
 ### Added
 - **A non-zero `make upgrade` ends with `What to do:`** — every remediation the
   run printed, numbered, repeated under the exit code. A finding is often forty
@@ -3521,7 +3523,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.52.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.53.0...HEAD
+[0.53.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.52.0...v0.53.0
 [0.52.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.51.0...v0.52.0
 [0.51.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.50.0...v0.51.0
 [0.50.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.49.2...v0.50.0
