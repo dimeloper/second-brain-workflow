@@ -119,6 +119,18 @@ findings=0
 undetermined=0
 doctor_rc=0
 
+# Remediations, queued as they are printed. A run that ends `Exit 1: 1
+# finding(s)` names the finding forty lines above the exit code, and the reader
+# who scrolled to the verdict is the reader who most needs the command — so the
+# summary repeats every remediation this script printed. Queued from the same
+# string that was printed under the finding (see `act`), so the two copies
+# cannot drift into disagreeing about what to run.
+#
+# Doctor's own findings are not in here: this script runs doctor as a separate
+# program and prints its output verbatim, so it cannot enumerate what doctor
+# advised. It queues a pointer to that block instead.
+ACTIONS=""
+
 while [ $# -gt 0 ]; do
   case "$1" in
     --yes) APPLY=1; shift ;;
@@ -139,6 +151,12 @@ heading() { printf '\n%s\n' "$1"; }
 ok()   { echo "  ok    $1"; }
 warn() { echo "  warn  $1"; findings=$((findings + 1)); }
 note() { echo "        $1"; }
+
+# act: say it where the reader is, and again where the exit code is.
+# queue: only the second, for advice whose first copy is another program's.
+queue() { ACTIONS="${ACTIONS}$1
+"; }
+act()   { note "$1"; queue "$1"; }
 
 # `git checkout` rewrites files under this checkout, and one of them is this
 # script. Bash reads a script incrementally, so a switch performed halfway
@@ -334,6 +352,11 @@ run_doctor() {
   doctor_rc=0
   "${STANDARDS_DIR}/scripts/doctor.sh" --vault "${VAULT}" || doctor_rc=$?
   echo "  doctor exited ${doctor_rc}"
+  # A pointer rather than a copy: doctor prints its own remediation under each
+  # of its findings, and this script cannot read them back out of another
+  # program's stdout. Without this line the summary's action list would be
+  # silent about the half of the report doctor produced.
+  [ "${doctor_rc}" -eq 0 ] || queue "work through doctor's findings above — each names its own fix; re-run just those with $(say_remediation 'make doctor' "./scripts/doctor.sh --vault ${VAULT}")"
 }
 
 # Step 7: which onboarded repos are behind. Reports; never renders.
@@ -348,7 +371,7 @@ run_doctor() {
 # bookkeeping gap, not a reason to skip it. It is labelled in the same line,
 # since `render.py <repo>` closes both at once.
 report_repos() {
-  local file entries scan targets repo drift=0 live=0 stale=0 unreg=0 label rmode
+  local file entries scan targets repo drift=0 live=0 stale=0 unreg=0 label rmode line
   heading "Onboarded repos (render --check, nothing is rendered)"
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
@@ -404,11 +427,26 @@ ${repo}
     if [ ! -d "${repo}" ]; then
       stale=$((stale + 1))
       warn "registered, but not there: ${repo} — cannot be checked"
+      # Not `--unrender`: that needs the directory it is undoing a render in, so
+      # with the repo gone the line in the registry is all there is left to
+      # remove. Left there until someone says the repo is gone for good — an
+      # unmounted volume is not a deleted repo.
+      act "if ${repo} is gone for good, delete its line from ${file}"
       continue
     fi
     if ! sbw_registry_marker_present "${repo}"; then
       stale=$((stale + 1))
       warn "registered, but carries no rendered output: ${repo} — cannot be checked"
+      note "its rendered files are gone, so there is nothing to check it against."
+      # Both ways out, from lib/registry.sh so doctor and repos-check print the
+      # same two. Two findings' worth of actions for one repo, deliberately: the
+      # decision is which of them applies, and this script does not make it.
+      while IFS= read -r line; do
+        [ -n "${line}" ] || continue
+        act "${line}"
+      done <<EOF
+$(sbw_registry_stale_advice "${repo}")
+EOF
       continue
     fi
 
@@ -446,6 +484,10 @@ EOF
       echo "  ${drift} of ${live} checkable repo(s) need re-rendering, with the commands above."
     fi
     echo "  This script does not render: --check reports, you decide."
+    # One queued line for the whole set rather than one per repo: after a
+    # version switch every repo drifts, and a summary that reprints twelve
+    # render commands buries the findings that are not just "re-render".
+    queue "re-render the ${drift} repo(s) marked DRIFT above — each line names its own command"
   elif [ "${live}" -eq 0 ]; then
     # Nothing was checkable, and the two ways that happens do not read alike.
     # Guarded on the registry being empty, the way check_registry guards its
@@ -473,6 +515,7 @@ EOF
     findings=$((findings + 1))
     echo "  ${unreg} of those carr(ies) rendered output the registry does not name."
     echo "  Rendering each registers it; leave the ones you have abandoned."
+    queue "register the ${unreg} rendered repo(s) the registry does not name, above — or leave the abandoned ones"
   fi
 
   sbw_scan_say_scope
@@ -528,6 +571,7 @@ report_vault_pins() {
     ref="$(sed -n 's/^[[:space:]]*ENGINE_REF:[[:space:]]*\([^[:space:]]*\).*/\1/p' "${file}" | head -1)"
     if [ -z "${ref}" ]; then
       warn "${wf}.yml pins no ENGINE_REF — its checks run against whatever main is"
+      act "add ENGINE_REF: ${TARGET_REF} to ${file}"
       continue
     fi
     # A pin that is not a release tag is not "behind": it tracks a moving ref,
@@ -545,16 +589,46 @@ report_vault_pins() {
       eq) ok "${wf}.yml pins ${ref}, matching the target" ;;
       lt) warn "${wf}.yml pins ${ref}, behind the target ${TARGET_REF}"
           note "that workflow runs an older engine than this machine will."
-          note "edit ENGINE_REF in ${file} yourself — this script never writes to a vault." ;;
+          act "edit ENGINE_REF in ${file} to ${TARGET_REF} — this script never writes to a vault" ;;
       gt) warn "${wf}.yml pins ${ref}, ahead of the target ${TARGET_REF}"
-          note "the workflow would run an engine this machine does not have." ;;
+          note "the workflow would run an engine this machine does not have."
+          # No queued command: the two ways out are to upgrade this machine
+          # further or to lower the pin, and which is right depends on what the
+          # rest of the team's vault CI is running.
+          note "either target ${ref} here, or lower the pin — both are decisions, not repairs." ;;
     esac
   done
   [ "${found}" -eq 1 ] || echo "  none  no guard.yml or audit.yml in ${VAULT}/.github/workflows — skipped"
   return 0
 }
 
+# Every remediation this run printed, once more, under the exit code. Prints
+# nothing when the queue is empty — a clean run, and a refusal, which exits
+# before any check has run.
+#
+# Numbered for reference, and headed "What to do" rather than "everything to
+# do": doctor's half of the report is a pointer, and a repo whose rendered
+# output is gone contributes two lines of which exactly one applies.
+say_actions() {
+  local n=0 line
+  [ -n "${ACTIONS}" ] || return 0
+  echo
+  echo "  What to do:"
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    n=$((n + 1))
+    printf '    %d. %s\n' "${n}" "${line}"
+  done <<EOF
+${ACTIONS}
+EOF
+}
+
+# The verdict first, then the commands, then the exit. Structured as one rc
+# rather than four early exits so the action list cannot be skipped by whichever
+# branch happens to fire: the state that sent a reader here to ask what to do
+# was exit 1 with a finding and no command anywhere near it.
 summarise() {
+  local rc=0
   heading "Summary"
   if [ "${APPLY}" -eq 0 ]; then
     echo "  Preview only — nothing was changed."
@@ -562,18 +636,18 @@ summarise() {
   fi
   if [ "${undetermined}" -eq 1 ]; then
     echo "  Exit 3: the onboarded repo set is undetermined (above)."
-    exit 3
-  fi
-  if [ "${doctor_rc}" -ge 2 ]; then
+    rc=3
+  elif [ "${doctor_rc}" -ge 2 ]; then
     echo "  Exit 2: doctor reported a misconfiguration (above)."
-    exit 2
-  fi
-  if [ "${findings}" -gt 0 ] || [ "${doctor_rc}" -ne 0 ]; then
+    rc=2
+  elif [ "${findings}" -gt 0 ] || [ "${doctor_rc}" -ne 0 ]; then
     echo "  Exit 1: ${findings} finding(s) here, doctor exited ${doctor_rc}."
-    exit 1
+    rc=1
+  else
+    echo "  Nothing to act on."
   fi
-  echo "  Nothing to act on."
-  exit 0
+  [ "${rc}" -eq 0 ] || say_actions
+  exit "${rc}"
 }
 
 main() {

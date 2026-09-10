@@ -27,6 +27,14 @@ out_lacks() {
   TESTS_RUN=$((TESTS_RUN + 1))
   if grep -qF -- "$1" "${OUT}"; then fail "$2" "$(cat "${OUT}")"; else pass "$2"; fi
 }
+# For the one thing a fixed string cannot assert: that a line is numbered. The
+# number itself is not asserted — what is in the list before a given item
+# depends on what else the run found, and pinning it would make every new
+# finding rewrite these tests.
+out_matches() {
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if grep -qE -- "$1" "${OUT}"; then pass "$2"; else fail "$2" "$(cat "${OUT}")"; fi
+}
 
 # --- the fixture checkout ----------------------------------------------------
 FIX="${SANDBOX}/engine"
@@ -423,12 +431,49 @@ out_lacks "the registry names none" \
   "and never says the registry names none while it names two"
 out_has "all 2 registered path(s) are missing or no" \
   "saying instead that nothing could be checked, and why"
+# The remediation, and then the same remediation under the exit code. A reader
+# who scrolls to the verdict is the reader who most needs the command, and
+# `Exit 1: 1 finding(s)` used to be the last line of the run.
+out_has "if ${SANDBOX}/gone-one is gone for good, delete its line from" \
+  "a path that is gone names the one thing left to remove"
+out_lacks "unrender REPO=${SANDBOX}/gone-one" \
+  "and never unrender, which needs the directory it is undoing a render in"
+out_has "What to do:" "the summary repeats what to do"
+out_matches "^ +[0-9]+\. if .*gone-one is gone for good" \
+  "numbered, from the findings above"
 TESTS_RUN=$((TESTS_RUN + 1))
 if [ "${rc}" = "1" ]; then
   pass "it is a finding, so the run exits 1"
 else
   fail "it is a finding, so the run exits 1" "got ${rc}: $(cat "${OUT}")"
 fi
+
+# --- registered, present, and carrying no rendered output -------------------
+# Reported by upgrade, doctor and repos-check alike, and until now only doctor
+# said anything about what to do — so an upgrade ended `Exit 1: 1 finding(s)`
+# with no command anywhere in the run. Both ways out are printed because which
+# one applies is a decision about that repo: it may still want the rules, or it
+# may be one you are done with.
+UNRENDERED="${SANDBOX}/repo-emptied"
+make_target_repo "${UNRENDERED}"
+UNRENDERED_HOME="${SANDBOX}/unrendered-registry"
+mkdir -p "${UNRENDERED_HOME}/second-brain-workflow"
+real "${UNRENDERED}" > "${UNRENDERED_HOME}/second-brain-workflow/repos"
+( XDG_CONFIG_HOME="${UNRENDERED_HOME}" SBW_SCAN_ROOTS="${EMPTY_SCAN}" \
+  "${UPGRADE}" --no-fetch --vault "${VAULT}" --ref v0.9.1 >"${OUT}" 2>&1 )
+rc=$?
+out_has "registered, but carries no rendered output: $(real "${UNRENDERED}")" \
+  "a registered repo whose rendered files are gone is named"
+out_has "re-render it, if it still uses these rules: ${FIX}/scripts/render.py $(real "${UNRENDERED}")" \
+  "with the command that puts them back"
+out_has "or forget it, if it does not: ${FIX}/scripts/render.py --unrender $(real "${UNRENDERED}")" \
+  "and the command that retires the repo instead"
+out_has "(preview; --yes acts)" \
+  "in its preview form, since unrender deletes what a partial render left behind"
+out_has "What to do:" "and the summary carries both, under the exit code"
+out_matches "^ +[0-9]+\. re-render it" "as a numbered list of what this run found"
+out_matches "^ +[0-9]+\. or forget it" "carrying the second way out as its own item"
+assert_exit 1 "${rc}" "the state is a finding, so the run exits 1"
 
 # --- an unregistered repo is drift-checked like any other -------------------
 echo "tampered by hand" >> "${UNREG}/.claude/rules/frontend-angular.md"

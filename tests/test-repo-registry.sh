@@ -184,6 +184,13 @@ rm -f "${STRIPPED}/.sbw-version" "${STRIPPED}/AGENTS.md" "${STRIPPED}/CLAUDE.md"
 "${DOCTOR}" --vault "${VAULT}" >"${OUT}" 2>&1 || true
 out_has "carries no rendered output any more" "doctor reports a repo whose rendered output is gone"
 out_has "$(real "${SANDBOX}")/stripped-repo" "and names it"
+# Both ways out, from lib/registry.sh so upgrade and repos-check print the same
+# two. What was here before said "delete its line from <registry>", which
+# predates --unrender and leaves behind whatever else the render put there.
+out_has "re-render it, if it still uses these rules" \
+  "offering the command that puts the rendered output back"
+out_has "or forget it, if it does not" "and the one that retires the repo instead"
+out_has "(preview" "in its preview form — unrender deletes files in a repo we do not own"
 
 # --- doctor: all present ----------------------------------------------------
 CLEAN_HOME="${SANDBOX}/clean-config-home"

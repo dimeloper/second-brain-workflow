@@ -8,6 +8,7 @@
 #   sbw_registry_excluded DIR         # does DIR carry our .git/info/exclude block?
 #   sbw_registry_mode_effective DIR   # recorded mode, else inferred, else unknown
 #   sbw_registry_marker_present DIR   # does DIR still carry rendered output?
+#   sbw_registry_stale_advice DIR     # the two ways out, one per line
 #   sbw_scan_rendered_repos           # which repos on this machine do, found
 #   sbw_scan_scope_line               # ...and the boundary that answer holds in
 #
@@ -27,6 +28,14 @@
 # the machine config file (that parser does not strip trailing comments, and
 # this is a list, not key/value), and deliberately not redirected by
 # SBW_CONFIG_FILE, which names the config file rather than a config directory.
+
+# sbw_registry_stale_advice prints a command, so it needs to know whether the
+# reader typed `make` — the same rule every other remediation here follows, kept
+# in one place rather than re-derived from MAKELEVEL a fourth time. Sourced by
+# path the way resolve-vault.sh sources config.sh; re-sourcing it in a caller
+# that already has it only redefines the same two functions.
+# shellcheck source=scripts/lib/invocation.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/invocation.sh"
 
 sbw_registry_path() {
   local base="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -159,6 +168,33 @@ sbw_registry_marker_present() {
     grep -qF "${SBW_RENDER_MARKER}" "${repo}/${f}" 2>/dev/null && return 0
   done
   return 1
+}
+
+# What to do about an entry whose rendered output is gone — as lines of advice,
+# unprefixed, for the caller to print in its own layout.
+#
+# One state, three reporters: doctor, upgrade step 7, and repos-check. Only
+# doctor said anything about it, and what it said predates `--unrender` — "delete
+# its line" does one half of the job and leaves the other half (the exclusion
+# block, if the repo was rendered --local) behind. The other two named the state
+# and stopped, which is how a reader ends up with a warning, an exit 1, and no
+# command to run.
+#
+# Two lines, because this is a decision and not a repair: whether that repo
+# should still carry your conventions is not something a check can answer, and
+# both answers are legitimate. Nothing here acts on either.
+sbw_registry_stale_advice() {
+  local repo="$1" engine
+  engine="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  printf 're-render it, if it still uses these rules: %s/scripts/render.py %s\n' \
+    "${engine}" "${repo}"
+  # The preview form, not the acting one. The rendered *output* is gone, but a
+  # rule file left under .cursor/rules or a --local exclusion block may not be,
+  # and unrender deletes what it finds — so the command handed to a reader is
+  # the one that shows them first.
+  printf 'or forget it, if it does not: %s\n' \
+    "$(say_remediation "make unrender REPO=${repo}   (preview; YES=1 acts)" \
+                       "${engine}/scripts/render.py --unrender ${repo}   (preview; --yes acts)")"
 }
 
 # --- the second source ------------------------------------------------------

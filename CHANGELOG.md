@@ -17,6 +17,42 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **A non-zero `make upgrade` ends with `What to do:`** — every remediation the
+  run printed, numbered, repeated under the exit code. A finding is often forty
+  lines above the verdict, and the reader who scrolled to `Exit 1: 1 finding(s)`
+  is the one who most needs the command. Each line is queued from the same
+  string printed under its finding, so the two copies cannot drift; `doctor`'s
+  findings appear as a pointer to its block rather than a copy, since `upgrade`
+  runs it as a separate program and prints its output verbatim.
+
+  A vault `ENGINE_REF` that is behind, or missing entirely, now names the edit
+  that fixes it. One that is *ahead* still does not: targeting it here and
+  lowering the pin are both legitimate, and which is right depends on what the
+  rest of the team's vault CI runs.
+
+### Fixed
+- **`registered, but carries no rendered output` now says what to do about it.**
+  Three checks report that state — `doctor`, `upgrade` step 7, `repos-check` —
+  and only `doctor` said anything, offering a hand-edit of the registry that
+  predates `--unrender` and does half the job: it leaves a `--local` repo's
+  exclusion block, and any rule file a partial render left behind, in place. The
+  other two named the state and stopped, which is how an upgrade ends non-zero
+  with no command anywhere in the run.
+
+  All three now print the same two lines, from one function in
+  `lib/registry.sh`: re-render it, if that repo still uses these rules, or
+  unrender it, if it does not. Two, because it is a decision rather than a
+  repair — both answers are legitimate and nothing here picks one. The unrender
+  form is the **preview** command, since what it deletes is whatever the
+  half-gone render left.
+
+  A registered path that is *gone from disk* is unchanged in substance and
+  clearer in wording: `--unrender` needs the directory it is undoing a render
+  in, so the registry line is all there is left to delete — and it stays until
+  someone says the repo is gone for good, because an unmounted volume is not a
+  deleted repo.
+
 ## [0.52.0] - 2026-09-09
 
 ### Added
