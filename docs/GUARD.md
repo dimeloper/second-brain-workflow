@@ -357,8 +357,10 @@ a variable argument, so `VAULT=~/vaults/...` stats nothing.
   scan of this machine for repos carrying rendered output, because the registry
   alone only knows what a render told it. Registered repos that are gone or no
   longer rendered are named and never pruned (a repo on an unmounted volume is
-  not a deleted repo); repos that are rendered but *not* registered are named
-  with the command that registers each. Every report states the scan's scope —
+  not a deleted repo) — one that is still there carries both ways out, re-render
+  or [unrender](REFERENCE.md#unrendering-a-repo), because which applies is a
+  decision about that repo; repos that are rendered but *not* registered are
+  named with the command that registers each. Every report states the scan's scope —
   `roots=… depth=…`, on clean runs too — because a scan cannot claim
   completeness, and *undetermined* now means only that no configured root could
   be read. See the reference's [repo registry](REFERENCE.md#the-repo-registry)

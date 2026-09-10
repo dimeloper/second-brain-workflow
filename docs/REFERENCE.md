@@ -1231,7 +1231,12 @@ output (a `.sbw-version`, or the provenance marker in `AGENTS.md` / `CLAUDE.md` 
 the same rule every other registry check uses) and compares the two sets:
 
 - **Registered, but gone or no longer rendered** — named, never pruned. A repo on
-  an unmounted volume is not a deleted repo.
+  an unmounted volume is not a deleted repo. A repo that is *there* but no longer
+  carries rendered output is reported with both ways out — re-render it, or
+  [unrender it](#unrendering-a-repo) to retire it — because which one applies is a
+  decision about that repo. One that is gone from disk gets neither: `--unrender`
+  needs the directory it is undoing a render in, so its registry line is all
+  there is left to delete.
 - **Rendered, but not registered** — named, with `./scripts/render.py <repo>` to
   register it, or leave it if that repo is abandoned. Nothing adopts it for you.
 
@@ -1494,6 +1499,14 @@ it plainly.
 
 It never renders, commits, pushes, or writes to a vault. `--check` reports and you
 decide; a stale `ENGINE_REF` is named, not edited.
+
+A non-zero run ends with **`What to do:`** — every remediation the run printed,
+numbered, repeated under the exit code. The finding is often forty lines above
+the verdict, and the reader who scrolled to `Exit 1` is the one who most needs
+the command. It is queued from the same string printed under each finding, so the
+two copies cannot disagree; `doctor`'s own findings appear there as a pointer to
+its block rather than a copy, since `upgrade` runs it as a separate program and
+prints its output verbatim.
 
 `make upgrade REF=v0.9.0` targets a specific tag instead of the newest, and
 `NO_FETCH=1` skips contacting the remote. Exit codes: `0` nothing to act on, `1`

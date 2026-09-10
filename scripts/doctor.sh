@@ -475,8 +475,12 @@ EOF
         Delete the line yourself once you know it is gone."
     elif ! sbw_registry_marker_present "${repo}"; then
       stale=$((stale + 1))
+      # The advice lives in lib/registry.sh, next to the check that produces
+      # this state, because upgrade and repos-check report it too. What used to
+      # be here — "delete its line from ${file}" — predates --unrender and did
+      # half the job: it left a --local repo's exclusion block behind.
       warn "registered repo carries no rendered output any more: ${repo}
-        re-render it, or delete its line from ${file}."
+$(sbw_registry_stale_advice "${repo}" | sed 's/^/        /')"
     else
       registered=$((registered + 1))
     fi

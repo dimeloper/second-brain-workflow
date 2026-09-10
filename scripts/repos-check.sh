@@ -95,11 +95,18 @@ ${repo}
   if [ ! -d "${repo}" ]; then
     stale=$((stale + 1))
     echo "  warn  registered, but not there: ${repo} — cannot be checked"
+    # Not `--unrender`: it undoes a render inside a directory, and there is no
+    # directory. The line stays until someone says the repo is gone for good —
+    # an unmounted volume is not a deleted repo.
+    echo "        if it is gone for good, delete its line from $(sbw_registry_path)"
     continue
   fi
   if ! sbw_registry_marker_present "${repo}"; then
     stale=$((stale + 1))
     echo "  warn  registered, but carries no rendered output: ${repo} — cannot be checked"
+    # The same two lines doctor and upgrade print, from lib/registry.sh. Naming
+    # the state and stopping is what left a reader with a warning and no command.
+    sbw_registry_stale_advice "${repo}" | sed 's/^/        /'
     continue
   fi
 

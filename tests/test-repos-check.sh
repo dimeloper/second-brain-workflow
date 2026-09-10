@@ -133,6 +133,27 @@ run_check
 rc_is 0 "an unreachable path is a warning, not drift"
 out_has "registered, but not there" "and it is named"
 out_lacks "up to date" "and nothing is claimed to be current"
+out_has "if it is gone for good, delete its line from" \
+  "with the one thing left to remove once a repo is gone from disk"
+out_lacks "unrender" "and never unrender, which has no directory left to work in"
+
+# --- a registered path that is there, and no longer rendered -----------------
+# The other half of the same state, and the one a reader is most likely to hit:
+# the repo is fine, its rendered output is not. Both ways out are printed
+# because which applies is a decision about that repo, and this script decides
+# nothing.
+STRIPPED="${SANDBOX}/repo-stripped"
+make_target_repo "${STRIPPED}"
+render "${STRIPPED}" >/dev/null 2>&1
+rm -f "${STRIPPED}/.sbw-version" "${STRIPPED}/AGENTS.md" "${STRIPPED}/CLAUDE.md"
+printf '%s\n' "$(real "${STRIPPED}")" > "${REGISTRY}"
+run_check
+rc_is 0 "an entry that carries no rendered output is a warning, not drift"
+out_has "registered, but carries no rendered output: $(real "${STRIPPED}")" "and it is named"
+out_has "re-render it, if it still uses these rules: ${ENGINE}/scripts/render.py $(real "${STRIPPED}")" \
+  "with the command that puts the rendered output back"
+out_has "or forget it, if it does not" "and the one that retires the repo instead"
+out_has "(preview" "in its preview form — unrender deletes files in a repo we do not own"
 
 # --- a repo whose rule files resolve to nothing ------------------------------
 # The one case that needs the scan, so it does not use run_check. Not drift: the
