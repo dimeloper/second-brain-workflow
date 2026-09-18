@@ -24,6 +24,22 @@ the total is unchanged, the counts say how many exist, and anything flagged
 `blocked` or `credential` is listed in full whatever repo it belongs to, because
 that kind of urgency has nothing to do with where you happen to be standing.
 
+**It is the default under --recent**, and was opt-in for four releases. Every
+reader of that window is standing in a repo and asking about it; leaving the
+collapse to a flag meant the common case printed thirteen fully-described items
+from three other repos unless somebody remembered the flag, and "focus on this
+repo" became a thing to ask for twice. `--full` is the way back to every item,
+and the long-range --stale-days audit still defaults to it — that one is a
+sweep, and it runs on a machine with no repo to be relative to.
+
+A report of what is open is not, on its own, an answer to "so what do I do now".
+So a repo-scoped run ends with **Next**: at most four lines, naming a blocker to
+clear, work the repo says already landed and should be confirmed, the oldest
+item still open here, and how many have been open long enough to be worth
+re-deciding. Each line points at an item by *date*, never by repeating its
+text — "every item appears exactly once" is what makes this report readable,
+and a suggestion block that re-lists items is the easiest way to break it.
+
 A ticked item carrying `#outcome/dropped` or `#outcome/handed-off` is reported
 too, in a bucket of its own. "Done" and "abandoned" look identical once ticked
 and lead to opposite actions when the question comes back: one is finished work
@@ -35,7 +51,7 @@ for.
 Usage:
   check-followups.py [--vault PATH] [--stale-days N | --recent [N]]
                      [--as-of YYYY-MM-DD] [--repo NAME | --no-repo-grouping]
-                     [--brief]
+                     [--brief | --full]
 
 Read-only. Never writes to the vault. Stdlib only.
 """
@@ -176,12 +192,18 @@ def outcome_mark(s):
     return f"[{outcome}] "
 
 
+def days(n):
+    """"4 days" / "1 day". A report that says "1 days open" reads as a bug in
+    the thing reporting it, which is a poor advertisement for its arithmetic."""
+    return f"{n} day" if n == 1 else f"{n} days"
+
+
 def line_for(s):
     # The flag is a marker in place, never a second listing of the same item —
     # the contract is that every item appears exactly once, and a "blockers
     # first" section that then re-lists them under their repo breaks it.
     mark = outcome_mark(s) + (f"[{s['flag']}] " if s.get("flag") else "")
-    return f"  - {s['date'].isoformat()} ({s['age']} days open): {mark}{display(s['item'])}"
+    return f"  - {s['date'].isoformat()} ({days(s['age'])} open): {mark}{display(s['item'])}"
 
 
 def lines_for(s, note=None, show_repo=False):
@@ -344,6 +366,74 @@ def check_landed(threads, only_repo=None):
     return footers
 
 
+# Past this, "is it still worth doing" is a real question rather than a nag.
+# Three weeks is two restatements' worth of carrying something forward in this
+# vault's own notes — long enough that the answer is sometimes `#outcome/dropped`.
+RECONSIDER_DAYS = 21
+
+
+def next_actions(repo, groups, done, unres):
+    """What to do next in the repo the reader is standing in, at most four lines.
+
+    A report of what is open does not answer "so what do I do now", and the
+    answer was being reconstructed by hand from a list every time. It is derived
+    from what the report already computed — nothing here reads the vault again.
+
+    **Actions, not a second listing.** Each line points at an item shown above,
+    by date, and never repeats a bucket. A "blockers first" section followed by
+    the same items under their repos is the shape that broke the
+    appears-exactly-once contract in practice, and a suggestions block is the
+    easiest place to break it again.
+
+    Empty when there is no repo to be relative to: an instruction about "here"
+    needs a here.
+    """
+    if not repo:
+        return []
+    mine = list(groups[0])
+    mine_done = [t for t, _ in done if t.get("repo") == repo]
+    mine_unres = [t for t, _ in unres if t.get("repo") == repo]
+
+    steps = []
+    flagged = [t for t, _ in mine if t.get("flag")]
+    if flagged:
+        first = flagged[0]
+        steps.append(f"Clear the {first['flag']} item above, from "
+                     f"{first['date'].isoformat()}, before anything else.")
+    if mine_done:
+        steps.append(f"Confirm the {len(mine_done)} item(s) above that this repo "
+                     "says already landed, then tick each with its outcome — "
+                     "the evidence is about the ref, not about the whole item.")
+    # mine is oldest-first, and the oldest open thing is the one that has been
+    # carried longest — not the one most recently written down.
+    nxt = next((t for t, _ in mine if not t.get("flag")), None)
+    if nxt:
+        # By date, never by text. Repeating the item here would put it in the
+        # report twice, which is the one thing this report promises not to do —
+        # and a grep for an item's words would then find two hits for one task,
+        # which is exactly how a reader concludes a thread was not collapsed.
+        steps.append("Take the oldest one still open here: the "
+                     f"{nxt['date'].isoformat()} item above, {days(nxt['age'])} old.")
+    reconsider = [t for t, _ in mine if t["age"] > RECONSIDER_DAYS]
+    if reconsider:
+        steps.append(f"{len(reconsider)} item(s) here have been open more than "
+                     f"{days(RECONSIDER_DAYS)}. Ask whether each is still worth "
+                     "doing; closing one with #outcome/dropped is a real answer.")
+    if mine_unres:
+        steps.append(f"{len(mine_unres)} item(s) here were closed without being "
+                     "finished — dropped, or somebody else's now. Decide whether "
+                     "that is still the right state.")
+    # Nothing to suggest is not a heading with an apology under it: the report
+    # above already says this repo has nothing open, and the counts for the
+    # other repos are on the line right before this would print.
+    if not steps:
+        return []
+
+    lines = ["", f"Next, in `{repo}` — actions, not a second listing"]
+    lines.extend(f"  {i}. {step}" for i, step in enumerate(steps[:4], 1))
+    return lines
+
+
 def basis_suffix(note):
     """How the item got attributed — the repo when it isn't obvious, the guess
     when it was one, and nothing at all when neither adds anything.
@@ -398,7 +488,7 @@ def done_block(done):
 
 
 def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
-                 footers=()):
+                 footers=(), actions=()):
     """This repo in full; every other repo as a count. Nothing dropped.
 
     The asymmetry is the point: run from a repo, the items you can act on now are
@@ -412,7 +502,7 @@ def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
     mine, elsewhere, unknown = groups
     lines = [f"second-brain-workflow follow-ups audit — vault: {vault}", "", header]
     lines.append(f"Brief: `{repo}` (from {basis}) in full, other repos as counts. "
-                 "Nothing is filtered — run without --brief for every item.")
+                 "Nothing is filtered — --full lists every item.")
 
     lines.extend(done_block(done))
     # Above the count-collapsed groups for the same reason a blocker is: what a
@@ -441,6 +531,7 @@ def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
         lines.append("  " + " · ".join(f"{name} {n}" for name, n in
                                        elsewhere_tally(elsewhere, unknown)))
     lines.extend(footers)
+    lines.extend(actions)
     return "\n".join(lines)
 
 
@@ -459,7 +550,7 @@ def total_phrase(threads):
 
 
 def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
-           window=None, brief=False, done=(), unres=(), footers=()):
+           window=None, brief=False, done=(), unres=(), footers=(), actions=()):
     """The audit as text. Oldest first, and grouped by repo when we know one.
 
     The count line comes before any grouping and counts everything, so the
@@ -487,11 +578,12 @@ def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
         for s in stale:
             lines.extend(lines_for(s, show_repo=True))
         lines.extend(footers)
+        lines.extend(actions)
         return "\n".join(lines)
 
     if brief:
         return brief_report(stale, vault, lines[-1], repo, basis, groups, done,
-                            unres, footers)
+                            unres, footers, actions)
 
     mine, elsewhere, unknown = groups
     lines.append(f"Grouped by repo. This repo is `{repo}` (from {basis}); "
@@ -509,6 +601,7 @@ def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
         for s, note in bucket:
             lines.extend(lines_for(s, note, show_repo))
     lines.extend(footers)
+    lines.extend(actions)
     return "\n".join(lines)
 
 
@@ -525,7 +618,13 @@ def main():
     ap.add_argument("--brief", action="store_true",
                     help="this repo's items in full, every other repo as a count. "
                          "Anything flagged blocked or credential is still shown in "
-                         "full whatever repo it is in. Nothing is filtered.")
+                         "full whatever repo it is in. Nothing is filtered. This "
+                         "is the default with --recent; pass it to collapse the "
+                         "long-range audit the same way.")
+    ap.add_argument("--full", action="store_true",
+                    help="every item in every repo, instead of collapsing the "
+                         "other repos to counts. The default for the --stale-days "
+                         "audit, which is a sweep rather than a to-do list.")
     ap.add_argument("--no-threads", action="store_true",
                     help="report every restatement of a carried-forward item "
                          "separately, instead of collapsing them into one thread "
@@ -556,6 +655,11 @@ def main():
     # list under a heading promising brevity.
     if args.brief and args.no_repo_grouping:
         ap.error("--brief and --no-repo-grouping are opposites; pick one")
+    if args.brief and args.full:
+        ap.error("--brief and --full are opposites; pick one")
+    if args.full and args.no_repo_grouping:
+        ap.error("--full lists every repo's items under its own heading, which "
+                 "--no-repo-grouping refuses to do; pick one")
     if args.landed and args.no_landed:
         ap.error("--landed and --no-landed are opposites; pick one")
 
@@ -628,6 +732,12 @@ def main():
                             "whether the work was done, dropped, superseded or "
                             "handed off."])
 
+    # Brief by default for the skill's window, because every reader of it is
+    # standing in a repo and asking about that repo. The long-range audit keeps
+    # the full list: it is a sweep, and it usually runs where there is no repo.
+    brief = args.brief or (args.recent is not None and not args.full
+                           and not args.no_repo_grouping)
+
     done, unres = (), ()
     if repo:
         groups = group_for_repo(stale, repo, known, repo_files,
@@ -642,10 +752,20 @@ def main():
         if args.brief:
             print("note: --brief needs a repo to be brief relative to; "
                   "showing every item.", file=sys.stderr)
+        elif args.recent is not None:
+            print("note: not in a repo, so there is nothing to collapse against "
+                  "or to suggest next — every item is listed.", file=sys.stderr)
+
+    # The skill's window only. The long-range audit is a sweep — it runs from
+    # `make audit` and from a vault's CI, where "what should I do next in this
+    # repo" is a question nobody asked and the answer would be printed into a
+    # report nobody is standing in a repo to read.
+    actions = (next_actions(repo, groups, done, unres)
+               if groups and args.recent is not None else [])
 
     print(report(stale, vault, args.stale_days, repo, basis, groups, window,
-                 brief=args.brief and groups is not None, done=done, unres=unres,
-                 footers=footers))
+                 brief=brief and groups is not None, done=done, unres=unres,
+                 footers=footers, actions=actions))
     return 0
 
 

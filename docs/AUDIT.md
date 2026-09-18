@@ -190,8 +190,14 @@ current repo, then the note's `## Built` context.
 ./scripts/check-followups.py --repo acme-backend          # group as another repo
 ./scripts/check-followups.py --no-repo-grouping           # one flat list
 ./scripts/check-followups.py --recent                     # the skill's window instead
-./scripts/check-followups.py --recent --brief             # this repo in full, others tallied
+./scripts/check-followups.py --recent --full              # ...with every repo's items
+./scripts/check-followups.py --brief                      # collapse the audit too
 ```
+
+`--recent` is brief by default — this repo in full, every other repo as a count,
+and a short **Next** block naming what to do here. The long-range audit above is
+not: it is a sweep, it usually runs where there is no repo to be relative to,
+and `make audit`'s output is unchanged by that default.
 
 An item carried forward by hand — rewritten into a later note because it is
 still open, and reworded on the way — is reported once, as a **thread**: dated

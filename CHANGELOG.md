@@ -72,6 +72,36 @@ write release notes, not two to keep in sync by hand.
   three copies of the provenance marker are the same string.
 
 ### Changed
+- **`check-followups.py --recent` is repo-first by default.** This repo's items
+  in full, every other repo as a count — the shape `--brief` produced, now the
+  behaviour of the window itself. Every reader of that window is standing in a
+  repo and asking about that repo; leaving the collapse to a flag meant the
+  common case printed thirteen fully-described items from three other repos
+  whenever the flag was forgotten, and the focus had to be asked for a second
+  time. `--full` lists every repo's items, `--brief` still works and now also
+  collapses the long-range audit, and the two together are refused rather than
+  resolved.
+
+  **The `--stale-days` audit is unchanged**, so `make audit` and a vault's CI
+  print exactly what they did: that one is a sweep, and it usually runs where
+  there is no repo to be relative to.
+
+- **A repo-scoped `--recent` run ends with `Next`** — at most four lines,
+  computed from what the report already knows: a blocker to clear first, work
+  the repo says already landed and should be confirmed, the oldest item still
+  open here, and how many have been open past three weeks and are worth
+  re-deciding (closing one `#outcome/dropped` is a real answer). A list of what
+  is open does not answer "so what do I do now", and that was being
+  reconstructed by hand every time.
+
+  Each line points at an item **by date, never by repeating its text**. Every
+  item appearing exactly once is what makes this report readable, and a
+  suggestions block that re-lists items is the easiest way to break it — the
+  same defect as the "blockers first" section that broke it before. Nothing is
+  ticked: the landed line says *confirm*, because the evidence is about the ref
+  and the item usually says more than the ref does. Absent when there is
+  nothing to suggest, when there is no repo, and in the audit.
+
 - `lib/followups.py` reads any of a daily note's list sections, not only
   `## Follow-ups` — `section_items`, `labelled_sections` and `heading_repo` are
   new; `collect_spans` takes an optional heading and is otherwise unchanged. One

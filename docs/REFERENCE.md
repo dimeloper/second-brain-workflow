@@ -119,7 +119,7 @@ Five skills own the vault, and the read/write split is deliberate:
 |-------|------|
 | `obsidian-knowledge-base` | **read only** — load this repo's project context, find applicable notes, score work against them |
 | `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
-| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first, plus anything closed without being finished |
+| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's in full and every other repo as a count, plus anything closed without being finished, ending with what to do next here |
 | `recent-work` | **read only** — what the same notes say was *achieved*: `## Built` bullets and the ticks that closed, this repo's first |
 | `extract-product-context` | **read only** — draft a project's `context/` from a product repo's own files, tier by tier, rather than from memory or marketing copy |
 
@@ -129,6 +129,16 @@ recently** for the other half of the same window. "Recent" is
 deliberately narrow — a commitment that fell out of that window is `make audit`'s
 job instead (via `check-followups.py`), part of the [Review loop](#review-loop),
 not a skill.
+
+Both are **repo-first by default**: run from a repo, each prints that repo's
+items in full and collapses the others to a count line, with `--full` the way to
+everything. That is a layout and never a filter — the total is stated before any
+grouping, and a blocker or a live credential is listed in full whatever repo it
+belongs to. `check-follow-ups` then closes with a short **Next** block: the
+blocker to clear, work the repo says already landed and should be confirmed, the
+oldest item still open here, and how many have been open past three weeks. Each
+line points at an item by date rather than repeating it, because every item
+appearing exactly once is what makes the report readable.
 
 `check-follow-ups` and `recent-work` read the same notes and must not be
 collapsed into one report: a list of what you finished handed back alongside a

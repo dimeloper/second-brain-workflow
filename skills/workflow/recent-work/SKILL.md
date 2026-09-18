@@ -118,7 +118,7 @@ honest:
 5. **Do not pad.** Two items is a two-item summary. Inventing a narrative arc
    over a quiet week is how a record stops being trusted.
 6. **Never tick anything.** If the conversation establishes that an open item is
-   actually done, that write belongs to `check-follow-ups` step 6 or
+   actually done, that write belongs to `check-follow-ups` step 7 or
    `update-second-brain` — with an outcome, through the appender.
 
 ## Where it stands now is a different question
