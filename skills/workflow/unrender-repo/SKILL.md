@@ -69,6 +69,20 @@ Re-onboarding is just a render: `render.py "<TARGET>"`. Nothing about
 unrendering is destructive to the repo's own history — every file it removes is
 one the engine generated and can generate again.
 
+**A retired repo reads as never-onboarded, so a wrap-up there will offer to
+onboard it.** That is correct for a repo you unrendered to re-render cleanly,
+and wrong for one you are walking away from. If the user is retiring it for
+good, record the decision in the same breath:
+
+```bash
+~/second-brain-workflow/scripts/onboarding-state.py --repo "<TARGET>" \
+  --decline --reason 'retired, not coming back'
+```
+
+Ask which of the two it is when it is not obvious from what they said; it is
+one short question, and the alternative is `update-second-brain` re-offering
+something they just deliberately undid.
+
 Report to the user what was removed and that the repo is no longer tracked.
 Do not offer to delete the repo directory; that is theirs to do.
 

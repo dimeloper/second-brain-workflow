@@ -145,7 +145,8 @@ EOF
 echo "Removed ${removed} link(s). ${kept} entr(ies) left alone."
 echo
 echo "Not removed, by design: your vault(s), $(ds_config_path),"
-echo "the repo registry ($(sbw_registry_path)), and rendered"
+echo "the repo registry ($(sbw_registry_path)), the never-ask list"
+echo "($(sbw_declined_path)), and rendered"
 echo "rules in any repo you onboarded (.cursor/rules, .claude/rules, AGENTS.md,"
 echo "CLAUDE.md, .sbw-version — delete those per repo if you want them gone)."
 echo "A repo rendered with --local also has a marked block in its"

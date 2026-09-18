@@ -36,6 +36,9 @@ help:
 	@echo "make project-for REPO=... the vault's context for this repo's initiative"
 	@echo "make context-sources REPO=... where a repo states its own audience, voice and brand"
 	@echo "make project-candidates  which long-running initiatives the daily notes evidence"
+	@echo "make recent-work         what the recent daily notes say was achieved, this repo first"
+	@echo "                         REPO=... for another repo, NOTES=n / SINCE=YYYY-MM-DD for the window"
+	@echo "make onboarding-state REPO=... is that repo onboarded, and was the question already answered"
 	@echo "make uninstall           preview removing them; make uninstall YES=1 to act"
 	@echo "make upgrade             preview switching to the newest release; YES=1 to act"
 	@echo "make adopt               preview turning on the opt-in features; YES=1 to act"
@@ -101,6 +104,7 @@ lint-python:
 	  scripts/lib/followups.py scripts/lib/followup_threads.py scripts/lib/landed.py \
 	  scripts/project-candidates.py scripts/project-for.py scripts/lib/projects.py \
   scripts/check-markdown.py scripts/lib/markdown.py scripts/context-sources.py \
+	  scripts/recent-work.py scripts/onboarding-state.py scripts/lib/onboarding.py \
 	  && echo "python syntax OK"
 
 # Tests run entirely against fixtures in $$TMPDIR. They must never touch a real
@@ -237,6 +241,23 @@ context-sources:
 project-candidates:
 	@./scripts/project-candidates.py --vault "$(VAULT)" \
 	  $(if $(NOTES),--notes $(NOTES),) $(if $(ALL),--all,)
+
+# What the recent daily notes say was achieved — the read side's other half.
+# check-followups.py answers "what is still open"; this answers "what got done",
+# from the same notes and with the same attribution. Read-only, and it never
+# ticks anything: closing an item is a write, and writes go through
+# update-second-brain.
+recent-work:
+	@./scripts/recent-work.py --vault "$(VAULT)" \
+	  $(if $(REPO),--repo "$(REPO)",) $(if $(NOTES),--recent $(NOTES),) \
+	  $(if $(SINCE),--since $(SINCE),) $(if $(FULL),--full,)
+
+# Has this machine rendered into that repo, and if not, was that on purpose?
+# The question update-second-brain asks before offering to onboard a repo it is
+# wrapping up in. Reports; renders nothing, and writes only with --decline /
+# --undecline. Exit 1 means "not onboarded", which is a question and not a fault.
+onboarding-state:
+	@./scripts/onboarding-state.py $(if $(REPO),--repo "$(REPO)",) $(if $(LIST),--list,)
 
 # The gate the release practice was missing. Deliberately NOT part of `make
 # check`: this one reads the network and asks about a specific commit, and it is

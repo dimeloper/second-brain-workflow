@@ -42,6 +42,14 @@ sbw_registry_path() {
   echo "${base}/second-brain-workflow/repos"
 }
 
+# The sibling list: repos this machine deliberately did *not* onboard, so a
+# wrap-up stops offering. Written and read by scripts/lib/onboarding.py; named
+# here so a shell consumer can print the path without spelling it a second time.
+sbw_declined_path() {
+  local base="${XDG_CONFIG_HOME:-$HOME/.config}"
+  echo "${base}/second-brain-workflow/onboard-declined"
+}
+
 # Whole entries, fields and all. Blank lines and comments are stripped, so a
 # hand-seeded file can be annotated.
 sbw_registry_read_entries() {

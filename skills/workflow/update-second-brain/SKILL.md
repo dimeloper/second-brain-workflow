@@ -111,6 +111,20 @@ Strongest evidence first:
 Identify the working repo's slug (e.g. `acme-backend`, `globex-web`)
 — it is the provenance key for every practice observation.
 
+**Then ask this machine whether that repo is onboarded at all.** Read-only, one
+command, and it answers from all three places the answer hides — the repo
+registry, a `.sbw-version` or provenance marker in the repo, and the never-ask
+list:
+
+```bash
+~/second-brain-workflow/scripts/onboarding-state.py --repo "$PWD"
+```
+
+Exit 1 means not onboarded. **Note it and carry on** — the question belongs in
+Step 5b, after the capture has shipped. Every other exit is silence: 0 is
+onboarded, deliberately declined, or a target this never had (the engine
+checkout, a vault), and 3 is a path it cannot read.
+
 ## Step 2 — Load vault conventions
 
 If you are Claude Code and have a memory file for the vault
@@ -490,6 +504,57 @@ Practice notes are a second commit, after approval. Two commits per wrap-up is
 the intended shape, not a defect: the capture is a fact and does not need
 approval, and the promotion is a proposal and does.
 
+## Step 5b — If the repo is not onboarded, ask once
+
+Only when Step 1 came back `not-onboarded`. Skip this step entirely otherwise,
+and say nothing about it — `onboarded`, `declined` and `skip` are all settled
+answers, and re-raising a settled answer at the end of every session is how a
+prompt becomes something people learn to dismiss without reading.
+
+**Why here, after the capture has been pushed.** A question is a place a session
+can stop. Put this before Step 5 and a wrap-up that goes unanswered leaves the
+daily note uncommitted — the exact failure Step 5 exists to prevent, reintroduced
+by a prompt about something else entirely.
+
+**Why ask at all.** You are standing in the one place that knows: a repo with no
+rendered output is a repo whose sessions load none of these rules, and nothing
+else on the machine is in a position to notice. `make doctor` reports repos it
+already knows about; a repo it has never heard of is invisible to it by
+construction.
+
+Ask in one short message, with four answers and no default:
+
+1. **Shared** — `render.py <repo>`. The rendered files are committed like any
+   other file in that repo.
+2. **Quiet** — `render.py <repo> --local`. Same files, added to
+   `.git/info/exclude`, so they work in your sessions and the remote never sees
+   them. This is the right answer for a repo that is not yours: a client's, a
+   team's that has not adopted these, an upstream you contribute to.
+3. **Not now** — record nothing. The next wrap-up here asks again.
+4. **Never for this repo** — records the decision on this machine, so nothing
+   asks again:
+
+   ```bash
+   ~/second-brain-workflow/scripts/onboarding-state.py --repo "$PWD" \
+     --decline --reason 'not mine to add conventions to'
+   ```
+
+   The reason is optional and is the half worth writing: six months later it is
+   the difference between a decision and a repo somebody has to re-argue.
+   `--undecline` puts it back in scope, and `--list` shows what is on the list.
+
+**Do not pick one.** Shared and quiet differ in *who else ends up seeing these
+files*, which is not a detail to guess at on someone's behalf — and a wrap-up
+that rendered into a repo unasked would be writing to the working repo, which
+nothing else in this skill does.
+
+If the answer is shared or quiet, **follow the `onboard-repo` skill** rather than
+running the render alone: it also writes the onboarding rule, infers the stack,
+and wires project-scoped MCP. Its daily-note bullet goes in through the appender
+like every other write here, and rides along in the Step 8 commit — the capture
+of Step 5 has already gone out, and reopening it would mean amending a pushed
+commit to record something that happened after it.
+
 ## Step 6 — Propose practice-note changes (approval required)
 
 Derive candidates in three buckets. **Propose all of them in one message and wait
@@ -650,6 +715,10 @@ or the product repo as part of this skill.
   pass, and `_project.md` left alone is the normal, correct outcome worth stating
 - Notes created / updated / promoted, and any remaining promotion candidates
 - Anything left unstaged, and why
+- The onboarding question, if Step 5b asked it: what was answered, and the
+  render mode if it was onboarded. A decline is worth one line too — it is a
+  decision that now lives on this machine, and the line is where a reader finds
+  out it can be undone
 - Whether a write was ever refused as stale, and what you re-read — a wrap-up
   that raced another session is worth one line, not silence
 
@@ -760,4 +829,6 @@ backfill decides.
 | **update second brain** / publish / commit the vault | **this skill** |
 | **backfill project docs** | **this skill**, backfill mode above — never on its own |
 | what's still open / check my tasks | `check-follow-ups` (read only) |
+| what have I done lately / catch me up | `recent-work` (read only) |
 | onboard repo | `onboard-repo`; appends a daily-note line only |
+| is this repo onboarded at all | `onboarding-state.py`, Step 1 and Step 5b above |

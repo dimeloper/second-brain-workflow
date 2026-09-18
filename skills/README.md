@@ -35,7 +35,7 @@ copy could drift from the version Railway supports.
 
 | Folder | Purpose | Skills |
 |--------|---------|--------|
-| `workflow/` | Standards system, vault, onboarding, MCP isolation | `onboard-repo`, `obsidian-knowledge-base`, `update-second-brain`, `check-follow-ups`, `mcp-per-project` |
+| `workflow/` | Standards system, vault, onboarding, MCP isolation | `onboard-repo`, `unrender-repo`, `obsidian-knowledge-base`, `update-second-brain`, `check-follow-ups`, `recent-work`, `extract-product-context`, `mcp-per-project` |
 
 Add a category only when a clear domain appears. Prefer extending `workflow/`.
 

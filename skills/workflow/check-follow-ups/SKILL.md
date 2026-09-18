@@ -1,14 +1,17 @@
 ---
 name: check-follow-ups
 description: >-
-  Scan recent daily notes' Follow-ups sections and report what's still open,
-  oldest first, leading with the ones for the repo you're in — plus anything
-  ticked as dropped or handed off, which is closed without being finished.
-  Read-only — walks back to the last real notes, so it survives a weekend, a
-  holiday, or a vacation gap without missing anything, and it groups by repo
-  rather than filtering, so nothing is hidden. Use when the user asks to check my tasks,
-  check follow ups, what's pending, what do I still need to do, or any open
-  items.
+  Scan recent daily notes' Follow-ups sections and report what's still open in
+  the repo you are standing in — that repo's items in full, every other repo as
+  a count, no flag and no second question — plus anything ticked as dropped or
+  handed off, which is closed without being finished. Ends with what to do next
+  here: a blocker to clear, work that already landed and needs confirming, the
+  oldest item still open, and which have been open long enough to be worth
+  re-deciding. Read-only — walks back to the last real notes, so it survives a
+  weekend, a holiday, or a vacation gap without missing anything, and it groups
+  by repo rather than filtering, so nothing is hidden. Use when the user asks to
+  check my tasks, check follow ups, what's pending, what do I still need to do,
+  what should I do next, or any open items.
 ---
 
 # Check follow-ups
@@ -120,8 +123,8 @@ service, an ops task, a decision about the vault itself. Twenty items in one
 undifferentiated list, when three of them are about the repo the user is
 standing in, reads as noise and gets skimmed.
 
-So when invoked from inside a git repo, the default is **this repo in full, every
-other repo as a count**:
+So when invoked from inside a git repo, the default — the script's, not a flag
+you have to remember — is **this repo in full, every other repo as a count**:
 
 1. **This repo** — every item, oldest first, in full
 2. **Elsewhere** — one line: `acme-ingestion 3 · globex-web 3 ·
@@ -203,7 +206,7 @@ above everything else.
 report says it landed. The evidence is about the *ref*, and the item usually
 says more than the ref does — "Merge PR #28 **and ship a TestFlight build**" is
 half done when the PR merges. Read the block out, say what the evidence is, and
-tick only what the user confirms, via step 6 below.
+tick only what the user confirms, via step 7 below.
 
 Never hide an `[unchecked]`. "No checkout of `foo` found under SBW_SCAN_ROOTS"
 is a fact about this machine the user can fix in one line; swallowing it turns a
@@ -217,6 +220,35 @@ negative*: "not merged" about work that landed a fortnight ago, said with the
 same confidence as a true one. Fix it by fetching that repo, then re-running. A
 PR verdict is live and never goes stale.
 
+## Next
+
+A list of what is open does not answer "so what do I do now", and reconstructing
+that from the list by hand was happening every time. A repo-scoped run ends with
+at most four lines, computed from what the report already knows:
+
+1. **a blocker to clear**, if this repo has one — it is what is stopping the rest
+2. **work the repo says already landed**, to confirm and tick with an outcome
+3. **the oldest item still open here** — the one that has been carried longest,
+   not the one most recently written down
+4. **how many have been open more than three weeks**, which is the point at
+   which "is this still worth doing" is a real question rather than a nag
+
+Read them out as the close of your report, in that order, and **then ask** —
+they are suggestions, not a plan you have started on.
+
+Two things they are not:
+
+- **Not a second listing.** Each line points at an item by *date*, because the
+  item is already printed above and "every item appears exactly once" is what
+  makes this readable. Do not helpfully re-quote the item text alongside it.
+- **Not permission to tick anything.** Line 2 says *confirm*. The evidence is
+  about the ref, and the item usually says more than the ref does.
+
+The block is absent when there is nothing to suggest, when you are not in a
+repo, and in the long-range audit — that one is a sweep read by someone who is
+not standing anywhere. Absent means say nothing; do not invent a next step to
+fill the gap.
+
 ### Run the script rather than re-implementing this
 
 All of the above is already implemented. **This skill directory contains only
@@ -224,8 +256,8 @@ All of the above is already implemented. **This skill directory contains only
 a relative `scripts/...` path will not resolve:
 
 ```bash
-~/second-brain-workflow/scripts/check-followups.py --recent --brief   # the default
-~/second-brain-workflow/scripts/check-followups.py --recent           # expand everything
+~/second-brain-workflow/scripts/check-followups.py --recent           # this repo first — the default
+~/second-brain-workflow/scripts/check-followups.py --recent --full    # expand every repo
 ~/second-brain-workflow/scripts/check-followups.py --recent --repo NAME
 ~/second-brain-workflow/scripts/check-followups.py --recent 8         # look further back
 ~/second-brain-workflow/scripts/check-followups.py --recent --no-threads   # every restatement
@@ -233,16 +265,24 @@ a relative `scripts/...` path will not resolve:
 ~/second-brain-workflow/scripts/check-followups.py --recent --landed-all   # check every repo's refs
 ```
 
-`--recent` already implies both threading and the landed check. Reach for
-`--no-threads` when the user disputes a collapse and wants the raw items, and
-for `--no-landed` when they want the answer immediately and the repo checks are
-costing seconds they don't want to spend.
+`--recent` already implies threading, the landed check, **and the repo focus**.
+Reach for `--no-threads` when the user disputes a collapse and wants the raw
+items, and for `--no-landed` when they want the answer immediately and the repo
+checks are costing seconds they don't want to spend.
 
-**Run it with `--brief` first.** It computes exactly the shape described above —
-this repo in full, others tallied, flagged items lifted out — so the collapsing is
-a command's output rather than a summarisation you perform, which is what kept
-drifting back into thirteen fully-described items from three other repos. Drop
-`--brief` when the user asks for everything.
+**Run it plain.** `--recent` computes exactly the shape described above — this
+repo in full, others tallied, flagged items lifted out, and what to do next —
+so the collapsing is a command's output rather than a summarisation you perform.
+It was `--brief` and opt-in until v0.54.0, which meant the common case printed
+thirteen fully-described items from three other repos whenever the flag was
+forgotten, and the reader had to ask for the focus a second time. `--brief`
+still works and is still what the long-range audit needs; `--full` is the way
+to every item.
+
+**Never add `--full` because the report looks short.** A repo with two open
+items has two open items; expanding every other repo to pad it is how the list
+becomes the wall of text the collapsing exists to remove. Expand when the user
+asks what else is out there, and not before.
 
 **`--recent` is this skill's window**, implemented in the script rather than
 described here: the 4 most recent notes that exist, today included, selected by
@@ -285,7 +325,10 @@ tool's.
    appears-exactly-once contract in practice.
 5. If nothing is unchecked anywhere in the window, say so plainly rather than
    printing an empty report.
-6. If the user confirms an item is closed during the conversation, tick it
+6. Close with the **Next** block the script printed, in its order, and then ask
+   which of them the user wants. If it printed nothing, close without one —
+   an invented next step is worse than none.
+7. If the user confirms an item is closed during the conversation, tick it
    **and record the outcome with it** — `#outcome/done`, `#outcome/dropped`,
    `#outcome/superseded`, or `#outcome/handed-off` plus `#owner/<name>`. A bare
    tick is an incomplete write: it is the state that makes "finished" and
@@ -328,8 +371,14 @@ same thread and keeps its original age, so there is no reason to preserve
 yesterday's wording for a task you now understand better.
 
 **It never ticks anything off by itself**, whatever the repo says. A merged PR
-is evidence, and step 6 is still the only write — after the user confirms, and
+is evidence, and step 7 is still the only write — after the user confirms, and
 with the outcome the user names, not one inferred from the evidence.
+
+**It does not report what was finished.** A window's ticks are read only so an
+item closed in a newer note stops being listed as open in an older one; nobody
+wants a list of what they completed handed back as a task list. "What did I get
+done lately" is a real question and a different skill answers it — `recent-work`,
+which reads the same notes' `## Built` sections and the ticks that closed.
 
 **It never filters by repo, and never hides an item it couldn't attribute.**
 Attribution is best-effort and "No repo identified" is a normal, populated

@@ -113,20 +113,39 @@ make vault-index          # or: ./scripts/build-vault-index.py [--vault PATH]
 make vault-index-check    # fails if the index is stale
 ```
 
-Four skills own the vault, and the read/write split is deliberate:
+Five skills own the vault, and the read/write split is deliberate:
 
 | Skill | Role |
 |-------|------|
 | `obsidian-knowledge-base` | **read only** — load this repo's project context, find applicable notes, score work against them |
 | `update-second-brain` | **the only write path for content** — daily note, practice proposals, promotions, commit, push |
-| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's first, plus anything closed without being finished |
+| `check-follow-ups` | **read only** — unchecked `## Follow-ups` items from recent daily notes, this repo's in full and every other repo as a count, plus anything closed without being finished, ending with what to do next here |
+| `recent-work` | **read only** — what the same notes say was *achieved*: `## Built` bullets and the ticks that closed, this repo's first |
 | `extract-product-context` | **read only** — draft a project's `context/` from a product repo's own files, tier by tier, rather than from memory or marketing copy |
 
 Say **update second brain** at the end of a session to capture and publish it,
-or **check my tasks** any morning to see what's still open. "Recent" is
+**check my tasks** any morning to see what's still open, or **what have I done
+recently** for the other half of the same window. "Recent" is
 deliberately narrow — a commitment that fell out of that window is `make audit`'s
 job instead (via `check-followups.py`), part of the [Review loop](#review-loop),
 not a skill.
+
+Both are **repo-first by default**: run from a repo, each prints that repo's
+items in full and collapses the others to a count line, with `--full` the way to
+everything. That is a layout and never a filter — the total is stated before any
+grouping, and a blocker or a live credential is listed in full whatever repo it
+belongs to. `check-follow-ups` then closes with a short **Next** block: the
+blocker to clear, work the repo says already landed and should be confirmed, the
+oldest item still open here, and how many have been open past three weeks. Each
+line points at an item by date rather than repeating it, because every item
+appearing exactly once is what makes the report readable.
+
+`check-follow-ups` and `recent-work` read the same notes and must not be
+collapsed into one report: a list of what you finished handed back alongside a
+list of what you owe is the shape that makes both get skimmed. A ticked
+`#outcome/dropped` item belongs to the first and never to the second — nobody
+did that work, and reporting it as an achievement is not an imprecision, it is
+the opposite of what the tick recorded.
 
 ### Project notes
 
@@ -360,6 +379,43 @@ folder in full, and write only the ones approved, one candidate at a time.
 Incomplete and guessed drafts are expected: a draft assembled from six weeks of
 notes is almost entirely `[second-hand]` and says so. Nothing is ever constructed
 silently, and nothing is promoted.
+
+### What got done, from the same notes
+
+`recent-work` is the read side's other half, and `scripts/recent-work.py` is
+what it runs:
+
+```bash
+make recent-work                          # the last 6 notes, this repo first
+make recent-work NOTES=12                 # look further back
+make recent-work SINCE=2026-09-01         # a month or a sprint, by the calendar
+make recent-work REPO=acme-backend FULL=1 # another repo, every bucket expanded
+```
+
+It reads each note's `## Built` bullets — including every `## Built (<repo>: …)`
+label, which is where a day that ran two work streams says which was which — and
+the `## Follow-ups` ticks that *closed*. Attribution, grouping and the window
+are the ones `check-follow-ups` uses, because the notes are the same notes and
+two answers to "which repo is this about" would be one too many. Every inferred
+line carries its basis, so a grouping can be argued with.
+
+Newest first, unlike the follow-ups report: there, age is the finding; here, the
+most recent thing is what a status update leads with.
+
+**Notes back, not days back** for `--recent`, so a weekend or a vacation costs
+nothing. `--since` is the other question and is a date filter, since "what did I
+get done this month" is a calendar span rather than a note count.
+
+A `#outcome/dropped` or `#outcome/handed-off` tick is **not** reported here. The
+tick records that nobody did the work — `check-follow-ups` keeps those visible
+as unresolved risk, and listing them as achievements would be the exact inverse
+of what they say. `superseded` is reported and labelled; a bare `- [x]` counts
+as done, as it always has.
+
+The footer says how many notes in the window had no `## Built` section at all. A
+thin record and a quiet week read identically in a summary and lead to opposite
+conclusions, so the report states which it is looking at rather than leaving it
+to be inferred.
 
 ### Follow-ups close with an outcome
 
@@ -877,7 +933,7 @@ filesystem scripts; it needs no Codex-specific copy or Obsidian MCP server.
 
 ### Bringing your own skills
 
-The engine ships seven skills of its own and tracks one pinned upstream set. It
+The engine ships eight skills of its own and tracks one pinned upstream set. It
 does **not** ship a roster of other people's skills, for the same reason
 [`rules/`](#one-rule-set-every-agent) ships empty: a curated selection of someone
 else's craft skills is an opinion, and the engine's job is the mechanism.
@@ -1160,6 +1216,61 @@ Or manually:
 ./scripts/sync-rules.sh /path/to/target-repo
 ./scripts/sync-skills.sh   # once per machine, or after pulling skill changes
 ```
+
+### Is this repo onboarded at all?
+
+```bash
+make onboarding-state REPO=/path/to/repo
+make onboarding-state LIST=1              # the never-ask list
+```
+
+`scripts/onboarding-state.py` answers it from all three places the answer
+hides — the [repo registry](#the-repo-registry), a `.sbw-version` or provenance
+marker in the repo itself, and the never-ask list below. Five states, and the
+exit code is the part a caller acts on:
+
+| State | Exit | Means |
+|---|---|---|
+| `onboarded` | 0 | registered, or carrying rendered output. The mode is named |
+| `declined` | 0 | asked once, answered never. Nothing asks again |
+| `skip` | 0 | the engine checkout or a vault — never onboarding targets |
+| `not-onboarded` | 1 | nothing on this machine says that was on purpose |
+| `undetermined` | 3 | no such directory. It does not guess |
+
+Exit 1 is a **question**, not a fault. `update-second-brain` runs this in its
+Step 1 and, when it comes back 1, offers to onboard the repo in Step 5b — after
+the capture has been committed and pushed, never before. A question is a place a
+session can stop, and a wrap-up that stops before its commit is the exact
+failure that step exists to prevent.
+
+The offer has four answers: shared, quiet (`--local`), not now, and never for
+this repo. Nothing picks one — shared and quiet differ in who else ends up
+seeing those files, which is not a detail to decide on someone's behalf.
+
+#### The never-ask list
+
+`${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/onboard-declined`, in the
+same format as the repo registry beside it, with an optional `reason=` field:
+
+```bash
+./scripts/onboarding-state.py --repo /path/to/repo --decline --reason 'not mine'
+./scripts/onboarding-state.py --repo /path/to/repo --undecline
+./scripts/onboarding-state.py --list
+```
+
+Separate from the registry on purpose. The registry is the set of repos this
+machine rendered into; this is the set it deliberately did not, and folding them
+together would need a `mode` value meaning "none" — which `render.py` is right
+to refuse, since every mode it understands answers "who sees your conventions".
+
+It stops a *prompt*, never an instruction: "onboard this repo" always wins, and
+nothing in `onboard-repo` reads the list. `make doctor` reports the list's size
+on a clean run, because a decision nothing ever mentions is one nobody can undo.
+`make uninstall` leaves it alone, like the registry and your vault.
+
+A repo you `--unrender` reads as never-onboarded afterwards, so a wrap-up there
+will offer again — correct when you unrendered to re-render cleanly, wrong when
+you are walking away. Decline it in the same breath if it is the second.
 
 ### Unrendering a repo
 

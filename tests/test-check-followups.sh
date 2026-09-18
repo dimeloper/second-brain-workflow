@@ -436,17 +436,129 @@ case "${out_brief}" in
   *) fail "an empty this-repo bucket says so instead of showing a bare heading" "${out_brief}" ;;
 esac
 
+# --- --recent is brief by default, and --full is the way out ----------------
+# Every reader of this window is standing in a repo and asking about that repo.
+# Leaving the collapse to a flag meant "focus on this repo" had to be asked for
+# twice: once by running the check, once by saying which repo you meant.
+out_default="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
+  --repo alpha-service 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_default}" in
+  *"beta-app 3 · gamma-tool 1"*) pass "--recent collapses other repos with no flag at all" ;;
+  *) fail "--recent collapses other repos with no flag at all" "${out_default}" ;;
+esac
+
+out_expanded="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
+  --repo alpha-service --full 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_expanded}" in
+  *"Other repos ("*) pass "--full lists every repo's items under its own heading" ;;
+  *) fail "--full lists every repo's items under its own heading" "${out_expanded}" ;;
+esac
+
+# The long-range audit is a sweep, not a to-do list, and it runs where there is
+# usually no repo at all — `make audit`, a vault's CI. Its default is unchanged.
+out_audit="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-03-01 \
+  --repo alpha-service 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_audit}" in
+  *"Other repos ("*) pass "the --stale-days audit still lists every item" ;;
+  *) fail "the --stale-days audit still lists every item" "${out_audit}" ;;
+esac
+
+"${CHECK}" --vault "${RVAULT}" --recent 1 --brief --full >/dev/null 2>&1
+assert_exit 2 "$?" "--brief and --full are opposites and are refused, not resolved"
+
+"${CHECK}" --vault "${RVAULT}" --recent 1 --full --no-repo-grouping >/dev/null 2>&1
+assert_exit 2 "$?" "--full and --no-repo-grouping are refused together"
+
+# --- Next: what to do about this repo, from what the report already knows ---
+# A wider window, because in the one-note window above this repo has nothing
+# open — and a suggestion block with nothing to suggest prints nothing, which
+# is asserted further down.
+out_next="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 6 \
+  --repo alpha-service --no-landed 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_next}" in
+  *"Next, in \`alpha-service\`"*) pass "a repo-scoped window ends with what to do next here" ;;
+  *) fail "a repo-scoped window ends with what to do next here" "${out_next}" ;;
+esac
+
+# By date, never by text. Repeating an item would put it in the report twice,
+# which is the one thing it promises not to do — and a grep for an item's words
+# would then find two hits for one task.
+TESTS_RUN=$((TESTS_RUN + 1))
+oldest="$(printf '%s\n' "${out_next}" | grep -c 'Named in prose: bump')"
+if [ "${oldest}" = "1" ]; then
+  pass "the next-up line points at an item by date and never repeats its text"
+else
+  fail "the next-up line points at an item by date and never repeats its text" \
+    "appeared ${oldest} times"
+fi
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_next}" in
+  *"Take the oldest one still open here"*) pass "and says which one it means" ;;
+  *) fail "and says which one it means" "${out_next}" ;;
+esac
+
+# Nothing open here is not a heading with an apology under it: the bucket above
+# already says so, and the other repos' counts are on the line before it.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_default}" in
+  *"Next, in"*) fail "an empty this-repo bucket suggests nothing at all" "printed anyway" ;;
+  *) pass "an empty this-repo bucket suggests nothing at all" ;;
+esac
+
+# A blocker outranks the oldest item: it is the thing stopping everything else.
+out_blocked="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
+  --repo beta-app 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_blocked}" in
+  *"Next, in \`beta-app\`"*"1. Clear the blocked item above"*)
+    pass "a blocker is the first thing suggested" ;;
+  *) fail "a blocker is the first thing suggested" "${out_blocked}" ;;
+esac
+
+# "Still valid?" is a real question at three weeks, and the answer is sometimes
+# #outcome/dropped — which is a close, not a failure.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$("${CHECK}" --vault "${RVAULT}" --as-of 2026-03-01 --recent 6 \
+  --repo alpha-service --no-landed 2>/dev/null)" in
+  *"have been open more than 21 days"*"#outcome/dropped is a real answer"*)
+    pass "long-open items are offered for re-deciding, not just carried" ;;
+  *) fail "long-open items are offered for re-deciding, not just carried" \
+       "$("${CHECK}" --vault "${RVAULT}" --as-of 2026-03-01 --recent 6 \
+          --repo alpha-service --no-landed 2>/dev/null)" ;;
+esac
+
+# No repo, no "here" for an instruction to be about.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
+  --no-repo-grouping 2>/dev/null)" in
+  *"Next, in"*) fail "no repo means no next-actions block" "printed anyway" ;;
+  *) pass "no repo means no next-actions block" ;;
+esac
+
+# The audit is read by people who are not standing anywhere. Suggesting what to
+# do next in a repo would be answering a question nobody asked.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_audit}" in
+  *"Next, in"*) fail "the long-range audit suggests nothing" "printed anyway" ;;
+  *) pass "the long-range audit suggests nothing" ;;
+esac
+
 # --- flags are markers in place, never a second listing ------------------
 # The contract that broke in practice: a "blockers first" section followed by the
 # same items under their repos.
 out_full="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-06 --recent 1 \
-  --repo beta-app 2>/dev/null)"
+  --repo beta-app --full 2>/dev/null)"
 TESTS_RUN=$((TESTS_RUN + 1))
 listed="$(printf '%s\n' "${out_full}" | grep -c "Awaiting the vendor's reply")"
 if [ "${listed}" = "1" ]; then
-  pass "without --brief a flagged item is marked in place and listed once"
+  pass "with --full a flagged item is marked in place and listed once"
 else
-  fail "without --brief a flagged item is marked in place and listed once" \
+  fail "with --full a flagged item is marked in place and listed once" \
     "appeared ${listed} times"
 fi
 
@@ -454,6 +566,18 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_full}" in
   *"[blocked] Awaiting the vendor's reply"*) pass "and still carries its marker" ;;
   *) fail "and still carries its marker" "${out_full}" ;;
+esac
+
+# Closed without being finished is a state to decide about, not a backlog to
+# work through — so it earns a line of its own in what to do next.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$("${CHECK}" --vault "${OVAULT}" --as-of 2026-01-06 --recent 4 \
+  --repo alpha-service --no-landed 2>/dev/null)" in
+  *"were closed without being finished"*"still the right state"*)
+    pass "dropped and handed-off items are put back in front of a decision" ;;
+  *) fail "dropped and handed-off items are put back in front of a decision" \
+       "$("${CHECK}" --vault "${OVAULT}" --as-of 2026-01-06 --recent 4 \
+          --repo alpha-service --no-landed 2>/dev/null)" ;;
 esac
 
 # --- the #repo/ tag is machinery, not content ----------------------------
@@ -484,8 +608,12 @@ assert_exit 2 "$?" "--brief and --no-repo-grouping are refused together"
 # rewrite *and* aged from the newest one — a four-day-old task reading as one
 # day old. --no-landed throughout: whether two items are the same task is a
 # question about text, and testing it must not need a network or another repo.
+# --full: --recent collapses other repos to a count by default, and every
+# assertion below is about which bucket an item landed in, which needs the
+# buckets printed.
 threads() {
-  "${CHECK}" --vault "${TVAULT}" --as-of 2026-01-06 --recent 3 --no-landed "$@"
+  "${CHECK}" --vault "${TVAULT}" --as-of 2026-01-06 --recent 3 --no-landed \
+    --full "$@"
 }
 
 out_t="$(threads --repo alpha-service 2>/dev/null)"
@@ -640,14 +768,26 @@ cat > "${LVAULT}/2026-01-02.md" <<EOF
 - [ ] Merge PR #7 in a repo nobody has cloned #repo/absent-repo
 EOF
 
+# --full for the same reason as threads() above: the absent-repo probe asserts
+# on an item in a *different* repo, which the default window tallies.
 landed() {
   PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
     "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 \
-    --repo landed-repo --landed-all "$@"
+    --repo landed-repo --landed-all --full "$@"
 }
 
 out_l="$(landed 2>/dev/null)"
 assert_exit 0 "$?" "a landed check is still never a build break"
+
+# The one part of the report with a cheap action attached, so it is the first
+# thing suggested after a blocker — and it says confirm, never tick: the
+# evidence is about the ref, and the item usually says more than the ref does.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_l}" in
+  *"says already landed, then tick each with its outcome"*)
+    pass "work the repo says already landed is offered for confirmation first" ;;
+  *) fail "work the repo says already landed is offered for confirmation first" "${out_l}" ;;
+esac
 
 for probe in \
   "[landed] \`feature/merged\` is merged into main|a branch merged into main reads as landed" \
