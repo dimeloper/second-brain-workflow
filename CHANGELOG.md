@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-09-18
+
 ### Added
 - **`recent-work`: what the daily notes say was achieved, this repo first.** The
   read side's other half — `check-follow-ups` answers "what is still open", and
@@ -3614,7 +3616,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.53.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.54.0...HEAD
+[0.54.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.53.0...v0.54.0
 [0.53.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.52.0...v0.53.0
 [0.52.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.51.0...v0.52.0
 [0.51.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.50.0...v0.51.0
