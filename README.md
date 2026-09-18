@@ -194,9 +194,21 @@ lead to opposite actions when the question comes back. It walks back to the last
 daily notes that actually exist rather than a fixed number of calendar days, so a
 weekend, a holiday or a vacation gap does not swallow anything.
 
+Ask **what have I done recently** in the same repo and `recent-work` answers the
+other half from the same notes: what the `## Built` sections and the ticks that
+closed actually say got done, this repo first, over the last few notes that
+exist. It never ticks anything and never writes — the two read-side skills
+report, and only **update second brain** writes.
+
 That is the whole loop. Say **onboard repo** in a project to wire rules into it,
 and keep going. Practice notes accumulate from what you actually did — do not
 scaffold them.
+
+A wrap-up in a repo that was never onboarded now says so and offers to fix it —
+shared, quiet (`--local`, so the remote never sees the rules), not now, or never
+for this repo, recorded so nothing asks again. The capture is committed and
+pushed before the question is asked, because a question is a place a session can
+stop.
 
 ## Why this doesn't rot
 
@@ -237,7 +249,7 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   quietly sharing what you kept private — `--shared` is the explicit way back.
   See
   [Rendering into a repo you do not own](docs/REFERENCE.md#rendering-into-a-repo-you-do-not-own).
-- **Bring your own skills.** The engine ships seven of its own and no roster of
+- **Bring your own skills.** The engine ships eight of its own and no roster of
   other people's. Declare the ones you want in a `skills.json`, pinned by sha
   and allowlisted per source, so two machines reading the same manifest install
   the same thing. See

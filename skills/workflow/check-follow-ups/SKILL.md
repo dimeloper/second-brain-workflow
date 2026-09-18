@@ -331,6 +331,12 @@ yesterday's wording for a task you now understand better.
 is evidence, and step 6 is still the only write — after the user confirms, and
 with the outcome the user names, not one inferred from the evidence.
 
+**It does not report what was finished.** A window's ticks are read only so an
+item closed in a newer note stops being listed as open in an older one; nobody
+wants a list of what they completed handed back as a task list. "What did I get
+done lately" is a real question and a different skill answers it — `recent-work`,
+which reads the same notes' `## Built` sections and the ticks that closed.
+
 **It never filters by repo, and never hides an item it couldn't attribute.**
 Attribution is best-effort and "No repo identified" is a normal, populated
 group, not a defect to work around — most items predate the `#repo/` convention

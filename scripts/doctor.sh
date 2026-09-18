@@ -431,7 +431,7 @@ check_submodules() {
 # engine old enough that re-rendering is a decision).
 check_registry() {
   local file entries scan repo registered=0 stale=0 unregistered=0 line
-  local broken broken_repo dangler broken_repos=0
+  local broken broken_repo dangler broken_repos=0 declined_count
 
   file="$(sbw_registry_path)"
   entries="$(sbw_registry_read)"
@@ -547,6 +547,17 @@ EOF
     else
       ok "${registered} onboarded repo(s) registered, all still rendered, and none unregistered"
     fi
+  fi
+  declined_count="$(python3 "${STANDARDS_DIR}/scripts/onboarding-state.py" \
+    --list --count 2>/dev/null || echo 0)"
+  # Not a finding: a repo somebody decided not to onboard is a decision, and
+  # doctor does not report decisions as gaps. It is said out loud because
+  # nothing else on this machine would ever mention it — a wrap-up that stays
+  # quiet about a repo looks identical to one that never checked, and the list
+  # is what tells a reader the silence was asked for.
+  if [ "${declined_count}" != "0" ]; then
+    ok "${declined_count} repo(s) on the never-ask list — deliberately not onboarded
+        ./scripts/onboarding-state.py --list    (--undecline puts one back in scope)"
   fi
   sbw_scan_say_scope
   return 0

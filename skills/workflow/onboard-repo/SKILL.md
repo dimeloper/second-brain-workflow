@@ -39,6 +39,19 @@ ls -d ~/*/*/.cursor/bin 2>/dev/null | sed 's|/.cursor/bin$||'
 
 Prefer the one whose stack and provider mix is closest to the target repo.
 
+## Where this gets triggered
+
+Usually the user says so. The other route is `update-second-brain`, which checks
+whether the repo it is wrapping up has ever been rendered into and offers this
+when it has not — so you may arrive here with the capture already committed and
+a mode already chosen (shared or quiet). Take the mode as given in that case
+rather than re-asking.
+
+A user who answered "never for this repo" is on a never-ask list this machine
+keeps; `onboarding-state.py --list` shows it, `--undecline` clears one. Nothing
+here reads that list — it exists to stop a *prompt*, never to refuse an
+instruction, so a direct "onboard this repo" always wins.
+
 ## Target repo
 
 1. Prefer the current workspace root if it is a single project git repo.

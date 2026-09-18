@@ -1,4 +1,4 @@
-"""Reading `## Follow-ups` items, and attributing each one to a repo.
+"""Reading a daily note's list sections, and attributing each item to a repo.
 
 Two consumers, one implementation — the check-follow-ups skill (recent notes,
 interactive) and check-followups.py (every note, long-range). They must agree
@@ -7,6 +7,7 @@ differently depending on which one you asked. Same reasoning as
 lib/vault-identity.sh for the guard/init-vault pair.
 
     from lib.followups import open_followups, attribute, group_for_repo
+    from lib.followups import section_items          # `## Built`, and friends
 
 Attribution is best-effort by design, and the honest outcome is three-valued:
 this repo, another repo, or unknown. Callers **group** on that; they never
@@ -159,7 +160,26 @@ def flag_for(item):
 FILE_REF_RE = re.compile(r'`([^`\s]*[\w-]+\.[A-Za-z0-9]{1,6}|[^`\s]*/[^`\s]+)`')
 
 
-def collect_spans(text, want):
+FOLLOWUPS_HEADING = "## Follow-ups"
+BUILT_HEADING = "## Built"
+
+# A plain list item — no checkbox. `## Built` bullets are prose, not tasks.
+PLAIN_ITEM_RE = re.compile(r'^-\s+(.*)$')
+
+
+def heading_matches(line, heading):
+    """Is this `## ` line the section `heading` names?
+
+    Exact, or `<heading> (label)`. A note that spans several work streams labels
+    each one `## Built (<repo>: what happened)`, and a reader of that note counts
+    every one of them as the day's Built — so a section reader that matched only
+    the bare heading would report a three-stream day as having built nothing.
+    """
+    line = line.strip()
+    return line == heading or line.startswith(heading + " (")
+
+
+def collect_spans(text, want, heading=FOLLOWUPS_HEADING):
     """[(item_text, first_line, last_line), ...] — `_collect` with line numbers.
 
     The write side has to edit the exact lines an item occupies, and deriving
@@ -186,7 +206,7 @@ def collect_spans(text, want):
     for n, line in enumerate(text.splitlines()):
         if line.startswith("## "):
             flush()
-            in_section = line.strip() == "## Follow-ups"
+            in_section = heading_matches(line, heading)
             continue
         if not in_section:
             continue
@@ -206,8 +226,8 @@ def collect_spans(text, want):
     return items
 
 
-def _collect(text, want):
-    """Text of every item under `## Follow-ups` matching `want`, in order.
+def _collect(text, want, heading=FOLLOWUPS_HEADING):
+    """Text of every item under `heading` matching `want`, in order.
 
     A note with no `## Follow-ups` heading yields nothing rather than erroring —
     notes written before the section existed are still perfectly good notes.
@@ -219,7 +239,7 @@ def _collect(text, want):
     line under an item — including an indented sub-bullet, which belongs to the
     item above it rather than being an item of its own.
     """
-    return [text_ for text_, _, _ in collect_spans(text, want)]
+    return [text_ for text_, _, _ in collect_spans(text, want, heading)]
 
 
 def open_followups(text):
@@ -251,6 +271,58 @@ def unmarked_ticks(text):
     that finished, or abandoned?".
     """
     return [item for item in done_followups(text) if not OUTCOME_TAG_RE.search(item)]
+
+
+def section_items(text, heading=BUILT_HEADING):
+    """Every plain bullet under `heading` — `## Built`, by default.
+
+    The same joining rule the follow-up items get, because the reason for it is
+    the same: these are prose, they routinely wrap, and the repo name is as
+    likely to sit on the second line as the first. A checkbox item is read as
+    an ordinary bullet here, with its `[ ]` intact, since a section that mixes
+    the two is a note somebody wrote that way rather than a shape to correct.
+
+    Labelled sections are included, which is what makes a `## Built (acme: …)`
+    day countable at all. See heading_matches.
+    """
+    return _collect(text, PLAIN_ITEM_RE, heading)
+
+
+def labelled_sections(text, heading=BUILT_HEADING):
+    """[(heading_line, [items])] — one entry per occurrence of the section.
+
+    `section_items` flattens a day's work streams into one list, which is right
+    when you are counting them and wrong when you are attributing them: a note
+    with `## Built (acme-backend: …)` and `## Built (globex-web: …)` names the
+    repo for each stream *on its own heading*, and that is per-item evidence
+    note_context_repo deliberately refuses to use — it answers a question about
+    the whole note, and a note with two labels has no single answer.
+    """
+    chunks, current, body = [], None, []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if current is not None:
+                chunks.append((current, body))
+            current, body = (line.strip(), []) if heading_matches(line, heading) \
+                else (None, [])
+            continue
+        if current is not None:
+            body.append(line)
+    if current is not None:
+        chunks.append((current, body))
+    return [(head, _collect("\n".join([head] + lines), PLAIN_ITEM_RE, heading))
+            for head, lines in chunks]
+
+
+def heading_repo(heading_line, known_repos):
+    """The one known repo a section label names, or None.
+
+    Strict in the same way note_context_repo is: two repos on one heading is a
+    heading that attributes nothing, and picking one would be a coin flip
+    presented as a fact.
+    """
+    hits = {r for r in known_repos if mention_re(r).search(heading_line)}
+    return hits.pop() if len(hits) == 1 else None
 
 
 REPO_NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
@@ -387,7 +459,11 @@ def current_repo(start=None, known=None):
     return None, "not inside a git repository"
 
 
-def attribute(item, known_repos, current=None, repo_files=None, context=None):
+CONTEXT_BASIS = "this note's ## Built section, not the item itself"
+
+
+def attribute(item, known_repos, current=None, repo_files=None, context=None,
+              context_basis=CONTEXT_BASIS):
     """(repo, basis) for one follow-up item, or (None, None) if unattributable.
 
     Signals, strongest first — an explicit tag beats a guess, a guess from the
@@ -404,6 +480,12 @@ def attribute(item, known_repos, current=None, repo_files=None, context=None):
     4. `context`, the single repo the item's note is about (see
        note_context_repo) — the weakest, and the only one that can be right
        about the day while wrong about the item
+
+    `context_basis` names what that fourth signal actually was. A caller reading
+    `## Built (acme-backend: …)` has a statement about *that section*, which is
+    a stronger claim than the note-wide fallback the default wording describes,
+    and a report that called it the weaker one would be understating its own
+    evidence.
     """
     m = REPO_TAG_RE.search(item)
     if m:
@@ -428,7 +510,7 @@ def attribute(item, known_repos, current=None, repo_files=None, context=None):
                 return current, "file tracked in this repo"
 
     if context:
-        return context, "this note's ## Built section, not the item itself"
+        return context, context_basis
     return None, None
 
 
@@ -458,7 +540,7 @@ def repo_file_index(root, limit=20000):
 
 
 def annotate(records, known_repos, current=None, repo_files=None, text=None,
-             context=None):
+             context=None, context_basis=None):
     """Stamp each record with `repo` and `basis`, in place. -> the same list.
 
     Attribution used to happen as a side effect of grouping, which was fine while
@@ -469,9 +551,10 @@ def annotate(records, known_repos, current=None, repo_files=None, text=None,
     """
     get = text or (lambda i: i)
     ctx = context or (lambda i: None)
+    why = context_basis or (lambda i: CONTEXT_BASIS)
     for record in records:
         found, basis = attribute(get(record), known_repos, current, repo_files,
-                                 ctx(record))
+                                 ctx(record), why(record))
         record["repo"], record["basis"] = found, basis
     return records
 

@@ -17,6 +17,67 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`recent-work`: what the daily notes say was achieved, this repo first.** The
+  read side's other half — `check-follow-ups` answers "what is still open", and
+  this answers "what got done", from the same notes, the same window and the
+  same attribution. It reads each note's `## Built` bullets and the
+  `## Follow-ups` ticks that closed, newest first, this repo in full and every
+  other repo as a count. `make recent-work` / `scripts/recent-work.py`, with
+  `NOTES=n` for a wider window and `SINCE=YYYY-MM-DD` for a calendar span.
+
+  A `#outcome/dropped` or `#outcome/handed-off` tick is never reported here.
+  The tick records that nobody did the work, and listing it as an achievement
+  is not an imprecision — it is the inverse of what it says. `superseded` is
+  reported and labelled; a bare `- [x]` counts as done, as it always has.
+
+  A `## Built (<repo>: …)` label now attributes **its own section's** items.
+  `note_context_repo` deliberately refuses to answer for a day with two labelled
+  streams — it is a question about the whole note — so every bullet on a
+  two-stream day was going to "no repo identified" while the heading two lines
+  above it said exactly which repo it was.
+
+  The footer says how many notes in the window had no `## Built` section at all.
+  A thin record and a quiet week read identically in a summary and lead to
+  opposite conclusions.
+
+- **A wrap-up in a repo that was never onboarded now says so, once.**
+  `update-second-brain` asks `scripts/onboarding-state.py` in Step 1 and, when
+  the answer is "not onboarded", offers in a new Step 5b: shared, quiet
+  (`--local`, so the repo's remote never sees the rules), not now, or never for
+  this repo. It picks none of them — shared and quiet differ in who else ends up
+  seeing those files.
+
+  **The question comes after the capture is committed and pushed**, never
+  before. A question is a place a session can stop, and a wrap-up that stops
+  before its commit is the exact failure Step 5 exists to prevent.
+
+  "Never for this repo" is recorded in
+  `${XDG_CONFIG_HOME:-~/.config}/second-brain-workflow/onboard-declined` — the
+  same format as the repo registry beside it, with an optional reason, and
+  `--undecline` to reverse it. A separate file rather than a registry field: the
+  registry is the set of repos this machine rendered into, and a `mode` value
+  meaning "none" is one `render.py` is right to refuse. It stops a prompt and
+  never an instruction — "onboard this repo" always wins.
+
+  `make doctor` reports the list's size on a clean run, and `make uninstall`
+  leaves it alone: a decision nothing ever mentions is one nobody can undo.
+  `unrender-repo` now points at it too, since a retired repo reads as
+  never-onboarded and would otherwise be re-offered at the next wrap-up.
+
+- `make onboarding-state REPO=...` and `make recent-work` for the two commands
+  above, plus `registry.rendered()` and `registry.write_entries()` — the Python
+  mirror of `sbw_registry_marker_present`, and one atomic writer shared by the
+  registry and the never-ask list. `tests/test-repo-registry.sh` now asserts all
+  three copies of the provenance marker are the same string.
+
+### Changed
+- `lib/followups.py` reads any of a daily note's list sections, not only
+  `## Follow-ups` — `section_items`, `labelled_sections` and `heading_repo` are
+  new; `collect_spans` takes an optional heading and is otherwise unchanged. One
+  parser, because an item this side joined across four lines and another read as
+  one would be reported, and ticked, in different places.
+
 ## [0.53.0] - 2026-09-10
 
 ### Added

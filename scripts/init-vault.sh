@@ -320,6 +320,9 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
 -
 
 <!-- Add another "## Built (label)" block per distinct work stream if needed.
+     Label it "## Built (<repo>: what happened)" when the streams are different
+     repos — recent-work reads these bullets back as what got done, and the
+     label is what tells it which repo each stream belongs to.
      Everything below stays ONE section for the whole day — append to it,
      don't repeat the header. -->
 
@@ -338,8 +341,9 @@ write_if_absent "${VAULT}/_templates/daily-note.md" <<'EOF'
        - [x] Rotate the CRM key #outcome/handed-off #owner/ops-team
      "Done" is finished work you can cite. "Dropped" is an accepted risk and
      "handed off" is somebody else's backlog — check-follow-ups keeps those two
-     visible instead of reading them as work that happened. A bare `- [x]` still
-     closes, so nothing written before this convention changes.
+     visible instead of reading them as work that happened, and recent-work
+     leaves them out of "what got done" for the same reason. A bare `- [x]`
+     still closes, so nothing written before this convention changes.
 
      End each item with `#repo/<name>` for the repo it belongs to, spelled the
      way practice notes' `repos:` field spells it:

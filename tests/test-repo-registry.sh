@@ -149,6 +149,19 @@ else
     "render.py='${py_marker}' registry.sh='${sh_marker}'"
 fi
 
+# And the third copy: lib/registry.py's rendered(), which onboarding-state.py
+# asks before offering to onboard a repo. A marker that drifted here would
+# report every already-onboarded repo as never onboarded — and the prompt built
+# on that answer would offer to render into repos that already carry the rules.
+TESTS_RUN=$((TESTS_RUN + 1))
+lib_marker="$(sed -n 's/^RENDER_MARKER = "\(.*\)"$/\1/p' "${ENGINE}/scripts/lib/registry.py")"
+if [ -n "${py_marker}" ] && [ "${py_marker}" = "${lib_marker}" ]; then
+  pass "registry.py's provenance marker matches render.py's"
+else
+  fail "registry.py's provenance marker matches render.py's" \
+    "render.py='${py_marker}' registry.py='${lib_marker}'"
+fi
+
 # --- doctor: a registered repo that is no longer there ----------------------
 GONE="${SANDBOX}/deleted-repo"
 make_target_repo "${GONE}"

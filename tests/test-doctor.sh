@@ -454,5 +454,30 @@ case "${out}" in
 esac
 rm -rf "${RD_CAND%/rules}"
 
+# --- the never-ask list is reported, because nothing else mentions it -------
+# A repo somebody decided not to onboard is a decision, not a gap — so it is an
+# ok line and never a warning, and it is a line at all because a decision no
+# report ever names is one nobody can undo. Last in the file, and cleaned up
+# after: it writes to the shared XDG_CONFIG_HOME every case above reads.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$("${DOCTOR}" --vault "${V}" 2>&1)" in
+  *"never-ask list"*) fail "an empty never-ask list is not mentioned at all" "mentioned" ;;
+  *) pass "an empty never-ask list is not mentioned at all" ;;
+esac
+
+mkdir -p "${SANDBOX}/declined-repo"
+"${ENGINE}/scripts/onboarding-state.py" --repo "${SANDBOX}/declined-repo" \
+  --decline --reason "not mine" >/dev/null 2>&1
+out="$("${DOCTOR}" --vault "${V}" 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "a declined repo is never a finding — doctor still exits 0"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"1 repo(s) on the never-ask list"*"--undecline"*)
+    pass "names how many repos are on the list, and how to reverse one" ;;
+  *) fail "names how many repos are on the list, and how to reverse one" "${out}" ;;
+esac
+rm -f "${XDG_CONFIG_HOME}/second-brain-workflow/onboard-declined"
+
 
 finish
