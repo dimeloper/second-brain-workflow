@@ -20,7 +20,8 @@ render "${REPO}" >/dev/null 2>&1
 assert_exit 0 $? "renders all targets"
 assert_file "${REPO}/.cursor/rules/frontend-angular.mdc" "cursor: .mdc written"
 assert_file "${REPO}/.claude/rules/frontend-angular.md"  "claude-code: rule written"
-assert_file "${REPO}/CLAUDE.md"                          "claude-code: CLAUDE.md written"
+assert_no_file "${REPO}/CLAUDE.md" \
+  "claude-code: no CLAUDE.md stub — Claude Code reads AGENTS.md itself"
 assert_file "${REPO}/AGENTS.md"                          "agents: AGENTS.md written"
 
 assert_file "${REPO}/.cursor/rules/local-only.mdc" "hand-written rule survives"
@@ -32,8 +33,6 @@ assert_contains "${REPO}/.claude/rules/frontend-angular.md" 'paths:' \
   "claude rule uses native paths:"
 assert_contains "${REPO}/.claude/rules/frontend-angular.md" '"\*\*/\*.component.ts"' \
   "claude paths: is a yaml list of globs"
-assert_contains "${REPO}/CLAUDE.md" '@AGENTS.md' \
-  "CLAUDE.md imports AGENTS.md rather than forking it"
 
 # Frontmatter must start on line 1 or the agent cannot parse it.
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -343,25 +342,41 @@ assert_contains "${REPO_AO3}/.cursor/rules/always-on.mdc" "alwaysApply: true" \
 assert_contains "${REPO_AO3}/AGENTS.md" "my own conventions" \
   "a hand-written AGENTS.md is still never overwritten"
 
-# The skip message for a hand-written CLAUDE.md used to say "add `@AGENTS.md` at
-# its top to pick up shared standards" unconditionally. Where AGENTS.md is not
-# ours that promises something it cannot deliver — the rules went to
-# .claude/rules/ — and where AGENTS.md is a symlink to CLAUDE.md, following it
-# makes the file import itself. Both shapes are real onboarded repos.
+# A hand-written CLAUDE.md shadows the AGENTS.md we wrote: Claude Code reads it
+# and, because it exists at all, never falls back to AGENTS.md natively. With
+# the stub dropped there is nothing else left to carry the always-on set there,
+# so this warning is the only thing standing between that repo and a silent gap.
+#
+# It has to stay silent in the cases where the advice would be wrong, each a
+# real onboarded repo. AGENTS.md not ours: the rules are per-rule files under
+# .claude/rules/ already, and importing a hand-written AGENTS.md picks up
+# nothing. AGENTS.md a symlink to CLAUDE.md: following it makes the file import
+# itself.
 printf 'my own notes\n' > "${REPO_AO3}/CLAUDE.md"
 out_nudge="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
   "${REPO_AO3}" --check 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nudge}" in
-  *"add \`@AGENTS.md\` at its top"*)
-    fail "no import is suggested when AGENTS.md is not ours" "${out_nudge}" ;;
-  *"nothing to import"*".claude/rules/"*)
-    pass "no import is suggested when AGENTS.md is not ours" ;;
-  *) fail "no import is suggested when AGENTS.md is not ours" "${out_nudge}" ;;
+  *"CLAUDE.md here is hand-written"*)
+    fail "silent when AGENTS.md is not ours" "${out_nudge}" ;;
+  *) pass "silent when AGENTS.md is not ours" ;;
 esac
 
-# ...and it is still suggested where it is the right advice: AGENTS.md ours,
-# CLAUDE.md the repo's own.
+REPO_AO6="${SANDBOX}/repo-ao6"
+make_target_repo "${REPO_AO6}"
+printf 'my own notes\n' > "${REPO_AO6}/CLAUDE.md"
+ln -s CLAUDE.md "${REPO_AO6}/AGENTS.md"
+out_nudge_link="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
+  "${REPO_AO6}" --check 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nudge_link}" in
+  *"CLAUDE.md here is hand-written"*)
+    fail "silent when AGENTS.md is the repo's symlink to CLAUDE.md" "${out_nudge_link}" ;;
+  *) pass "silent when AGENTS.md is the repo's symlink to CLAUDE.md" ;;
+esac
+
+# ...and it fires where the gap is real: AGENTS.md ours, CLAUDE.md the repo's
+# own, no import between them.
 REPO_AO5="${SANDBOX}/repo-ao5"
 make_target_repo "${REPO_AO5}"
 printf 'my own notes\n' > "${REPO_AO5}/CLAUDE.md"
@@ -369,24 +384,66 @@ out_nudge2="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
   "${REPO_AO5}" --check 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nudge2}" in
-  *"add \`@AGENTS.md\` at its top"*)
-    pass "the import is still suggested when AGENTS.md is ours" ;;
-  *) fail "the import is still suggested when AGENTS.md is ours" "${out_nudge2}" ;;
+  *"CLAUDE.md here is hand-written"*"reach"*"nowhere in this repo"*)
+    pass "warns when a hand-written CLAUDE.md shadows an AGENTS.md that is ours" ;;
+  *) fail "warns when a hand-written CLAUDE.md shadows an AGENTS.md that is ours" "${out_nudge2}" ;;
 esac
 
-# ...and not once it has been taken. Advice a reader has already acted on is
-# indistinguishable, on the next run, from advice they ignored.
+# ...and stops once the import is there. A warning a reader has acted on is
+# otherwise indistinguishable, next run, from one they ignored.
 printf '@AGENTS.md\n\nmy own notes\n' > "${REPO_AO5}/CLAUDE.md"
 out_nudge3="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
   "${REPO_AO5}" --check 2>&1)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_nudge3}" in
-  *"add \`@AGENTS.md\` at its top"*)
-    fail "the suggestion stops once the import is there" "${out_nudge3}" ;;
-  *"skip (hand-written, not ours): CLAUDE.md"*)
-    pass "the suggestion stops once the import is there" ;;
-  *) fail "the suggestion stops once the import is there" "${out_nudge3}" ;;
+  *"CLAUDE.md here is hand-written"*)
+    fail "the warning stops once the import is there" "${out_nudge3}" ;;
+  *) pass "the warning stops once the import is there" ;;
 esac
+
+# --- upgrading a repo that still carries the CLAUDE.md stub -----------------
+# Every repo onboarded up to v0.56.0 has a generated CLAUDE.md this engine no
+# longer writes. Left there it keeps working — it imports AGENTS.md — but it is
+# also the reason Claude Code does not read AGENTS.md natively, so the prune is
+# what actually completes the drop.
+REPO_STUB="${SANDBOX}/repo-stub"
+make_target_repo "${REPO_STUB}"
+"${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" "${REPO_STUB}" >/dev/null 2>&1
+cat > "${REPO_STUB}/CLAUDE.md" <<'STUB'
+<!-- generated by second-brain-workflow@deadbee (v0.56.0) from AGENTS.md -->
+
+@AGENTS.md
+STUB
+out_stub="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
+  "${REPO_STUB}" --check 2>&1)"
+rc_stub=$?
+assert_exit 1 "${rc_stub}" "a leftover generated CLAUDE.md is drift"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_stub}" in
+  *"stale generated file CLAUDE.md"*) pass "and the drift names it" ;;
+  *) fail "and the drift names it" "${out_stub}" ;;
+esac
+"${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" "${REPO_STUB}" >/dev/null 2>&1
+assert_no_file "${REPO_STUB}/CLAUDE.md" "re-rendering prunes it"
+assert_file "${REPO_STUB}/AGENTS.md" "and AGENTS.md, which it forwarded to, stays"
+
+# The guard that matters. A repo can commit `AGENTS.md -> CLAUDE.md`; a prune
+# that resolved the link would delete the repo's own file through it, which is
+# the defect v0.55.0 fixed on the write path. Both must survive.
+REPO_LINK="${SANDBOX}/repo-link"
+make_target_repo "${REPO_LINK}"
+printf 'the repo owns this, reachable as both\n' > "${REPO_LINK}/CLAUDE.md"
+ln -s CLAUDE.md "${REPO_LINK}/AGENTS.md"
+"${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" "${REPO_LINK}" >/dev/null 2>&1
+assert_file "${REPO_LINK}/CLAUDE.md" "a repo's own CLAUDE.md is never pruned"
+assert_contains "${REPO_LINK}/CLAUDE.md" "the repo owns this" \
+  "and is byte-identical afterwards"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -L "${REPO_LINK}/AGENTS.md" ]; then
+  pass "and its AGENTS.md symlink is left intact"
+else
+  fail "and its AGENTS.md symlink is left intact" "the link is gone"
+fi
 
 # --- upgrading a repo rendered before the fold ------------------------------
 # Every repo onboarded up to v0.54.0 carries an always-on .mdc this engine no
@@ -465,8 +522,11 @@ assert_str "1" "${headers}" "a second --local run leaves one block, not two"
 # we write it". Refusing there blocks correct work over a file nothing touches.
 TEAM_REPO="${SANDBOX}/team-owned"
 make_target_repo "${TEAM_REPO}"
-printf 'the teams own CLAUDE.md\n' > "${TEAM_REPO}/CLAUDE.md"
-git -C "${TEAM_REPO}" add CLAUDE.md
+# AGENTS.md, not CLAUDE.md: since the stub was dropped, CLAUDE.md is not a path
+# the render plans at all, so a tracked one is not "a tracked file the render
+# skips" — it is simply not the render's business. AGENTS.md still is.
+printf 'the teams own AGENTS.md\n' > "${TEAM_REPO}/AGENTS.md"
+git -C "${TEAM_REPO}" add AGENTS.md
 git -C "${TEAM_REPO}" -c user.email=t@example.com -c user.name=T commit -qm "team file"
 out="$("${ENGINE}/scripts/render.py" --rules-dir "${RULES_FIXTURES}" "${TEAM_REPO}" --local 2>&1)"
 rc=$?
@@ -476,21 +536,21 @@ assert_exit 0 "${rc}" "--local proceeds when the tracked file is one the render 
 # name something the reader did not type.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"local mode has nothing to hide"*"CLAUDE.md"*)
+  *"local mode has nothing to hide"*"AGENTS.md"*)
     pass "and names it as tracked-and-left-alone rather than refusing" ;;
   *) fail "and names it as tracked-and-left-alone rather than refusing" "${out}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
-if grep -q '^CLAUDE.md$' "${TEAM_REPO}/.git/info/exclude"; then
-  fail "a skipped file is not added to the exclude block" "CLAUDE.md was excluded"
+if grep -q '^AGENTS.md$' "${TEAM_REPO}/.git/info/exclude"; then
+  fail "a skipped file is not added to the exclude block" "AGENTS.md was excluded"
 else
   pass "a skipped file is not added to the exclude block"
 fi
 TESTS_RUN=$((TESTS_RUN + 1))
-if [ "$(cat "${TEAM_REPO}/CLAUDE.md")" = "the teams own CLAUDE.md" ]; then
+if [ "$(cat "${TEAM_REPO}/AGENTS.md")" = "the teams own AGENTS.md" ]; then
   pass "and the team's file is byte-identical afterwards"
 else
-  fail "and the team's file is byte-identical afterwards" "$(cat "${TEAM_REPO}/CLAUDE.md")"
+  fail "and the team's file is byte-identical afterwards" "$(cat "${TEAM_REPO}/AGENTS.md")"
 fi
 
 # ...but a tracked file the render *would* overwrite still refuses: that one is
@@ -665,7 +725,7 @@ case "${out}" in
   *"no AGENTS.md in"*) fail "and not reported as the engine having none" "${out}" ;;
   *) pass "and not reported as the engine having none" ;;
 esac
-assert_file "${HANDWRITTEN}/CLAUDE.md" "CLAUDE.md still renders alongside it"
+assert_no_file "${HANDWRITTEN}/CLAUDE.md" "and no CLAUDE.md stub is written beside it"
 
 # --- SBW_RENDER_SCOPE=relevant ----------------------------------------------
 # Under `all` (the default) every rule is written into every repo and the globs

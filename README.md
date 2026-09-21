@@ -223,8 +223,9 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   [the maturity gradient](docs/REFERENCE.md#the-maturity-gradient).
 - **One rule set, every agent — and one copy of it.** Write short imperative
   rules once (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
-  `CLAUDE.md`, and a portable `AGENTS.md` from the same source, each with a
-  provenance header naming the source SHA, and `--check` fails CI on drift. An
+  `.claude/rules/*.md`, and a portable `AGENTS.md` from the same source, each
+  with a provenance header naming the source SHA, and `--check` fails CI on
+  drift. An
   always-on rule is written to `AGENTS.md` and nowhere else, because every one
   of those agents reads it — so the set that loads on every turn exists once per
   repo and is measured once. See

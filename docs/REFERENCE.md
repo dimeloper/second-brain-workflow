@@ -616,17 +616,32 @@ description: Angular component and reactivity conventions
 | Target | Output | Always-on | Scoped |
 |--------|--------|-----------|--------|
 | `cursor` | `.cursor/rules/*.mdc` | via `AGENTS.md` — see below | derived `globs` string |
-| `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | via `AGENTS.md` — see below | `paths:` passed through |
+| `claude-code` | `.claude/rules/*.md` | via `AGENTS.md` — see below | `paths:` passed through |
 | `agents` | `AGENTS.md` | its own body **plus every always-on rule** | — |
 
 **`AGENTS.md` is the always-on carrier, and it is the only one.** A rule with no
 `paths:` is appended to it and written nowhere else, because every agent this
 engine renders for reads a root `AGENTS.md`: Cursor
 [directly](https://cursor.com/docs/rules), as an always-applied alternative to
-`.cursor/rules`, and Claude Code through the generated `CLAUDE.md`'s
-`@AGENTS.md` import — or natively, since
-[v2.1.277](https://code.claude.com/docs/en/changelog), in a repo with no
-`CLAUDE.md` at all.
+`.cursor/rules`, and Claude Code
+[natively since v2.1.277](https://code.claude.com/docs/en/changelog), in a repo
+with no `CLAUDE.md`.
+
+Until v0.57.0 a generated `CLAUDE.md` stub sat in each repo holding a
+provenance comment and an `@AGENTS.md` line, because Claude Code read
+`CLAUDE.md` and not `AGENTS.md`. It forwarded to a file the agent would now
+read on its own — and, by existing at all, was the only reason it had to.
+`make doctor` reports whether the machine in front of you is new enough; a
+leftover stub is pruned on the next render.
+
+**A hand-written `CLAUDE.md` still shadows `AGENTS.md`**, because the native
+fallback applies only where no `CLAUDE.md` exists. Where the fold put the
+always-on rules in an `AGENTS.md` of ours and the repo keeps its own
+`CLAUDE.md` without an `@AGENTS.md` import, the always-on set reaches Claude
+Code nowhere — so the run says so. It stays quiet when the import is already
+there, when `AGENTS.md` is not ours (the rules are per-rule files under
+`.claude/rules/` already), and when `AGENTS.md` is a symlink to `CLAUDE.md`
+(the advice would make the file import itself).
 
 So targets select which **scoped** formats to emit. `AGENTS.md` is written
 whenever the engine has one, whether or not `agents` is named — naming it is
@@ -756,7 +771,7 @@ its promise does not half-keep it. Nothing is written, the tracked files are
 named, and the two real options are: render without `--local` and decide file by
 file, or agree the rules with whoever owns the repo.
 
-A tracked file the render **skips** — the team's own `CLAUDE.md`, say — is not a
+A tracked file the render **skips** — the team's own `AGENTS.md`, say — is not a
 refusal. The writer never touches it, so there is nothing to hide; it is named in
 the output and left out of the exclude block, because an exclude entry for a
 tracked file does nothing and would imply otherwise.
@@ -1551,7 +1566,7 @@ Every rendered file's provenance comment names both the commit and the engine
 version it came from, and a plain `.sbw-version` file is written at the target
 repo's root alongside the rendered output — nothing else in the target carried
 this before, so this is the one new file `render.py` writes outside
-`.cursor/rules`, `.claude/rules`, `AGENTS.md` and `CLAUDE.md`. Like any other
+`.cursor/rules`, `.claude/rules` and `AGENTS.md`. Like any other
 rendered file, `--check` **reports** a lagging `.sbw-version` — "this repo hasn't
 re-rendered since the engine moved on" — but does **not** count it as drift and
 does not exit non-zero for it. The file holds a bare engine version, so it
