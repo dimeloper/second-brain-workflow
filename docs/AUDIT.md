@@ -365,6 +365,35 @@ note written before this check existed is full of prose nobody is going to
 re-wrap, and the vault's own rule for `#outcome/` tags applies unchanged: check
 what is being written, do not retrofit.
 
+### Is this already written down?
+
+`check-lineage.py --overlap` reports pairs of notes in the same domain whose
+slugs share most of their significant words — candidates for merging.
+
+```bash
+./scripts/check-lineage.py --vault ~/vaults/second-brain --overlap
+```
+
+The gap it closes sits at the other end of the pipeline from everything above.
+Lineage polices a note's maturity *after* it exists; `rule-budget` stops the
+rendered output becoming the unread wall the vault replaces. Nothing asked
+whether a new note was already there. In the week of 2026-09-14 the corpus took
+78 new notes onto a base of 477 — 16% in seven days — and two notes making one
+claim under two slugs are worse than one, because `practices-for` offers
+whichever it reaches first and the other decays unread.
+
+**Same domain only.** A backend note and a frontend note sharing three words are
+two places the same word is used, not duplicates; comparing across domains was
+tried first and produced mostly that.
+
+**Reported, never enforced**, and it does not touch the exit code. Two notes can
+share every significant word and make opposite claims — this cannot tell those
+apart and must not pretend to.
+
+**A clean run is a statement about wording, not about meaning.** Two notes
+making one claim in different words score zero here. This catches the cheap
+case, which is the one that actually happens when a corpus grows 16% in a week.
+
 ## Project state: does the overview still describe the repo?
 
 `recent-work.py` is a chronology and cannot go stale — a note about 2026-09-15

@@ -186,6 +186,72 @@ def load_notes(vault):
     return notes, problems
 
 
+# Words that carry no subject. A vault's slugs are written as sentences, so
+# without this every note shares "a", "the" and "not" with every other one and
+# the score measures English rather than overlap.
+OVERLAP_STOPWORDS = frozenset("""
+a an the of to in on at for with and or not no do dont doesnt is are be been
+it its your you this that these those from than then when what which who how
+only every each one two before after into out up down over under across
+""".split())
+
+# Jaccard over slug tokens. Tuned on this vault: 0.5 surfaces real near-twins
+# and leaves same-topic-different-claim pairs alone. It is a prompt for a human
+# to look, never a verdict — see `overlap` for why it cannot be a gate.
+OVERLAP_THRESHOLD = 0.5
+
+# A wall of maybes is a wall nobody reads. The strongest pairs are the ones
+# worth a look, and the threshold is one flag away for anyone who wants more.
+OVERLAP_LIMIT = 20
+
+
+def overlap_tokens(slug):
+    return frozenset(w for w in slug.split("-") if w and w not in OVERLAP_STOPWORDS)
+
+
+def overlap(notes, threshold=OVERLAP_THRESHOLD):
+    """[(a, b, score, shared)] — pairs of notes that may be the same claim twice.
+
+    The gap this closes. `check-lineage` polices a note's maturity *after* it
+    exists, and `rule-budget` stops the rendered output becoming the unread wall
+    the vault replaces. Nothing asks the question at the other end: is this
+    already written down. In the week of 2026-09-14 the corpus took 78 new notes
+    onto a base of 477 — 16% in seven days — and two notes saying the same thing
+    under different slugs are worse than one, because `practices-for` will offer
+    whichever it reaches first and the other decays unread.
+
+    **Same domain only.** The folder is the domain, and a backend note and a
+    frontend note sharing three words are not duplicates — they are two places
+    the same word is used. Comparing across domains was tried first and produced
+    mostly that.
+
+    **Reported, never enforced.** Two notes can share every significant word and
+    make opposite claims: `do-not-fetch-a-live-product-api-into-a-marketing-landing`
+    and a note about when you should is the shape. This cannot tell those apart
+    and must not pretend to — it is a prompt to look, which is why nothing here
+    affects an exit code.
+    """
+    by_domain = {}
+    for note in notes:
+        domain = note["rel"].split("/")[0] if "/" in note["rel"] else ""
+        by_domain.setdefault(domain, []).append(note)
+
+    out = []
+    for domain, group in by_domain.items():
+        tokens = {n["slug"]: overlap_tokens(n["slug"]) for n in group}
+        for i, a in enumerate(group):
+            for b in group[i + 1:]:
+                ta, tb = tokens[a["slug"]], tokens[b["slug"]]
+                if not ta or not tb:
+                    continue
+                shared = ta & tb
+                score = len(shared) / len(ta | tb)
+                if score >= threshold:
+                    out.append((a, b, score, sorted(shared)))
+    out.sort(key=lambda row: -row[2])
+    return out
+
+
 OBSERVED_IN_RE = re.compile(r'^\*\*Observed in:\*\*\s*(.*)', re.MULTILINE)
 
 
@@ -505,6 +571,9 @@ def audit(vault, rules_dir, stale_months, as_of):
 
     return {
         "ready": ready,
+        # Every note as loaded, for callers that ask a question about the
+        # corpus rather than about one note's rung — `--overlap` is the first.
+        "notes": notes,
         "lineage_groups": len(set(lineage.values())),
         "lineage_collapsed": sum(n["collapsed"] for n in notes),
         "trialing_bar": trialing_bar,
@@ -686,6 +755,29 @@ def report(result, vault, rules_dir, stale_months):
     return "\n".join(lines)
 
 
+def overlap_report(pairs, threshold):
+    """The overlap section. Never part of the exit code — see `overlap`."""
+    if not pairs:
+        # Said precisely, because the cheap reading of a clean run here is
+        # "there is no duplication in the vault", and this cannot show that.
+        # Two notes making one claim in different words score zero.
+        return (f"Possible overlap (shared-word score >= {threshold}): none — "
+                "no two notes in one domain share that much of their slug. "
+                "That is a statement about wording, not about meaning.")
+    lines = [f"Possible overlap (shared-word score >= {threshold}): {len(pairs)}",
+             "  Candidates for merging, not findings. Read both before touching "
+             "either — two notes can share every word and make opposite claims."]
+    for a, b, score, shared in pairs[:OVERLAP_LIMIT]:
+        lines.append(f"  - {score:.2f}  {a['slug']}")
+        lines.append(f"          {b['slug']}")
+        lines.append(f"          shared: {', '.join(shared)}")
+    if len(pairs) > OVERLAP_LIMIT:
+        lines.append(f"  ... and {len(pairs) - OVERLAP_LIMIT} more below the "
+                     f"{OVERLAP_LIMIT} strongest. Raise --overlap-threshold to "
+                     "narrow, or read these first.")
+    return "\n".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--vault", help="vault path (default: $SBW_VAULT)")
@@ -693,6 +785,15 @@ def main():
     ap.add_argument("--stale-months", type=int, default=6,
                      help="staleness window for enforced notes (default: 6)")
     ap.add_argument("--as-of", help="treat this ISO date as today (for reproducible runs/tests)")
+    ap.add_argument("--overlap", action="store_true",
+                    help="also report pairs of notes in the same domain that may "
+                         "be the same claim written twice. Reported, never "
+                         "enforced — it cannot tell a duplicate from two notes "
+                         "making opposite claims about one topic.")
+    ap.add_argument("--overlap-threshold", type=float, default=OVERLAP_THRESHOLD,
+                    metavar="F",
+                    help=f"shared-word score a pair needs to be reported "
+                         f"(default: {OVERLAP_THRESHOLD})")
     args = ap.parse_args()
 
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
@@ -716,6 +817,10 @@ def main():
         print(f"warning: {name}: {problem}", file=sys.stderr)
 
     print(report(result, vault, rules_dir, args.stale_months))
+    if args.overlap:
+        print()
+        print(overlap_report(overlap(result["notes"], args.overlap_threshold),
+                             args.overlap_threshold))
 
     return 1 if result["coverage"] == "none" or result["orphaned"] else 0
 

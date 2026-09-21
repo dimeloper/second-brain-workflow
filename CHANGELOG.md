@@ -48,6 +48,15 @@ write release notes, not two to keep in sync by hand.
   count from 54 to 49 and named the four wrong entries.
 
 ### Added
+- **`check-lineage.py --overlap`** reports pairs of notes in one domain whose
+  slugs share most of their significant words. Lineage polices a note's maturity
+  after it exists and `rule-budget` stops the rendered rules becoming a wall;
+  nothing asked whether a new note was already written down, while the corpus
+  took 78 new notes onto a base of 477 in the week of 2026-09-14. Opt-in, never
+  part of the exit code, same domain only, and a clean run is a statement about
+  wording rather than about meaning — two notes making one claim in different
+  words score zero. See
+  [Auditing the vault](docs/AUDIT.md#is-this-already-written-down).
 - **`check-project-state.py`, and `make audit` runs it.** A project overview is
   revised in place and written in the present tense, which makes it the one
   vault surface that can be *wrong* rather than merely old — and the first one a

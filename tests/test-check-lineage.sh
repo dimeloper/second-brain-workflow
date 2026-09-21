@@ -832,4 +832,64 @@ case "${out_bar}" in
   *) fail "a scoped note is still judged on repos" "${out_bar}" ;;
 esac
 
+# --- --overlap: is this already written down? -------------------------------
+#
+# check-lineage polices a note's maturity after it exists and rule-budget stops
+# the rendered output becoming a wall. Nothing asked the question at the other
+# end. In the week of 2026-09-14 the corpus took 78 new notes onto a base of
+# 477, and two notes making one claim under two slugs are worse than one:
+# practices-for offers whichever it reaches first and the other decays unread.
+
+out_overlap="$(run --overlap 2>/dev/null)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_overlap}" in
+  *"0.60  bound-every-outbound-call-with-a-deadline"*"bound-every-outbound-call-with-a-timeout"*)
+    pass "two near-twin slugs in one domain are reported as a pair" ;;
+  *) fail "two near-twin slugs in one domain are reported as a pair" "${out_overlap}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_overlap}" in
+  *"shared: bound, call, outbound"*)
+    pass "the pair says which words it scored on, so it can be argued with" ;;
+  *) fail "the pair says which words it scored on, so it can be argued with" "${out_overlap}" ;;
+esac
+
+# The constraint the whole heuristic rests on. The frontend fixture is a near
+# word-for-word match for the backend one and is not a duplicate of it — they
+# are two places the same words are used, which is what comparing across
+# domains produces almost all of.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_overlap}" in
+  *"bound-every-outbound-call-with-a-timeout-in-the-browser"*)
+    fail "a pair spanning two domains is not an overlap" "${out_overlap}" ;;
+  *) pass "a pair spanning two domains is not an overlap" ;;
+esac
+
+# Reported, never enforced: two notes can share every significant word and make
+# opposite claims, and this cannot tell those apart.
+run --overlap >/dev/null 2>&1
+rc_overlap=$?
+run >/dev/null 2>&1
+assert_exit "$?" "${rc_overlap}" "--overlap never changes the exit code"
+
+# A clean run here says something narrow, and the cheap reading of it — "there
+# is no duplication in the vault" — is exactly what it cannot show.
+out_clean="$(run --overlap --overlap-threshold 0.99 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_clean}" in
+  *"none"*"a statement about wording, not about meaning"*)
+    pass "a clean overlap run says what it does not prove" ;;
+  *) fail "a clean overlap run says what it does not prove" "${out_clean}" ;;
+esac
+
+# Off by default: a corpus-wide maybe does not belong in the report that gates
+# `make audit`.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(run 2>/dev/null)" in
+  *"Possible overlap"*) fail "--overlap is opt-in" "printed without the flag" ;;
+  *) pass "--overlap is opt-in" ;;
+esac
+
 finish
