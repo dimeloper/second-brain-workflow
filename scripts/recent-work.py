@@ -47,6 +47,8 @@ from lib.followups import done_followups, group_for_repo  # noqa: E402
 from lib.followups import heading_repo, labelled_sections  # noqa: E402
 from lib.followups import note_context_repo, outcome_for  # noqa: E402
 from lib.followups import repo_file_index, section_items, vault_repos  # noqa: E402
+from lib.practice_index import WORKFLOW_SCOPE  # noqa: E402
+from lib.practice_index import index as practice_index  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
 DATE_NOTE_RE = re.compile(r'^(\d{4})-(\d{2})-(\d{2})\.md$')
@@ -67,6 +69,17 @@ PRACTICES_HEADING = "## Practices followed"
 VAULT_WRITES_HEADING = "## Vault writes (approved)"
 
 WIKILINK_RE = re.compile(r'\[\[([^\]|]+)')
+
+# The *leading* link of a citation, which is the one the bullet is about.
+# `[[a]] — because [[b]] said so` cites a and mentions b, and a footer that
+# reads both as things followed reports the mention as a practice. Optional
+# emphasis, because `- **[[slug]]**` is the same citation typed louder.
+CITATION_RE = re.compile(r'^\s*(?:[*_]{1,2}\s*)?\[\[([^\]|]+)')
+
+# How much of a bullet that cites nothing is worth printing back at the reader
+# to find it by. Long enough to locate the line, short enough not to reprint a
+# paragraph inside a footer.
+UNCITED_WIDTH = 48
 
 
 def resolve_vault(explicit, cfg):
@@ -115,7 +128,13 @@ def window(vault, as_of, count=None, since=None):
 
 
 def links_in(text, heading):
-    """Wikilink targets (or bare bullets) under one section, deduped, in order."""
+    """Wikilink targets (or bare bullets) under one section, deduped, in order.
+
+    Still lenient, and deliberately so: `## Vault writes (approved)` records
+    what a session wrote, and a project doc revised in place is legitimately
+    written as prose rather than as a link. Practices are read by
+    `citations_in` instead, because there the claim is narrower.
+    """
     out = []
     for item in section_items(text, heading):
         found = WIKILINK_RE.findall(item)
@@ -126,7 +145,49 @@ def links_in(text, heading):
     return out
 
 
-def collect(notes, known_repos):
+def citations_in(text, heading):
+    """[(slug, item)] under one section — slug None when the bullet cites nothing.
+
+    One bullet, one citation, taken from the front of the line. Reading every
+    link on the line is what put a date in the practices footer: a citation
+    whose *reason* mentions another note ("filed on [[2026-09-15]] via --date")
+    was counted as two practices followed, one of them a day.
+    """
+    out = []
+    for item in section_items(text, heading):
+        m = CITATION_RE.match(item)
+        out.append((m.group(1).strip() if m else None, item))
+    return out
+
+
+def record_citation(summary, note_date, slug, item, practices):
+    """File one `## Practices followed` bullet into the bucket it belongs in.
+
+    Three buckets, because they call for three different things. A practice is
+    a decision the window made. A workflow-scoped one is the appender restating
+    its own invariant — true, and not evidence about the work. Anything that
+    resolves nowhere is a broken citation, and naming it is the only way it
+    ever gets fixed.
+    """
+    if slug is None:
+        shown = display(item)
+        if len(shown) > UNCITED_WIDTH:
+            shown = shown[:UNCITED_WIDTH].rstrip() + "…"
+        entry = f"{shown} (no wikilink)"
+        if entry not in summary["unresolved"]:
+            summary["unresolved"].append(entry)
+        return
+    entry = practices.get(slug)
+    if entry is None:
+        if slug not in summary["unresolved"]:
+            summary["unresolved"].append(slug)
+    elif entry.scope == WORKFLOW_SCOPE:
+        summary["hygiene"].setdefault(slug, set()).add(note_date)
+    elif slug not in summary["practices"]:
+        summary["practices"].append(slug)
+
+
+def collect(notes, known_repos, practices=None):
     """(records, summary) across `notes`.
 
     A record is one thing that happened: `kind` says which section said so, and
@@ -136,7 +197,9 @@ def collect(notes, known_repos):
     then met.
     """
     records = []
-    summary = {"notes": len(notes), "no_built": 0, "practices": [], "writes": []}
+    practices = practices or {}
+    summary = {"notes": len(notes), "no_built": 0, "practices": [], "writes": [],
+               "hygiene": {}, "unresolved": []}
     for note_date, path in notes:
         text = path.read_text(encoding="utf-8")
         # One context per note, shared by every item in it — the note's own
@@ -169,9 +232,8 @@ def collect(notes, known_repos):
                             "outcome": outcome, "context": context,
                             "basis_note": CONTEXT_BASIS})
 
-        for name in links_in(text, PRACTICES_HEADING):
-            if name not in summary["practices"]:
-                summary["practices"].append(name)
+        for slug, item in citations_in(text, PRACTICES_HEADING):
+            record_citation(summary, note_date, slug, item, practices)
         for name in links_in(text, VAULT_WRITES_HEADING):
             if name not in summary["writes"]:
                 summary["writes"].append(name)
@@ -271,6 +333,25 @@ def footers(summary, repo):
     if summary["practices"]:
         out.append(f"Practices followed in this window ({len(summary['practices'])}, "
                    "whatever repo): " + ", ".join(summary["practices"]))
+    hygiene = summary.get("hygiene") or {}
+    if hygiene:
+        # Counted in notes, not citations. Three invariants restated by each of
+        # four wrap-ups in a day is twelve lines and one fact, and it was that
+        # arithmetic — 53 of 164 citation lines in the week of 2026-09-14 —
+        # that made the practices list read as a third bookkeeping.
+        cited_in = len({d for dates in hygiene.values() for d in dates})
+        out.append(f"Workflow hygiene ({len(hygiene)}, cited in {cited_in} of "
+                   f"{plural(summary['notes'], 'note')}): "
+                   + ", ".join(sorted(hygiene))
+                   + " — the appender's own invariants, not decisions this "
+                     "window made.")
+    if summary.get("unresolved"):
+        out.append("Cited under Practices followed but not a practice note "
+                   f"({len(summary['unresolved'])}): "
+                   + ", ".join(summary["unresolved"]))
+        out.append("  A rule, a project doc or a date link resolves nowhere in "
+                   "practices/ — and is a dead link in the editor too. Fix the "
+                   "citation, or write the note it should point at.")
     if summary["writes"]:
         out.append(f"Vault writes approved in this window ({len(summary['writes'])}): "
                    + ", ".join(summary["writes"]))
@@ -291,7 +372,8 @@ def report(records, notes, asked, since, vault, repo, basis, groups, brief):
         lines.append("")
         lines.append("  Nothing recorded as built or closed in this window.")
         lines.extend([""] + footers({"notes": len(notes), "no_built": 0,
-                                     "practices": [], "writes": []}, repo))
+                                     "practices": [], "writes": [],
+                                     "hygiene": {}, "unresolved": []}, repo))
         return "\n".join(lines)
 
     if groups is None:
@@ -388,7 +470,7 @@ def main():
 
     asked = args.recent if args.recent is not None else DEFAULT_NOTES
     notes = window(vault, as_of, count=asked, since=since)
-    records, summary = collect(notes, known)
+    records, summary = collect(notes, known, practice_index(vault))
 
     repo_files = repo_file_index(Path.cwd()) if repo else None
     annotate(records, known, repo, repo_files,

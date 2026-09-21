@@ -86,6 +86,16 @@ practice-note template makes it every new note's default, so it means "not
 scoped yet" as often as "process rule". A domain-specific note with no glob is
 unscoped, stays on the repo bar, and wants a glob rather than a rung.
 
+**`scope: workflow` is a third thing, and it is about reporting rather than
+promotion.** A practice about how the vault itself gets written — label a
+repeated `## Built`, propose before you write, publish the capture first — is
+restated by every session wrap-up, because every wrap-up obeys it. Over the week
+of 2026-09-14 three such notes accounted for 53 of 164 citation lines, so a
+"practices followed" list read as a third bookkeeping. Marking the note
+`scope: workflow` moves it to its own footer line, counted in *notes* rather
+than citations. It changes no maturity bar and no promotion: the note is a real
+practice, it is simply not evidence about the work a window did.
+
 This is **opt-in**: a vault whose `00-maps/promotion-candidates.md` declares no
 `length(applications)` bar keeps every note on the repo bar, and its index and
 audit output are unchanged byte for byte. Vaults created by `init-vault.sh` are

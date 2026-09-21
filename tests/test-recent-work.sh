@@ -196,6 +196,57 @@ case "${out}" in
   *) fail "practices followed are reported as a vault-wide footer" "${out}" ;;
 esac
 
+# --- what a citation is, and what it is not ---------------------------------
+
+# The footer line alone, not the whole report: every note date appears in the
+# body, so a whole-report match here would pass on a report that got this
+# exactly wrong.
+practices_line="$(printf '%s\n' "${out}" | grep '^Practices followed in this window')"
+
+# The bug this section exists for: a citation whose *reason* mentions another
+# note was counted as two practices followed, and one of them was a day. Only
+# the leading link is the claim; everything after the dash is why.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${practices_line}" in
+  *"2026-01-02"*) fail "a date linked in a citation's prose is not a practice" "${practices_line}" ;;
+  *) pass "a date linked in a citation's prose is not a practice" ;;
+esac
+
+# Resolved against practices/, because nothing in `[[x]]` says what x is. A
+# rule, a project doc and a date all link identically and none of them is a
+# practice that was followed.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Cited under Practices followed but not a practice note (2):"*"verify-integrations"*)
+    pass "a citation that resolves nowhere is named, not counted" ;;
+  *) fail "a citation that resolves nowhere is named, not counted" "${out}" ;;
+esac
+
+# Named rather than dropped: a dead link is a finding about the note that wrote
+# it, and silently excluding it hides the same drift that counting it does.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"A line that cites nothing at all"*"(no wikilink)"*)
+    pass "a bullet with no link at all is reported with its own reason" ;;
+  *) fail "a bullet with no link at all is reported with its own reason" "${out}" ;;
+esac
+
+# The appender's own invariants are real practices and are not evidence about
+# the work, so they get their own line instead of outweighing it.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"Workflow hygiene (1, cited in 2 of 3 notes): keep-one-header-per-section-in-daily-notes"*)
+    pass "a scope: workflow practice is collapsed and counted in notes" ;;
+  *) fail "a scope: workflow practice is collapsed and counted in notes" "${out}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${practices_line}" in
+  *"keep-one-header-per-section"*)
+    fail "a workflow-scoped practice is not also in the practices list" "${practices_line}" ;;
+  *) pass "a workflow-scoped practice is not also in the practices list" ;;
+esac
+
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
   *"Vault writes approved in this window (1): dedupe-webhooks-on-an-idempotency-key"*)
