@@ -508,6 +508,32 @@ def resolve_mode(repo, asked, reporting):
     return "shared", "Mode: shared (first render here)" if not reporting else "Mode: shared"
 
 
+def foreign_symlink(repo, dest):
+    """Is this symlink the repo's own convention rather than our leftover?
+
+    The pre-copy layout linked each rendered path *out* of the repo and into the
+    rules source, so one of ours always resolves outside the repo. A convention
+    the repo made for itself points within it -- `AGENTS.md -> CLAUDE.md` is the
+    real case, committed deliberately in a repo that had never run this tool.
+    Where the link lands is therefore the signal, and it is the one signal that
+    does not change after we render: keying this on "have we rendered here
+    before" would protect the link on the first run and delete it on the second,
+    once `.sbw-version` existed.
+
+    Reading the link's *content* cannot decide this -- it resolves to the
+    target's bytes, which carry no marker either way, which is why this was
+    originally left as "a symlink is always ours".
+    """
+    if not dest.is_symlink():
+        return False
+    try:
+        target = Path(os.path.realpath(str(dest)))
+        target.relative_to(Path(os.path.realpath(str(repo))))
+    except (ValueError, OSError):
+        return False                    # outside the repo, or unreadable: ours
+    return True
+
+
 def would_write(repo, rel):
     """Would a render actually write this path, or does it skip it?
 
@@ -521,7 +547,9 @@ def would_write(repo, rel):
     if rel in HEADERLESS_OWNED:
         return True                     # overwritten unconditionally
     if dest.is_symlink():
-        return True                     # legacy link, always replaced
+        # A link into the repo is the repo's own convention, and the writer now
+        # skips it; one out of the repo is our pre-copy layout, still replaced.
+        return not foreign_symlink(repo, dest)
     if dest.exists() and not is_generated(dest):
         return False                    # hand-written: the writer skips it
     return True
@@ -882,12 +910,21 @@ def main():
 
     for rel, content in sorted(rendered.items()):
         dest = repo / rel
-        # A symlink is left over from the pre-copy layout — always ours, always
-        # replaced. Reading through it would find no marker and misclassify it
-        # as hand-written.
-        legacy_link = dest.is_symlink()
+        # A symlink here is either a leftover of our own pre-copy layout or a
+        # convention the repo made for itself. That used to resolve to "always
+        # ours, always replaced", which silently deleted a committed
+        # `AGENTS.md -> CLAUDE.md` in a repo that had never run this tool.
+        # `foreign_symlink()` distinguishes them by where the link lands; note
+        # that `agents_is_writable()` already reached the right answer here by
+        # reading through the link, so the two were contradicting each other and
+        # the destructive branch won.
+        foreign_link = foreign_symlink(repo, dest)
+        legacy_link = dest.is_symlink() and not foreign_link
         if legacy_link and mode == "write":
             dest.unlink()
+        if foreign_link:
+            print(f"  skip (hand-written, not ours): {rel} (symlink -> {os.readlink(dest)})")
+            continue
         if not legacy_link and dest.exists() and not is_generated(dest):
             print(f"  skip (hand-written, not ours): {rel}")
             if rel == "CLAUDE.md":
