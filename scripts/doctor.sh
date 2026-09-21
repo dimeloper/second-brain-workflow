@@ -13,6 +13,9 @@
 #   - every repo on this machine that carries rendered output is in the registry
 #   - no repo has rule files that resolve to nothing, which both checks above
 #     read as "not onboarded" rather than as the fault it is
+#   - whether this machine's Claude Code reads a root AGENTS.md on its own,
+#     which is what decides if the rendered CLAUDE.md stub is still carrying
+#     anything here (reported, never failed)
 # Changes nothing. Not part of `make check` — like `make guard` and
 # `make vault-index-check`, it needs a real vault, and CI has none.
 #
@@ -65,7 +68,15 @@ while [ $# -gt 0 ]; do
     # the closing paragraph mid-sentence each time a bullet was added.
     # tests/test-registry-scan.sh asserts the final line still reaches the
     # reader, so the next edit here cannot truncate it silently.
-    -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # Derived, not a line count. This range had rotted four times by v0.55.0 —
+    # every check added to the header above silently truncated the help, and
+    # each time the fix was to bump a number that would rot again on the next
+    # check. The header is every comment line from line 2 up to the first line
+    # that is not one, which is a fact about the file rather than a number
+    # about it.
+    -h|--help)
+      awk 'NR>1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "$0"
+      exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -820,6 +831,58 @@ EOF
   return 0
 }
 
+# Does this machine's Claude Code read a root AGENTS.md on its own?
+#
+# Claude Code 2.1.277 reads AGENTS.md in a project with no CLAUDE.md, which
+# makes the CLAUDE.md stub render.py emits — a provenance comment and an
+# `@AGENTS.md` line — redundant on a machine new enough. It is not redundant
+# yet everywhere, and this check is what says which kind of machine you are on
+# before that stub is dropped rather than after.
+#
+# Reported, never failed, in every outcome. An older CLI is not a
+# misconfiguration: it is a machine where the stub is still load-bearing, and
+# doctor's warnings are documented as states that need an action. There is no
+# action here — the stub is rendered either way today — so a warning would make
+# doctor non-zero on a setup with nothing wrong with it, which is the shape the
+# ok/warn/ERROR split exists to avoid.
+#
+# Two things this cannot see, both named in the output rather than assumed
+# away: the feature is off on Bedrock, Vertex and Foundry, and it is toggleable
+# under "Project instructions" in `/config`. A version at or above the floor is
+# therefore necessary and not sufficient, which is exactly why the message says
+# "can" and not "does".
+AGENTS_NATIVE_FLOOR="2.1.277"
+
+check_claude_agents_support() {
+  local raw version
+  if ! command -v claude >/dev/null 2>&1; then
+    ok "claude is not on PATH, so whether it reads AGENTS.md natively is unknown here
+        that is only a question for dropping the rendered CLAUDE.md stub; nothing renders differently"
+    return 0
+  fi
+  raw="$(claude --version 2>/dev/null || true)"
+  # "2.1.278 (Claude Code)" -> "2.1.278". Anything else is left unparsed rather
+  # than pattern-matched into a number that might not be one.
+  version="$(printf '%s' "${raw}" | sed -n 's/^\([0-9][0-9.]*\).*/\1/p')"
+  if [ -z "${version}" ]; then
+    ok "claude is on PATH but reported no parseable version (${raw:-no output})
+        cannot tell whether it reads AGENTS.md natively; the rendered CLAUDE.md stub covers it either way"
+    return 0
+  fi
+  # sort -V, not a numeric compare per field: the floor and the installed
+  # version are both dotted, and this is the one comparison in the file that
+  # has to get 2.1.9 < 2.1.277 right.
+  if [ "$(printf '%s\n%s\n' "${AGENTS_NATIVE_FLOOR}" "${version}" | sort -V | head -1)" = "${AGENTS_NATIVE_FLOOR}" ]; then
+    ok "claude ${version} can read a root AGENTS.md natively (>= ${AGENTS_NATIVE_FLOOR})
+        so the rendered CLAUDE.md stub is redundant here — but only here: it is off on
+        Bedrock/Vertex/Foundry and toggleable under \"Project instructions\" in /config"
+  else
+    ok "claude ${version} predates native AGENTS.md support (< ${AGENTS_NATIVE_FLOOR})
+        the rendered CLAUDE.md stub is what delivers the always-on set to Claude Code here"
+  fi
+  return 0
+}
+
 echo "second-brain-workflow doctor — vault: ${VAULT}"
 check_hook
 check_vault_ci
@@ -828,6 +891,7 @@ check_skills
 check_orphaned_skills
 check_rules
 check_roster
+check_claude_agents_support
 check_submodules
 check_registry
 

@@ -479,5 +479,83 @@ case "${out}" in
 esac
 rm -f "${XDG_CONFIG_HOME}/second-brain-workflow/onboard-declined"
 
+# --- native AGENTS.md support: reported, never a finding ---------------------
+# The check exists to say whether the rendered CLAUDE.md stub is still carrying
+# anything on this machine, before it is dropped rather than after. Every
+# outcome is an `ok` line: an older CLI is a working setup, and a warning would
+# make doctor non-zero on a machine with nothing wrong with it.
+#
+# A stub `claude` on PATH, so these cases test the parse and the comparison
+# rather than whatever version the developer happens to have installed.
+FAKEBIN="${SANDBOX}/fakebin"
+mkdir -p "${FAKEBIN}"
+fake_claude() {
+  printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$1" > "${FAKEBIN}/claude"
+  chmod +x "${FAKEBIN}/claude"
+}
+
+fake_claude "2.1.278 (Claude Code)"
+out="$(PATH="${FAKEBIN}:${PATH}" "${DOCTOR}" --vault "${V}" 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "a version at or above the floor is not a finding"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"claude 2.1.278 can read a root AGENTS.md natively"*"Bedrock/Vertex/Foundry"*)
+    pass "names the version, and that the floor is necessary and not sufficient" ;;
+  *) fail "names the version, and that the floor is necessary and not sufficient" "${out}" ;;
+esac
+
+# 2.1.9 < 2.1.277 only under a version-aware compare; a lexical or per-field
+# numeric one gets this backwards, which is the whole reason for sort -V.
+fake_claude "2.1.9 (Claude Code)"
+out="$(PATH="${FAKEBIN}:${PATH}" "${DOCTOR}" --vault "${V}" 2>&1)"
+rc=$?
+assert_exit 0 "${rc}" "a version below the floor is still not a finding"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"claude 2.1.9 predates native AGENTS.md support"*"stub is what delivers"*)
+    pass "2.1.9 is below 2.1.277, and the stub is named as load-bearing there" ;;
+  *) fail "2.1.9 is below 2.1.277, and the stub is named as load-bearing there" "${out}" ;;
+esac
+
+fake_claude "2.1.277 (Claude Code)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(PATH="${FAKEBIN}:${PATH}" "${DOCTOR}" --vault "${V}" 2>&1)" in
+  *"can read a root AGENTS.md natively"*) pass "the floor itself counts as supported" ;;
+  *) fail "the floor itself counts as supported" "exactly 2.1.277 read as unsupported" ;;
+esac
+
+# Unparseable output is not guessed at, and not treated as either answer.
+fake_claude "some future banner with no version"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(PATH="${FAKEBIN}:${PATH}" "${DOCTOR}" --vault "${V}" 2>&1)" in
+  *"reported no parseable version"*) pass "an unreadable version says so rather than assuming one" ;;
+  *) fail "an unreadable version says so rather than assuming one" "guessed at a version" ;;
+esac
+rm -f "${FAKEBIN}/claude"
+
+# No claude at all is the CI case, and the render is unaffected either way.
+# PATH is filtered rather than replaced: emptying it takes bash, sed and sort
+# with it, and doctor needs those. Filtered rather than left alone, too — the
+# developer's own claude is on PATH and would answer this case for it.
+path_without_claude() {
+  local out="" d oldifs="${IFS}"
+  IFS=:
+  # shellcheck disable=SC2086  # splitting PATH on : is the point
+  for d in ${PATH}; do
+    [ -x "${d}/claude" ] && continue
+    out="${out}${out:+:}${d}"
+  done
+  IFS="${oldifs}"
+  printf '%s' "${out}"
+}
+out="$(PATH="$(path_without_claude)" "${DOCTOR}" --vault "${V}" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"claude is not on PATH"*"nothing renders differently"*)
+    pass "no claude on PATH is reported as unknown, not as a problem" ;;
+  *) fail "no claude on PATH is reported as unknown, not as a problem" "${out}" ;;
+esac
+
 
 finish

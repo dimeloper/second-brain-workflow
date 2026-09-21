@@ -343,6 +343,51 @@ assert_contains "${REPO_AO3}/.cursor/rules/always-on.mdc" "alwaysApply: true" \
 assert_contains "${REPO_AO3}/AGENTS.md" "my own conventions" \
   "a hand-written AGENTS.md is still never overwritten"
 
+# The skip message for a hand-written CLAUDE.md used to say "add `@AGENTS.md` at
+# its top to pick up shared standards" unconditionally. Where AGENTS.md is not
+# ours that promises something it cannot deliver — the rules went to
+# .claude/rules/ — and where AGENTS.md is a symlink to CLAUDE.md, following it
+# makes the file import itself. Both shapes are real onboarded repos.
+printf 'my own notes\n' > "${REPO_AO3}/CLAUDE.md"
+out_nudge="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
+  "${REPO_AO3}" --check 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nudge}" in
+  *"add \`@AGENTS.md\` at its top"*)
+    fail "no import is suggested when AGENTS.md is not ours" "${out_nudge}" ;;
+  *"nothing to import"*".claude/rules/"*)
+    pass "no import is suggested when AGENTS.md is not ours" ;;
+  *) fail "no import is suggested when AGENTS.md is not ours" "${out_nudge}" ;;
+esac
+
+# ...and it is still suggested where it is the right advice: AGENTS.md ours,
+# CLAUDE.md the repo's own.
+REPO_AO5="${SANDBOX}/repo-ao5"
+make_target_repo "${REPO_AO5}"
+printf 'my own notes\n' > "${REPO_AO5}/CLAUDE.md"
+out_nudge2="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
+  "${REPO_AO5}" --check 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nudge2}" in
+  *"add \`@AGENTS.md\` at its top"*)
+    pass "the import is still suggested when AGENTS.md is ours" ;;
+  *) fail "the import is still suggested when AGENTS.md is ours" "${out_nudge2}" ;;
+esac
+
+# ...and not once it has been taken. Advice a reader has already acted on is
+# indistinguishable, on the next run, from advice they ignored.
+printf '@AGENTS.md\n\nmy own notes\n' > "${REPO_AO5}/CLAUDE.md"
+out_nudge3="$("${ENGINE}/scripts/render.py" --rules-dir "${AO_RULES}" \
+  "${REPO_AO5}" --check 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_nudge3}" in
+  *"add \`@AGENTS.md\` at its top"*)
+    fail "the suggestion stops once the import is there" "${out_nudge3}" ;;
+  *"skip (hand-written, not ours): CLAUDE.md"*)
+    pass "the suggestion stops once the import is there" ;;
+  *) fail "the suggestion stops once the import is there" "${out_nudge3}" ;;
+esac
+
 # --- upgrading a repo rendered before the fold ------------------------------
 # Every repo onboarded up to v0.54.0 carries an always-on .mdc this engine no
 # longer emits. Left in place it would keep loading, so the always-on set would
