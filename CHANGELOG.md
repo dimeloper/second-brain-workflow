@@ -17,6 +17,31 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **A repo's own symlink is no longer deleted by a render.** `render.py` treated
+  every symlink in its write set as a leftover of the pre-copy layout — "always
+  ours, always replaced" — because reading through one finds the target's bytes
+  and no marker, so it could not be classified the usual way. A repo that makes
+  its own convention out of a symlink hit that branch: `AGENTS.md -> CLAUDE.md`,
+  committed deliberately in a repo that had never run this tool, was unlinked
+  with no prompt and none of the "skip (hand-written, not ours)" protection the
+  adjacent `CLAUDE.md` gets. `agents_is_writable()` had already reached the right
+  answer about the same file by reading through the link, so the two disagreed
+  and the destructive branch won.
+
+  A symlink is now classified by **where it lands**: the pre-copy layout linked
+  out of the repo into the rules source, so one of ours resolves outside it,
+  while a repo's own convention points within. That signal is also the one that
+  does not change after we render — keying it on "have we rendered here before"
+  would have protected the link on the first run and deleted it on the second,
+  once `.sbw-version` existed.
+
+  This also unblocks `--local` on such a repo. The tracked-path refusal asks
+  `would_write()`, which shared the same assumption, so one tracked symlink
+  refused the whole render — including the 16 rule files and `.sbw-version`
+  beside it, all untracked and all excludable cleanly. Quiet onboarding now
+  renders around the link instead of refusing the repo.
+
 ## [0.54.0] - 2026-09-18
 
 ### Added
