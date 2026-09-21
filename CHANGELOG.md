@@ -17,6 +17,49 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`make doctor` says whether this machine's Claude Code reads `AGENTS.md` on
+  its own.** Claude Code 2.1.277 reads a root `AGENTS.md` in a project with no
+  `CLAUDE.md`, which is what decides whether the stub `render.py` emits is still
+  carrying anything here. The check is the groundwork for dropping that stub:
+  it answers the question before the drop rather than after it.
+
+  Reported in every outcome, never a finding. An older CLI is a working setup,
+  not a misconfiguration, and doctor's warnings are documented as states that
+  need an action — there is no action here, so a warning would make doctor
+  non-zero on a machine with nothing wrong with it.
+
+  Two things it cannot see are named rather than assumed away: the feature is
+  off on Bedrock, Vertex and Foundry, and it is toggleable under "Project
+  instructions" in `/config`. A version at or above the floor is necessary and
+  not sufficient, so the line says *can*, not *does*. A version it cannot parse,
+  and a `claude` that is not on PATH, both say so instead of being read as
+  either answer.
+
+### Fixed
+- **`render.py` no longer tells you to make a file import itself.** The skip
+  message for a hand-written `CLAUDE.md` said "add `@AGENTS.md` at its top to
+  pick up shared standards" unconditionally. That advice is only correct where
+  `AGENTS.md` is ours and the always-on rules were folded into it. Two real
+  onboarded repos were being told otherwise:
+
+  - `AGENTS.md` hand-written — the always-on rules went to `.claude/rules/`
+    instead, so importing it picks up nothing while promising standards.
+  - `AGENTS.md` a symlink to `CLAUDE.md`, a convention a repo can reasonably
+    have — following the advice makes `CLAUDE.md` import itself.
+
+  The rules reach Claude Code in both cases through the per-rule files, so the
+  message now says there is nothing to import and where they already are. It is
+  also suppressed once the import is present: advice a reader has acted on is
+  otherwise indistinguishable, on the next run, from advice they ignored.
+
+- **`doctor --help` prints its whole header again, and cannot silently lose it
+  next time.** The range was `sed -n '2,33p'` over doctor's own header, so every
+  check added to that header truncated the help by one line — four times now,
+  each fixed by bumping a number that would rot on the next check. It is derived
+  from where the comment block actually ends, which is a fact about the file
+  rather than a number about it.
+
 ## [0.55.0] - 2026-09-21
 
 ### Major

@@ -964,7 +964,30 @@ def main():
         if not legacy_link and dest.exists() and not is_generated(dest):
             print(f"  skip (hand-written, not ours): {rel}")
             if rel == "CLAUDE.md":
-                print("     add `@AGENTS.md` at its top to pick up shared standards")
+                # Only when AGENTS.md is *ours*. The advice promises shared
+                # standards, and it delivers them only where the fold put them
+                # in AGENTS.md. Where it did not, the same line is wrong in two
+                # different ways, both found in real onboarded repos:
+                #
+                #   - AGENTS.md hand-written: the always-on rules went to
+                #     .claude/rules/ instead, so importing AGENTS.md picks up
+                #     nothing and the reader is told otherwise.
+                #   - AGENTS.md is a symlink to CLAUDE.md, a convention a repo
+                #     can reasonably have: following the advice makes CLAUDE.md
+                #     import itself.
+                #
+                # The rules do reach Claude Code in both cases, through the
+                # per-rule files, so there is nothing to fix — which is what
+                # the else branch says instead of suggesting a fix for it.
+                if fold and "@AGENTS.md" in dest.read_text(
+                        encoding="utf-8", errors="ignore"):
+                    pass        # already imports it; nothing to advise
+                elif fold:
+                    print("     add `@AGENTS.md` at its top to pick up shared standards")
+                else:
+                    print("     nothing to import: AGENTS.md here is not ours, so the")
+                    print("     always-on rules are already their own files under "
+                          ".claude/rules/")
             continue
         if legacy_link and mode != "write":
             print(f"  {'DRIFT' if mode == 'check' else 'would replace'}: {rel} (legacy symlink)")
