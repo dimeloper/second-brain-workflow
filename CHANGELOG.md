@@ -17,6 +17,31 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`recent-work.py` counted things that are not practices.** The footer read
+  every wikilink on a `## Practices followed` bullet, so a citation whose
+  *reason* mentioned another note — "filed on `[[2026-09-15]]` via `--date`" —
+  was reported as two practices followed, one of them a day. A bullet with no
+  link at all became a "practice" named after its own first sentence. And
+  nothing resolved the slug, so rules from the rules repo and project feature
+  files were counted beside real practice notes.
+
+  Now one citation per bullet, taken from the front of the line, resolved
+  against `practices/**`. Anything that resolves nowhere is reported under
+  **Cited under Practices followed but not a practice note** rather than
+  dropped — a dead citation is a finding about the note that wrote it, and it
+  is a dead link in Obsidian too. Over the week of 2026-09-14 this moved the
+  count from 54 to 49 and named the four wrong entries.
+
+### Added
+- **`scope: workflow` on a practice note, and its own footer line.** A practice
+  about how the vault is written is restated by every session wrap-up; three of
+  them accounted for 53 of 164 citation lines in one week, which made the
+  practices list read as a third bookkeeping. Marked notes now collapse to a
+  **Workflow hygiene** line counted in notes rather than citations. No maturity
+  bar or promotion changes — see [Versioning and the
+  bars](docs/REFERENCE.md#the-maturity-gradient).
+
 ## [0.57.0] - 2026-09-21
 
 ### Major

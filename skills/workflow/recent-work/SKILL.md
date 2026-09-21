@@ -115,6 +115,15 @@ honest:
 4. **Name what is missing.** The footer says how many notes in the window had no
    `## Built` section; a thin record and a quiet week look identical in a
    summary and lead to opposite conclusions. Read that line out.
+
+   Two other footer lines are findings rather than context, and belong in the
+   summary when they are non-empty. **Workflow hygiene** collapses the
+   `scope: workflow` practices — the appender's own invariants — so they do not
+   outweigh the decisions in the practices list; quote the practices count, not
+   that one, when asked what discipline the window showed. **Cited under
+   Practices followed but not a practice note** is a broken citation: a rule, a
+   project doc or a date that resolves nowhere in `practices/`, which is also a
+   dead link in the editor. Say it out loud — nobody goes looking for those.
 5. **Do not pad.** Two items is a two-item summary. Inventing a narrative arc
    over a quiet week is how a record stops being trusted.
 6. **Never tick anything.** If the conversation establishes that an open item is
