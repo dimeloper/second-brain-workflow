@@ -436,6 +436,39 @@ case "${out_brief}" in
   *) fail "an empty this-repo bucket says so instead of showing a bare heading" "${out_brief}" ;;
 esac
 
+# --- the collapsed remainder still ages -------------------------------------
+#
+# `Next` asks "is this still worth doing" about the repo you are standing in,
+# and deliberately only about that one. So the other repos collapsed to a count
+# were the one place where an item open eleven weeks read exactly like one
+# written down this morning.
+out_aging="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-01-27 --stale-days 1 \
+  --repo alpha-service --brief 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_aging}" in
+  *"6 of 10 open more than 21 days — oldest in beta-app, 25 days"*)
+    pass "the collapsed remainder reports how much of it is past re-deciding" ;;
+  *) fail "the collapsed remainder reports how much of it is past re-deciding" "${out_aging}" ;;
+esac
+
+# In the long-range sweep every item is already older than --stale-days, so a
+# count of what is older than 21 would restate the header as a finding.
+out_allold="$("${CHECK}" --vault "${RVAULT}" --as-of 2026-03-01 \
+  --repo alpha-service --brief 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_allold}" in
+  *"Oldest elsewhere: beta-app, 58 days"*)
+    pass "a count that separates nothing is replaced by the worst case" ;;
+  *) fail "a count that separates nothing is replaced by the worst case" "${out_allold}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_allold}" in
+  *"10 of 10 open more than"*)
+    fail "the vacuous count is not printed" "${out_allold}" ;;
+  *) pass "the vacuous count is not printed" ;;
+esac
+
 # --- --recent is brief by default, and --full is the way out ----------------
 # Every reader of this window is standing in a repo and asking about that repo.
 # Leaving the collapse to a flag meant "focus on this repo" had to be asked for

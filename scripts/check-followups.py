@@ -487,6 +487,35 @@ def done_block(done):
     return lines
 
 
+def aging_line(rest):
+    """One line: how much of the collapsed remainder is past re-deciding.
+
+    `next_actions` raises the same question and is scoped to the repo you are
+    standing in — deliberately, since an instruction about "here" needs a here.
+    The consequence was that age only ever got asked about one repo's items.
+    Everything else collapsed to a per-repo count, where a thing open eleven
+    weeks looks exactly like a thing written down this morning.
+
+    A count and the worst case, not a listing: this block's whole job is to
+    collapse, and `--full` is one flag away for anyone who wants the items.
+    """
+    aging = [(t, note) for t, note in rest if t["age"] > RECONSIDER_DAYS]
+    if not aging:
+        return []
+    oldest, note = max(aging, key=lambda pair: pair[0]["age"])
+    where = (note or "").split(" — ")[0] or "no repo identified"
+    tail = "Re-decide or drop; --full lists them."
+    # In the long-range sweep every item is already past --stale-days, which is
+    # 30 by default, so "n open more than 21 days" would restate the header as
+    # if it had found something. A count is only worth printing where it
+    # separates part of the remainder from the rest of it.
+    if len(aging) == len(rest):
+        return [f"  Oldest elsewhere: {where}, {days(oldest['age'])}. {tail}"]
+    return [f"  {len(aging)} of {len(rest)} open more than "
+            f"{days(RECONSIDER_DAYS)} — oldest in {where}, "
+            f"{days(oldest['age'])}. {tail}"]
+
+
 def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
                  footers=(), actions=()):
     """This repo in full; every other repo as a count. Nothing dropped.
@@ -530,6 +559,7 @@ def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
         lines.extend(["", f"Elsewhere ({counted(elsewhere + unknown)}){note}"])
         lines.append("  " + " · ".join(f"{name} {n}" for name, n in
                                        elsewhere_tally(elsewhere, unknown)))
+        lines.extend(aging_line(elsewhere + unknown))
     lines.extend(footers)
     lines.extend(actions)
     return "\n".join(lines)
