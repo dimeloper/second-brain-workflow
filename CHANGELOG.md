@@ -48,6 +48,20 @@ write release notes, not two to keep in sync by hand.
   count from 54 to 49 and named the four wrong entries.
 
 ### Added
+- **`check-project-state.py`, and `make audit` runs it.** A project overview is
+  revised in place and written in the present tense, which makes it the one
+  vault surface that can be *wrong* rather than merely old — and the first one a
+  fresh session reads. Nothing checked it: on 2026-09-21 this engine's own
+  `_project.md` had said v0.51.0 for twelve days against a repo on v0.57.0, two
+  of the PRs it named already merged.
+
+  It compares the version in the **Where it stands** sentence against the
+  `VERSION` file of the first `repos:` entry that has one. Only that sentence,
+  because every other version in a project doc is a claim about the past; only a
+  repo that states its own version, because reading the newest tag instead would
+  be the tool deciding what the doc should have said. `--allow-behind` defaults
+  to 1 and a patch release counts for nothing. See
+  [Auditing the vault](docs/AUDIT.md#project-state-does-the-overview-still-describe-the-repo).
 - **`check-followups.py --brief` ages the repos it collapses.** The "is this
   still worth doing" question is asked by `Next`, which is scoped to the repo
   you are standing in — so the other repos, collapsed to a per-repo count, were

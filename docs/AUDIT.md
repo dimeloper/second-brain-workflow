@@ -1,6 +1,6 @@
 # Auditing the vault
 
-`make audit` runs four read-only scripts against a real vault — the review
+`make audit` runs seven read-only scripts against a real vault — the review
 side of the capture-then-review loop the README's project model describes.
 Read the README first for why this exists; this is the reference material.
 
@@ -364,6 +364,40 @@ write is aimed somewhere it should not go*; prose quality is not that.
 note written before this check existed is full of prose nobody is going to
 re-wrap, and the vault's own rule for `#outcome/` tags applies unchanged: check
 what is being written, do not retrofit.
+
+## Project state: does the overview still describe the repo?
+
+`recent-work.py` is a chronology and cannot go stale — a note about 2026-09-15
+is still true in December. The project docs are the other half: revised in
+place, present tense, and therefore the one surface in the vault that can be
+*wrong* rather than merely old. They are also the first thing a fresh session
+reads, because "where does this stand" is the question a chronology deliberately
+does not answer.
+
+```bash
+./scripts/check-project-state.py --vault ~/vaults/second-brain   # or: make audit
+```
+
+It compares the version named in a project overview's **Where it stands**
+sentence against the `VERSION` file in the first of its `repos:` that has one.
+On 2026-09-21 this engine's own `_project.md` had said v0.51.0 for twelve days
+against a repo on v0.57.0, with two of the PRs it named already merged.
+
+**Only that sentence.** A project doc is full of versions — a release history, a
+decision that shipped in v0.44.0, a tag somebody linked — and every one of them
+is a claim about the past that is supposed to stay where it is. A whole-document
+scan would report all of them on its first run, and a check people learn to
+ignore is worse than no check.
+
+**Only a repo that states its own version.** No `VERSION` file means there is
+nothing to compare against, and reading the newest tag instead would be this
+tool deciding what the doc should have said. Those projects are reported
+`skipped` rather than passing quietly, for the same reason an unreachable repo
+is `undetermined` in the freshness check above: a silent pass is
+indistinguishable from a clean answer.
+
+`--allow-behind` (default 1) is the tolerance, and a patch release counts for
+nothing — v0.57.0 to v0.57.1 does not change where a project stands.
 
 ## Running it weekly in CI
 
