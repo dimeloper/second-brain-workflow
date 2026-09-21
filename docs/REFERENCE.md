@@ -615,28 +615,43 @@ description: Angular component and reactivity conventions
 
 | Target | Output | Always-on | Scoped |
 |--------|--------|-----------|--------|
-| `cursor` | `.cursor/rules/*.mdc` | `alwaysApply: true` | derived `globs` string |
+| `cursor` | `.cursor/rules/*.mdc` | via `AGENTS.md` — see below | derived `globs` string |
 | `claude-code` | `.claude/rules/*.md`, root `CLAUDE.md` | via `AGENTS.md` — see below | `paths:` passed through |
 | `agents` | `AGENTS.md` | its own body **plus every always-on rule** | — |
 
-**Where an always-on rule lands depends on the other targets.** `AGENTS.md` is
-the portable output — the one an editor this engine renders no native format for
-still reads — so a rule with no `paths:` is appended to it, and the generated
-`CLAUDE.md` reaches it through `@AGENTS.md`. That import is the **sole delivery
-path** for always-on rules to Claude Code, not a convenience to avoid
-duplication, which is why no `.claude/rules/<name>.md` is written for one.
+**`AGENTS.md` is the always-on carrier, and it is the only one.** A rule with no
+`paths:` is appended to it and written nowhere else, because every agent this
+engine renders for reads a root `AGENTS.md`: Cursor
+[directly](https://cursor.com/docs/rules), as an always-applied alternative to
+`.cursor/rules`, and Claude Code through the generated `CLAUDE.md`'s
+`@AGENTS.md` import — or natively, since
+[v2.1.277](https://code.claude.com/docs/en/changelog), in a repo with no
+`CLAUDE.md` at all.
 
-Two cases where it falls back to a per-rule file instead, because there is
-nothing to fold into:
+So targets select which **scoped** formats to emit. `AGENTS.md` is written
+whenever the engine has one, whether or not `agents` is named — naming it is
+redundant rather than required, and it stays a legal target name so no existing
+`RENDER_TARGETS` breaks. Until v0.55.0 the file set depended on which *other*
+targets were configured: `RENDER_TARGETS=claude-code` alone produced per-rule
+always-on files and adding `agents` silently turned them into a fold.
 
-- `RENDER_TARGETS=claude-code` **without** `agents`. The same rules directory
-  therefore produces a different file set than `claude-code,agents` does.
-- A target repo whose `AGENTS.md` is hand-written, which the writer never
-  overwrites. The run says so when it happens.
+One case still falls back to a per-rule file in **both** rule directories,
+because there is nothing to fold into: a target repo whose `AGENTS.md` is
+hand-written, which the writer never overwrites. The run says so when it
+happens, and names the directories the rules landed in instead.
 
-`rule-budget.py` mirrors this exactly, and its *undeliverable* report is scoped
-to `agents` alone for the same reason: `claude-code` always has a fallback and
+`rule-budget.py` mirrors this exactly. It charges `AGENTS.md` to *every* target,
+because every target loads it, and its *undeliverable* report is scoped to
+`agents` alone: `cursor` and `claude-code` both have a per-rule fallback, and
 `agents` has no carrier but `AGENTS.md`.
+
+**Cursor used to be the exception here, and the exception was a real cost.**
+An always-on rule was written to `.cursor/rules/<name>.mdc` with `alwaysApply:
+true` *and* folded into `AGENTS.md`, so in any repo rendered for both — the
+default — Cursor loaded the always-on set twice. The budget report showed one
+copy, because it counted the `.mdc` and not `AGENTS.md`: the check that exists
+to stop the rendered output becoming an unread wall was the one thing blind to
+half of it.
 
 For a full worked example — one source file next to the exact `.mdc` and
 `.claude/rules/*.md` it produces — see
@@ -850,20 +865,30 @@ matching file as the active tab, once with a non-matching one. Answering
 instantly means the rule was in context; searching the repo first means it was
 not.
 
-**Not covered: Cursor's always-on path.** This canary tests a *scoped* rule, on a
-matching file and a non-matching one. An always-on rule reaches Cursor by a
-different mechanism — `alwaysApply: true` in the `.mdc`, not the `AGENTS.md`
-import Claude Code uses — and nothing has ever exercised it. v0.23.0 closed
-exactly this gap on the Claude Code side, where the two scoping probes could not
-attest that an always-on rule arrives; the same gap is open here, and Cursor
-having no headless agent is why it stays manual rather than why it stays
-unasserted. To check it by hand, put a second canary in a rule with no `paths:`
-and ask for it while editing a file that matches no glob.
+**Cursor's always-on path needs a second canary.** The one above tests a
+*scoped* rule, on a matching file and a non-matching one. As of v0.55.0 an
+always-on rule no longer gets an `alwaysApply: true` `.mdc` of its own — it
+reaches Cursor through the root `AGENTS.md`, the same carrier Claude Code reads,
+which is [what Cursor documents](https://cursor.com/docs/rules): `AGENTS.md` in
+the project root, an always-applied alternative to `.cursor/rules`. Cursor has
+no headless agent, so this stays manual; it does not stay unchecked.
 
-Verified 2026-08-02 on Cursor 3.14.7: known immediately on `*.component.ts`, and
-on a `.txt` file the agent had to grep for it. **Scoping** is confirmed on both
-agents; **always-on delivery** is confirmed on Claude Code only (v0.23.0's third
-probe) and remains unverified on Cursor, per the note above.
+Run both canaries in one repo, with **two different codewords** — one in a rule
+with no `paths:`, one in a scoped rule — and ask for both while editing a file
+that matches no glob, instructing the agent not to search. The scoped one is the
+control: if it comes back too, Cursor fed itself the repo some other way and the
+always-on answer proves nothing. If the always-on one is not known, the set is
+not reaching Cursor and the fold should be reverted — one `continue` in
+`plan()`'s cursor branch, and the matching arm of `rule-budget.py`'s `measure()`.
+
+Verified 2026-08-02 on Cursor 3.14.7 (scoping): known immediately on
+`*.component.ts`, and on a `.txt` file the agent had to grep for it. Verified
+2026-09-21 on Cursor 3.21.13 (always-on, after the fold): on a non-matching
+`.txt` file, the `AGENTS.md` codeword came back and the scoped codeword was
+reported as not in context — one file carrying the always-on set, reaching
+Cursor, with scoping still holding around it. **Scoping and always-on delivery
+are now both confirmed on both agents**; Claude Code's always-on probe is
+v0.23.0's third one.
 
 ## Skills
 

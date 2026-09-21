@@ -17,6 +17,63 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Major
+- **Re-render every onboarded repo: an always-on rule no longer gets its own
+  `.cursor/rules/*.mdc`.** It is written to `AGENTS.md` and nowhere else, for
+  every target. Cursor reads a root `AGENTS.md` and applies it always
+  ([Cursor docs](https://cursor.com/docs/rules)), so emitting an
+  `alwaysApply: true` `.mdc` as well put the same text in Cursor's context
+  twice, in every repo rendered for both targets — which is the default.
+
+  The action is required because `render.py --check` reports the now-redundant
+  `.mdc` as a stale generated file, so `make repos-check`, `make upgrade`'s
+  drift pass and any CI wired to `--check` fail until each repo is re-rendered
+  once. `./scripts/render.py <repo>` prunes it and leaves `AGENTS.md` carrying
+  the rule. Nothing has to be edited by hand, and a repo left alone keeps
+  loading its rules — twice, which is the thing being fixed.
+
+  **`rule-budget.py` was blind to exactly this.** It counted the `.mdc` and not
+  `AGENTS.md` for the cursor target, so a set that was in context twice was
+  reported at one copy. The check that exists to stop the rendered output
+  becoming the same unread wall the vault replaces was the one thing not
+  measuring half of it. It now charges `AGENTS.md` to every target, because
+  every target loads it, and cursor and claude-code report the same total for
+  the same set — which was not previously possible to compare.
+
+  One fallback survives, and it now covers both rule directories: a target repo
+  whose `AGENTS.md` is hand-written is never overwritten, so there is nothing to
+  fold into and the always-on rules stay as per-rule files under
+  `.cursor/rules/` and `.claude/rules/`. The run says so and names them.
+
+  **Cursor's always-on delivery is now verified, not just documented.** This
+  engine had never had a canary for it. Two codewords in one repo — one in a
+  rule with no `paths:`, one scoped — asked for on a non-matching file, with the
+  scoped one as the control: on Cursor 3.21.13 the `AGENTS.md` codeword came
+  back and the scoped one was reported as not in context. The procedure is in
+  the reference's
+  [Confirming a rule actually loads](docs/REFERENCE.md#confirming-a-rule-actually-loads),
+  so the next person changing this can re-run it rather than trust the note.
+
+### Changed
+- **`AGENTS.md` is written whenever the engine has one, whether or not `agents`
+  is a configured target.** It is the always-on carrier rather than one target's
+  output, since every agent rendered for reads it — Claude Code through the
+  generated `CLAUDE.md`'s `@AGENTS.md` import, or
+  [natively since v2.1.277](https://code.claude.com/docs/en/changelog) in a repo
+  with no `CLAUDE.md`, and Cursor directly. `RENDER_TARGETS` therefore selects
+  which *scoped* formats to emit.
+
+  What that removes is a file set that depended on which *other* targets were
+  named: `RENDER_TARGETS=claude-code` alone produced per-rule always-on files,
+  and adding `agents` silently turned them into a fold. `agents` stays a legal
+  target name — naming it is redundant now, not required — so no existing
+  `RENDER_TARGETS` breaks. A cursor-only render gains an `AGENTS.md` it did not
+  write before and still writes no `CLAUDE.md`.
+
+- `render.py --explain` says where an always-on rule lands (`all targets:
+  AGENTS.md`) instead of printing nothing for it, and names `AGENTS.md` as read
+  by every target rather than listing it under two.
+
 ### Fixed
 - **A repo's own symlink is no longer deleted by a render.** `render.py` treated
   every symlink in its write set as a leftover of the pre-copy layout — "always

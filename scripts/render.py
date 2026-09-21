@@ -9,10 +9,17 @@ and re-render.
               [--check] [--dry-run] [--explain] [--local | --shared]
 
 Targets
-    cursor       .cursor/rules/*.mdc      derived `globs` + `alwaysApply`
-    claude-code  .claude/rules/*.md       `paths:` passed through, plus a
-                                          root CLAUDE.md importing @AGENTS.md
-    agents       AGENTS.md                portable, always-on
+    cursor       .cursor/rules/*.mdc      scoped rules, derived `globs`
+    claude-code  .claude/rules/*.md       scoped rules, `paths:` passed
+                                          through, plus a root CLAUDE.md
+                                          importing @AGENTS.md
+    agents       AGENTS.md                the always-on carrier
+
+AGENTS.md is written whenever the engine has one, whether or not `agents` is
+named as a target, because every target above reads a root AGENTS.md. Targets
+therefore select the *scoped* output formats; the always-on set has one carrier
+and one copy of it. Naming `agents` is redundant rather than required, and left
+legal so no existing RENDER_TARGETS breaks.
 
 Source format is a YAML `paths:` list — Claude Code's native shape:
 
@@ -596,9 +603,21 @@ def plan(rules, targets, sha, warn=None, fold_always_on=True):
     have_agents = AGENTS_SRC.is_file()
     fold_here = have_agents and fold_always_on
     if "cursor" in targets:
-        # Cursor does not read AGENTS.md, so its always-on rules keep their own
-        # files with alwaysApply: true. Nothing to fold, nothing duplicated.
         for r in rules:
+            if r["always"] and fold_here:
+                # Cursor reads a root AGENTS.md and applies it always, so an
+                # `alwaysApply: true` .mdc carrying the same rule put the text
+                # in context twice — once from each file — in every repo
+                # rendered for both targets, which is the default. Worse, only
+                # the .mdc half was measured, so rule-budget.py under-reported
+                # cursor by roughly the size of the always-on set: the check
+                # that exists to stop the rendered output becoming an unread
+                # wall was the one blind to half of it.
+                #
+                # Folded for the same reason claude-code folds, and the rule is
+                # now uniform: one always-on carrier per repo, written once,
+                # read by every target, counted once.
+                continue
             p, c = render_cursor(r, sha)
             out[p] = c
     if "claude-code" in targets:
@@ -610,19 +629,26 @@ def plan(rules, targets, sha, warn=None, fold_always_on=True):
                 continue
             p, c = render_claude_rule(r, sha)
             out[p] = c
-    if "agents" in targets or "claude-code" in targets:
-        if have_agents:
-            p, c = render_agents(sha, always_on if fold_here else ())
+    # Unconditional, and no longer gated on `agents` being in targets. Every
+    # target this engine renders for reads a root AGENTS.md, so it is the
+    # carrier rather than one target's output, and naming `agents` in
+    # RENDER_TARGETS is redundant instead of required. What that removes is a
+    # file set that depended on *which other* targets were configured:
+    # `RENDER_TARGETS=claude-code` alone used to produce per-rule always-on
+    # files and adding `agents` silently changed them into a fold.
+    if have_agents:
+        p, c = render_agents(sha, always_on if fold_here else ())
+        out[p] = c
+        if "claude-code" in targets:
+            p, c = render_claude_md(sha)
             out[p] = c
-            if "claude-code" in targets:
-                p, c = render_claude_md(sha)
-                out[p] = c
-        elif warn:
-            warn(
-                f"no {AGENTS_SRC.name} in {ENGINE} — skipping AGENTS.md and "
-                "CLAUDE.md. Copy AGENTS.md.example to AGENTS.md to add "
-                "always-on conventions."
-            )
+    elif warn:
+        warn(
+            f"no {AGENTS_SRC.name} in {ENGINE} — nothing carries the always-on "
+            "set across agents, so every target falls back to its own per-rule "
+            "files. Copy AGENTS.md.example to AGENTS.md to add always-on "
+            "conventions."
+        )
     return out
 
 
@@ -834,10 +860,17 @@ def main():
                 for path in plan([r], [t], content_sha):
                     if path not in ("AGENTS.md", "CLAUDE.md"):
                         print(f"  {t}: {path}")
+            if r["always"] and AGENTS_SRC.is_file():
+                # Folded, so the loop above printed nothing for it. Say where it
+                # went rather than leave the rule looking unrendered.
+                print("  all targets: AGENTS.md")
             print()
         print("always-on files:")
-        if "agents" in targets or "claude-code" in targets:
-            print("  AGENTS.md")
+        if AGENTS_SRC.is_file():
+            print("  AGENTS.md (read by every target)")
+        else:
+            print("  none — no AGENTS.md, so always-on rules fall back to "
+                  "per-rule files")
         if "claude-code" in targets:
             print("  CLAUDE.md (imports @AGENTS.md)")
         return 0
@@ -870,10 +903,13 @@ def main():
     rendered = plan(rules, targets, content_sha,
                     warn=lambda m: print(f"warning: {m}", file=sys.stderr),
                     fold_always_on=fold)
-    if not fold and any(r["always"] for r in rules) and "claude-code" in targets:
+    fallback_dirs = ", ".join(d + "/" for d, _ in owned_dirs(targets))
+    if not fold and any(r["always"] for r in rules) and fallback_dirs:
+        # Both rule directories now, not just .claude/rules: cursor folds too,
+        # so a hand-written AGENTS.md sends cursor back to its own files as well.
         print("note: AGENTS.md here is hand-written, so the always-on rules stay "
-              "as their own files under .claude/rules/ rather than being folded "
-              "into it.", file=sys.stderr)
+              f"as their own files under {fallback_dirs} rather than being "
+              "folded into it.", file=sys.stderr)
     if local:
         planned = sorted(list(rendered) + list(HEADERLESS_OWNED))
         tracked = tracked_paths(repo, planned)
