@@ -19,10 +19,11 @@ tokenizer count. Good enough to notice growth and a ceiling crossing; not
 good enough to trust to the token.
 
 Always-on set, per configured target:
-  - AGENTS.md, if present (loaded by every agent that reads it)
+  - AGENTS.md, if present — counted against *every* target, because every
+    target this engine renders for reads a root AGENTS.md
   - CLAUDE.md, for the claude-code target (small, fixed content)
-  - any individual rule with no `paths:` — always-on in every target's own
-    native form, not just one of them
+  - any individual rule with no `paths:`, but only where it is not folded into
+    AGENTS.md — i.e. only when there is no AGENTS.md to fold into
 
 Ceiling: read from `.rule-budget` — a plain integer, sibling of wherever
 `rules/` resolves to (SBW_RULES_DIR's directory, or the engine checkout for a
@@ -80,39 +81,40 @@ def measure(targets, rules_dir, agents_src, sha):
     have_agents = agents_src.is_file()
     for target in targets:
         rows, undeliverable = [], []
-        if target == "cursor":
+        # Mirrors plan(): an always-on rule keeps its own per-rule file only
+        # where there is no AGENTS.md to fold it into. Now true of cursor as
+        # well as claude-code, and the cursor half was not merely a
+        # double-counted measurement — the renderer really emitted both files
+        # and cursor really loaded both. The report's blind spot was the
+        # opposite one: it counted the .mdc and *not* AGENTS.md, so it showed
+        # one copy of a set that was in context twice.
+        emit = {"cursor": render.render_cursor,
+                "claude-code": render.render_claude_rule}.get(target)
+        if emit and not have_agents:
             for r in always_on:
-                _, content = render.render_cursor(r, sha)
+                _, content = emit(r, sha)
                 rows.append((r["name"], len(content)))
-        elif target == "claude-code":
-            # Mirrors plan(): folded into AGENTS.md when there is one, and only
-            # then. Measuring them separately as well would double-count text
-            # that is rendered once.
-            for r in always_on:
-                if have_agents:
-                    continue
-                _, content = render.render_claude_rule(r, sha)
-                rows.append((r["name"], len(content)))
-            if have_agents:
+        if have_agents:
+            # Charged to every target, not just the two that used to name it as
+            # their output: AGENTS.md is the carrier, and its cost falls
+            # wherever it is read, which is everywhere.
+            _, content = render.render_agents(sha, always_on)
+            rows.append(("AGENTS.md", len(content)))
+            if target == "claude-code":
                 _, content = render.render_claude_md(sha)
                 rows.append(("CLAUDE.md", len(content)))
-        if target in ("agents", "claude-code"):
-            if have_agents:
-                _, content = render.render_agents(sha, always_on)
-                rows.append(("AGENTS.md", len(content)))
-            elif always_on and target == "agents":
-                # Only `agents`. Claude Code falls back to per-rule files in
-                # .claude/rules and still receives them, which is why the rows
-                # above are conditional on have_agents rather than skipped
-                # outright. `agents` emits AGENTS.md and nothing else, so with no
-                # AGENTS.md it has no carrier at all.
-                # Not zero — *undeliverable*. This target's only always-on
-                # carrier is AGENTS.md, and there isn't one, so rules that are
-                # always-on everywhere else silently do not reach it. A target
-                # that cannot deliver the set is not a target the set is free on,
-                # and reporting it at zero is the shape this whole check exists
-                # to avoid.
-                undeliverable = [r["name"] for r in always_on]
+        elif always_on and target == "agents":
+            # Only `agents`. Cursor and Claude Code fall back to per-rule files
+            # and still receive the set, which is why the rows above are
+            # conditional on have_agents rather than skipped outright. `agents`
+            # emits AGENTS.md and nothing else, so with no AGENTS.md it has no
+            # carrier at all.
+            # Not zero — *undeliverable*. This target's only always-on carrier
+            # is AGENTS.md, and there isn't one, so rules that are always-on
+            # everywhere else silently do not reach it. A target that cannot
+            # deliver the set is not a target the set is free on, and reporting
+            # it at zero is the shape this whole check exists to avoid.
+            undeliverable = [r["name"] for r in always_on]
         by_target[target] = {"rows": rows, "undeliverable": undeliverable}
     return by_target
 

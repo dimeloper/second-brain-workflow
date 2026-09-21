@@ -221,10 +221,13 @@ is a short summary; [docs/REFERENCE.md](docs/REFERENCE.md) is the full mechanics
   without contradiction — one rung per pass. Clearing a bar is necessary, not
   sufficient, and **you** do the promoting. See
   [the maturity gradient](docs/REFERENCE.md#the-maturity-gradient).
-- **One rule set, every agent.** Write short imperative rules once
-  (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's `CLAUDE.md`,
-  and a portable `AGENTS.md` from the same source, each with a provenance header
-  naming the source SHA, and `--check` fails CI on drift. See
+- **One rule set, every agent — and one copy of it.** Write short imperative
+  rules once (`rules/*.md`); `render.py` emits Cursor's `.mdc`, Claude Code's
+  `CLAUDE.md`, and a portable `AGENTS.md` from the same source, each with a
+  provenance header naming the source SHA, and `--check` fails CI on drift. An
+  always-on rule is written to `AGENTS.md` and nowhere else, because every one
+  of those agents reads it — so the set that loads on every turn exists once per
+  repo and is measured once. See
   [One rule set, every agent](docs/REFERENCE.md#one-rule-set-every-agent).
 - **The rule set has a budget.** `rule-budget.py` measures what an always-on
   rule set costs every session and reports when it is over — the mechanism that

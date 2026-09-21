@@ -131,9 +131,10 @@ def rendered(repo):
     sbw_registry_marker_present in lib/registry.sh, same order and same reasons.
 
     `.sbw-version` first: it is written on every successful render whatever
-    RENDER_TARGETS holds, so a cursor-only repo — no AGENTS.md, no CLAUDE.md —
-    is not read as a repo that was never onboarded. The marker files are the
-    fallback for a repo rendered by an engine old enough not to have written it.
+    RENDER_TARGETS holds, so a repo carrying neither marker file — a cursor-only
+    render against an engine with no AGENTS.md of its own — is not read as a
+    repo that was never onboarded. The marker files are the fallback for a repo
+    rendered by an engine old enough not to have written it.
     """
     root = Path(repo)
     if (root / ".sbw-version").is_file():

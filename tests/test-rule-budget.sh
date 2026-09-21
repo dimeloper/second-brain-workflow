@@ -20,15 +20,23 @@ case "${out}" in
   *) pass "a scoped rule never appears in the report" ;;
 esac
 
+# The always-on set is folded into AGENTS.md for every target, so it is charged
+# once per target as AGENTS.md rather than once as a per-rule file. Cursor used
+# to be the exception, and that exception was a real double-load: the .mdc was
+# counted, AGENTS.md was not, and both were in context.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"[cursor]"*"always-on"*) pass "an always-on rule appears under cursor" ;;
-  *) fail "an always-on rule appears under cursor" "${out}" ;;
+  *"[cursor]"*"always-on"*) fail "cursor is charged for AGENTS.md, not a per-rule file" \
+    "an always-on rule is still listed by name under cursor: ${out}" ;;
+  *"[cursor]"*"AGENTS.md"*) pass "cursor is charged for AGENTS.md, not a per-rule file" ;;
+  *) fail "cursor is charged for AGENTS.md, not a per-rule file" "${out}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"[claude-code]"*"always-on"*) pass "an always-on rule appears under claude-code" ;;
-  *) fail "an always-on rule appears under claude-code" "${out}" ;;
+  *"[claude-code]"*"always-on"*) fail "claude-code is charged for AGENTS.md, not a per-rule file" \
+    "an always-on rule is still listed by name under claude-code: ${out}" ;;
+  *"[claude-code]"*"AGENTS.md"*) pass "claude-code is charged for AGENTS.md, not a per-rule file" ;;
+  *) fail "claude-code is charged for AGENTS.md, not a per-rule file" "${out}" ;;
 esac
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
@@ -40,6 +48,22 @@ case "${out}" in
   *"CLAUDE.md"*) pass "CLAUDE.md is counted for the claude-code target" ;;
   *) fail "CLAUDE.md is counted for the claude-code target" "${out}" ;;
 esac
+
+# --- the two rule targets cost the same always-on set ------------------------
+# The bug this replaces was asymmetric accounting, not a wrong number: cursor
+# was measured on .mdc files and claude-code on AGENTS.md, so the report could
+# not be compared across targets even though both loaded the same text.
+cursor_total="$("${BUDGET}" --rules-dir "${RULES}" --targets cursor 2>/dev/null \
+  | awk '/total/ {print $1}')"
+agents_total="$("${BUDGET}" --rules-dir "${RULES}" --targets agents 2>/dev/null \
+  | awk '/total/ {print $1}')"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -n "${cursor_total}" ] && [ "${cursor_total}" = "${agents_total}" ]; then
+  pass "cursor and agents are charged the same always-on total"
+else
+  fail "cursor and agents are charged the same always-on total" \
+    "cursor=${cursor_total} agents=${agents_total}"
+fi
 
 # --- a tiny ceiling fails, and says by how much ------------------------------
 out_over="$("${BUDGET}" --rules-dir "${RULES}" --targets claude-code --ceiling 1 2>/dev/null)"
@@ -111,6 +135,16 @@ case "${out_noagents_cc}" in
   *"CANNOT CARRY"*) fail "claude-code still carries always-on rules without AGENTS.md" "${out_noagents_cc}" ;;
   *"tokens  always-on"*) pass "claude-code still carries always-on rules without AGENTS.md" ;;
   *) fail "claude-code still carries always-on rules without AGENTS.md" "${out_noagents_cc}" ;;
+esac
+
+# Same fallback, same reason, for cursor: with nothing to fold into, the
+# per-rule .mdc carries the rule and the budget has to see it again.
+out_noagents_cursor="$("${BUDGET}" --rules-dir "${NOAGENTS}/rules" --targets cursor 2>/dev/null)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_noagents_cursor}" in
+  *"CANNOT CARRY"*) fail "cursor still carries always-on rules without AGENTS.md" "${out_noagents_cursor}" ;;
+  *"tokens  always-on"*) pass "cursor still carries always-on rules without AGENTS.md" ;;
+  *) fail "cursor still carries always-on rules without AGENTS.md" "${out_noagents_cursor}" ;;
 esac
 
 # --- unknown target is an error, matching render.py's own validation --------
