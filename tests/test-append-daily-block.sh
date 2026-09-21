@@ -117,8 +117,8 @@ RACE_DAY="2026-08-26"
 RACE_NOTE="${VAULT}/${RACE_DAY}.md"
 printf '# %s\n\n## Built\n- base line\n' "${RACE_DAY}" > "${RACE_NOTE}"
 race_stamp="$("${APPEND}" --vault "${VAULT}" --date "${RACE_DAY}" --stamp --quiet)"
-printf '## Built\n- from A\n' > "${SANDBOX}/a.md"
-printf '## Built\n- from B\n' > "${SANDBOX}/b.md"
+printf '## Built\n- from A #repo/alpha-service\n' > "${SANDBOX}/a.md"
+printf '## Built\n- from B #repo/alpha-service\n' > "${SANDBOX}/b.md"
 ( "${APPEND}" --vault "${VAULT}" --date "${RACE_DAY}" --expect "${race_stamp}" \
     --block "${SANDBOX}/a.md" >/dev/null 2>&1; echo $? > "${SANDBOX}/rc-a" ) &
 ( "${APPEND}" --vault "${VAULT}" --date "${RACE_DAY}" --expect "${race_stamp}" \
@@ -151,7 +151,7 @@ cat > "${HAND_NOTE}" <<'EOF'
 ## Reading
 - a hand-written section this tool does not know
 EOF
-printf '## Built\n- appended work\n' > "${SANDBOX}/hand.md"
+printf '## Built\n- appended work #repo/alpha-service\n' > "${SANDBOX}/hand.md"
 "${APPEND}" --vault "${VAULT}" --date "${HAND_DAY}" \
   --expect "$("${APPEND}" --vault "${VAULT}" --date "${HAND_DAY}" --stamp --quiet)" \
   --block "${SANDBOX}/hand.md" >/dev/null 2>&1
@@ -177,7 +177,7 @@ cat > "${TPL_NOTE}" <<'EOF'
 ## Follow-ups
 - [ ]
 EOF
-printf '## Built\n- real work\n' > "${SANDBOX}/tpl.md"
+printf '## Built\n- real work #repo/alpha-service\n' > "${SANDBOX}/tpl.md"
 "${APPEND}" --vault "${VAULT}" --date "${TPL_DAY}" \
   --expect "$("${APPEND}" --vault "${VAULT}" --date "${TPL_DAY}" --stamp --quiet)" \
   --block "${SANDBOX}/tpl.md" >/dev/null 2>&1
@@ -255,9 +255,44 @@ printf 'no headers at all\n' > "${SANDBOX}/headerless.md"
 append --expect "$(stamp)" --block "${SANDBOX}/headerless.md" >/dev/null 2>&1
 assert_exit 4 $? "a block with no header at all is refused"
 
+# --- a Built block says which repo ------------------------------------------
+#
+# The read side attributes a day's work per repo, and a bare `## Built` is the
+# one shape it cannot place: over the week of 2026-09-14, 35 of 308 recorded
+# items had no repo at all. Refused on the write side, where the session still
+# knows the answer, rather than reported on the read side a week later.
+printf '## Built\n- shipped the retry\n' > "${SANDBOX}/bare.md"
+append --expect "$(stamp)" --block "${SANDBOX}/bare.md" >/dev/null 2>&1
+assert_exit 4 $? "a bare ## Built naming no repo is refused"
+
+# A refusal that does not say how to satisfy it trains people to reach for the
+# opt-out, which is the opposite of the point.
+out="$(append --expect "$(stamp)" --block "${SANDBOX}/bare.md" 2>&1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"label the header"*"tag an item"*"--allow-unattributed-built"*)
+    pass "the refusal names both ways to satisfy it, and the opt-out" ;;
+  *) fail "the refusal names both ways to satisfy it, and the opt-out" "${out}" ;;
+esac
+
+printf '## Built (alpha-service: retries)\n- shipped the retry\n' > "${SANDBOX}/labelled.md"
+append --expect "$(stamp)" --block "${SANDBOX}/labelled.md" >/dev/null 2>&1
+assert_exit 0 $? "a labelled ## Built says which repo on its heading and passes"
+
+printf '## Built\n- shipped the retry #repo/alpha-service\n' > "${SANDBOX}/tagged.md"
+append --expect "$(stamp)" --block "${SANDBOX}/tagged.md" >/dev/null 2>&1
+assert_exit 0 $? "a #repo/ tag on any item is enough"
+
+# Work that genuinely belongs to no repo — a machine-level decision, a
+# cross-repo policy — is a real case, so the guard has a door rather than a
+# workaround.
+append --expect "$(stamp)" --block "${SANDBOX}/bare.md" \
+  --allow-unattributed-built >/dev/null 2>&1
+assert_exit 0 $? "--allow-unattributed-built is the deliberate way through"
+
 # --- --dry-run writes nothing ----------------------------------------------
 before="$(stamp)"
-printf '## Built\n- dry run only\n' > "${SANDBOX}/dry.md"
+printf '## Built\n- dry run only #repo/alpha-service\n' > "${SANDBOX}/dry.md"
 out="$(append --expect "${before}" --block "${SANDBOX}/dry.md" --dry-run)"
 assert_str "${before}" "$(stamp)" "--dry-run leaves the note byte-identical"
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -271,7 +306,7 @@ esac
 # out on a session that started yesterday. --date exists for tests and for a
 # deliberate correction; omitting it must mean today.
 TODAY="$(date +%F)"
-printf '## Built\n- todays work\n' > "${SANDBOX}/today.md"
+printf '## Built\n- todays work #repo/alpha-service\n' > "${SANDBOX}/today.md"
 "${APPEND}" --vault "${VAULT}" --expect absent --block "${SANDBOX}/today.md" >/dev/null 2>&1
 assert_file "${VAULT}/${TODAY}.md" "with no --date, the note is today's, off the clock"
 

@@ -187,10 +187,22 @@ Omit empty sections — leave them out of the block and they are never created.
   day's work is a second note, never a second `## Built` in the first. Within a
   day, append bullets under the existing header. A labelled `## Built (label)`
   block is allowed only for a genuinely distinct work stream.
+- **A `## Built` block says which repo, and the appender refuses one that does
+  not.** Either label the header — `## Built (acme-backend: search filters)`,
+  which is also what a multi-stream day needs — or carry a `#repo/` tag on an
+  item. Attribution is free here and expensive later: the session knows the
+  answer now, and a week on the read side is left guessing from the note's
+  other sections, or from nothing. Work that genuinely belongs to no repo (a
+  machine-level decision, a cross-repo policy) passes
+  `--allow-unattributed-built`, and the block should say why.
 - `## Follow-ups` records what is left open — `- [ ]` pending, `- [x]` done. See
   the repo tag below; this is the only section another skill reads back.
 - `## Practices followed` links existing notes as `[[wikilink]]` with a short
-  note on how each was applied.
+  note on how each was applied. **One citation per bullet, at the front of the
+  line**: `- [[slug]] — how it applied`. A link in the *reason* is read as prose,
+  not as a second practice, and a bullet that opens with no link is reported as
+  a broken citation. Cite a rule or a project doc only if a practice note of
+  that name exists — it is a dead link in the editor either way.
 - `## Drift / gaps` records where reality diverged from a practice, or gaps with
   no note yet — raw material for new candidates.
 - `## Vault candidates` lists proposals; `(approved)` / `(declined)` record the

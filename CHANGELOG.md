@@ -17,6 +17,20 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Major
+- **`append-daily-block.py` refuses a bare `## Built` that names no repo**
+  (exit 4). A day's work is read back per repo, and an unattributed Built block
+  is the one shape nothing downstream can place: in the week of 2026-09-14, 35
+  of 308 recorded items had no repo at all, and 189 of the rest were attributed
+  by guessing from a section heading.
+
+  **The action, if you call the appender yourself:** label the header —
+  `## Built (acme-backend: search filters)` — or put a `#repo/` tag on an item.
+  Either satisfies it. Work that genuinely belongs to no repo passes
+  `--allow-unattributed-built`. Nothing already written to a note is touched,
+  and `update-second-brain` composes attributed blocks from this release on, so
+  a vault whose blocks come from the skill needs no change.
+
 ### Fixed
 - **`recent-work.py` counted things that are not practices.** The footer read
   every wikilink on a `## Practices followed` bullet, so a citation whose
