@@ -175,6 +175,8 @@ audit:
 	./scripts/check-markdown.py --vault "$(VAULT)" || fail=1; \
 	echo; \
 	./scripts/check-context-freshness.py --vault "$(VAULT)" --quiet || fail=1; \
+	echo; \
+	./scripts/check-project-state.py --vault "$(VAULT)" --quiet || fail=1; \
 	exit $$fail
 
 # Not part of `make check`: costs model calls and needs network. Run it once per
