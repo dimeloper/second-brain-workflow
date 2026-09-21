@@ -21,7 +21,6 @@ good enough to trust to the token.
 Always-on set, per configured target:
   - AGENTS.md, if present — counted against *every* target, because every
     target this engine renders for reads a root AGENTS.md
-  - CLAUDE.md, for the claude-code target (small, fixed content)
   - any individual rule with no `paths:`, but only where it is not folded into
     AGENTS.md — i.e. only when there is no AGENTS.md to fold into
 
@@ -100,9 +99,6 @@ def measure(targets, rules_dir, agents_src, sha):
             # wherever it is read, which is everywhere.
             _, content = render.render_agents(sha, always_on)
             rows.append(("AGENTS.md", len(content)))
-            if target == "claude-code":
-                _, content = render.render_claude_md(sha)
-                rows.append(("CLAUDE.md", len(content)))
         elif always_on and target == "agents":
             # Only `agents`. Cursor and Claude Code fall back to per-rule files
             # and still receive the set, which is why the rows above are

@@ -153,8 +153,9 @@ the `+` state, which is why nothing else notices it.
 
 The engine ships with `rules/` empty — it works with zero rules, rendering
 nothing and saying so. `AGENTS.md` is optional too: without it, rules still
-render and the run warns that `AGENTS.md` and `CLAUDE.md` were skipped. An
-empty start is a valid state, not a broken one.
+render and the run warns that nothing carries the always-on set across agents,
+so each target falls back to its own per-rule files. An empty start is a valid
+state, not a broken one.
 
 Two ways to add your own conventions:
 
@@ -602,9 +603,11 @@ provenance header, and that is the only place it is written:
 
 **No `.cursor/rules/verify-integrations.mdc` and no
 `.claude/rules/verify-integrations.md` are written.** Both agents read a root
-`AGENTS.md` — Claude Code through `CLAUDE.md`'s `@AGENTS.md` import, Cursor
-directly — so a per-rule file as well would load the same text twice and charge
-the budget for both.
+`AGENTS.md` directly — Claude Code since 2.1.277, Cursor all along — so a
+per-rule file as well would load the same text twice and charge the budget for
+both. No `CLAUDE.md` is written either; if the repo keeps its own, add
+`@AGENTS.md` at its top, because a `CLAUDE.md` that exists stops Claude Code
+falling back to `AGENTS.md`. The run says so when that applies.
 
 One case falls back to that per-rule file, because there is nothing to fold
 into: a target repo whose `AGENTS.md` is hand-written and therefore never

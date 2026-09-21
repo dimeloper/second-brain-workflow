@@ -17,6 +17,52 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Major
+- **Re-render every onboarded repo: the generated `CLAUDE.md` is gone.** Claude
+  Code [reads a root `AGENTS.md` natively since
+  2.1.277](https://code.claude.com/docs/en/changelog) in a project with no
+  `CLAUDE.md`, so the stub — a provenance comment and an `@AGENTS.md` line —
+  forwarded to a file the agent would read on its own, and by existing at all
+  was the only reason it had to.
+
+  **This one has a floor.** `AGENTS.md` reaches Claude Code natively only on
+  2.1.277 or newer, and not on Bedrock, Vertex or Foundry, where the feature is
+  not available yet. `make doctor` reports which kind of machine you are on —
+  that check shipped in v0.56.0 precisely so this question could be answered
+  before the drop rather than after it. On an older CLI, pin the engine at
+  v0.56.0 until you upgrade.
+
+  The action is required because `render.py --check` reports a leftover stub as
+  a stale generated file, so `make repos-check`, `make upgrade`'s drift pass and
+  any CI wired to `--check` fail until each repo is re-rendered once.
+  `./scripts/render.py <repo>` prunes it. A repo left alone keeps working — the
+  stub still imports `AGENTS.md` — so nothing breaks while you get to it.
+
+  **The prune will not touch a file that is not ours.** It asks the same
+  questions the per-rule prune asks — ours by marker — plus one more: a symlink
+  the repo made for itself is never removed, whatever it resolves to. A repo can
+  reasonably commit `AGENTS.md -> CLAUDE.md`, and a prune that resolved the link
+  would delete the repo's own file through it, which is exactly the defect
+  v0.55.0 fixed on the write path. Asserted in both directions.
+
+### Added
+- **A hand-written `CLAUDE.md` that shadows `AGENTS.md` is now reported.** The
+  native fallback applies only where no `CLAUDE.md` exists, so a repo that keeps
+  its own, with no `@AGENTS.md` import, is one where the always-on set reaches
+  Claude Code nowhere at all. That gap is not new; what is new is that dropping
+  the stub removed the message that used to hint at it, and made the gap worse,
+  since there is no longer a stub to carry the rules either.
+
+  It is keyed on the repo's shape rather than on what the render happened to
+  write, and it is quiet in the three cases where the advice would be wrong:
+  when the import is already there, when `AGENTS.md` is not ours (the rules are
+  per-rule files under `.claude/rules/` already), and when `AGENTS.md` is a
+  symlink to `CLAUDE.md` (following it would make the file import itself).
+
+### Changed
+- `rule-budget.py` no longer reports a `CLAUDE.md` row, and `claude-code` now
+  costs the same always-on set as every other target.
+
 ## [0.56.0] - 2026-09-21
 
 ### Added

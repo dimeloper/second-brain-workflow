@@ -43,11 +43,24 @@ case "${out}" in
   *"AGENTS.md"*) pass "AGENTS.md is counted when present" ;;
   *) fail "AGENTS.md is counted when present" "${out}" ;;
 esac
+# Nothing to count since the stub was dropped: claude-code's always-on cost is
+# AGENTS.md and nothing else, the same as every other target's.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
-  *"CLAUDE.md"*) pass "CLAUDE.md is counted for the claude-code target" ;;
-  *) fail "CLAUDE.md is counted for the claude-code target" "${out}" ;;
+  *"CLAUDE.md"*) fail "CLAUDE.md is no longer a cost this reports" "${out}" ;;
+  *) pass "CLAUDE.md is no longer a cost this reports" ;;
 esac
+TESTS_RUN=$((TESTS_RUN + 1))
+cc_total="$("${BUDGET}" --rules-dir "${RULES}" --targets claude-code 2>/dev/null \
+  | awk '/total/ {print $1}')"
+ag_total="$("${BUDGET}" --rules-dir "${RULES}" --targets agents 2>/dev/null \
+  | awk '/total/ {print $1}')"
+if [ -n "${cc_total}" ] && [ "${cc_total}" = "${ag_total}" ]; then
+  pass "claude-code and agents now cost the same always-on set"
+else
+  fail "claude-code and agents now cost the same always-on set" \
+    "claude-code=${cc_total} agents=${ag_total}"
+fi
 
 # --- the two rule targets cost the same always-on set ------------------------
 # The bug this replaces was asymmetric accounting, not a wrong number: cursor
