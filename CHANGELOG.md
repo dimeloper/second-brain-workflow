@@ -48,6 +48,14 @@ write release notes, not two to keep in sync by hand.
   count from 54 to 49 and named the four wrong entries.
 
 ### Added
+- **`check-followups.py --brief` ages the repos it collapses.** The "is this
+  still worth doing" question is asked by `Next`, which is scoped to the repo
+  you are standing in — so the other repos, collapsed to a per-repo count, were
+  the one place an item open eleven weeks read exactly like one written down
+  this morning. The Elsewhere block now carries how many are past 21 days and
+  where the oldest sits. Where that count separates nothing — the long-range
+  sweep, in which everything is already older than `--stale-days` — it prints
+  the oldest instead of restating the header as a finding.
 - **`scope: workflow` on a practice note, and its own footer line.** A practice
   about how the vault is written is restated by every session wrap-up; three of
   them accounted for 53 of 164 citation lines in one week, which made the
