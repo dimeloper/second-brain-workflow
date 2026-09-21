@@ -63,6 +63,7 @@ Usage:
   append-daily-block.py [--vault PATH] [--date YYYY-MM-DD] --stamp [--quiet]
   append-daily-block.py [--vault PATH] [--date YYYY-MM-DD] --expect HASH \\
                         [--block FILE] [--close SPEC ...] [--link DAY] [--dry-run]
+                        [--allow-unattributed-built]
 
   --block -     read the block from stdin
   --expect      the hash printed by --stamp, or `absent` if there was no note
@@ -70,6 +71,8 @@ Usage:
                 done, superseded, dropped, handed-off; OWNER only on handed-off.
                 WHY is the rest of the string, so it may itself contain `::`.
   --dry-run     print the merged note to stdout, write nothing
+  --allow-unattributed-built
+                accept a bare `## Built` naming no repo (work that has none)
 
 Exit codes: 0 written, 2 usage, 3 stale (someone else wrote), 4 malformed
 block, 5 the write would have lost or altered a line (a bug here; nothing is
@@ -113,6 +116,11 @@ CANONICAL = (
 RANK = {h: i for i, h in enumerate(CANONICAL)}
 
 BUILT_LABELLED_RE = re.compile(r"^## Built \(.+\)$")
+
+# The same tag the read side attributes on. Kept as its own pattern rather than
+# imported from lib.followups so this file's refusal does not change the day
+# somebody widens what counts as a repo reference over there.
+REPO_TAG_RE = re.compile(r"(?:^|\s)#repo/[A-Za-z0-9._-]+")
 HEADER_RE = re.compile(r"^## ")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -252,7 +260,29 @@ def add_link(note_text, day, other):
     return "\n".join(head + ["", line, ""] + tail) + "\n", True
 
 
-def merge(note_text, block_text):
+def unattributed_built(block_sections):
+    """Bare `## Built` headers in the block whose body names no repo.
+
+    A labelled `## Built (acme-backend: search)` says which repo on the heading
+    and is the shape the read side attributes 189 of 308 items by. A bare one
+    says nothing, and the reader is left inferring from the note's other
+    sections — or, for 35 items in the week of 2026-09-14, from nothing at all.
+
+    The test is deliberately weak: *any* `#repo/` tag under the header. Not
+    which repo, and not whether it is a repo the vault has heard of, because a
+    repo's first note is written before anything knows its name and refusing
+    that would be refusing the honest case.
+    """
+    bad = []
+    for header, body in block_sections:
+        if header != "## Built":
+            continue
+        if not any(REPO_TAG_RE.search(line) for line in body):
+            bad.append(header)
+    return bad
+
+
+def merge(note_text, block_text, allow_unattributed=False):
     """Return (merged_text, touched_headers). Only ever adds lines."""
     block_preamble, block_sections = split_sections(block_text)
     stray = [ln for ln in block_preamble if ln.strip()]
@@ -274,6 +304,19 @@ def merge(note_text, block_text):
                 f"unknown section header in the block: {header}\n"
                 "       Allowed: " + ", ".join(CANONICAL) + ", or `## Built (label)`."
             )
+
+    if not allow_unattributed and unattributed_built(block_sections):
+        raise Malformed(
+            "the block has a bare `## Built` that names no repo.\n"
+            "       A day's work is read back per repo, and an unattributed\n"
+            "       Built block is the one shape nothing downstream can place.\n"
+            "       Either is enough:\n"
+            "         - label the header: `## Built (acme-backend: search filters)`\n"
+            "         - or tag an item:   `- Shipped the retry #repo/acme-backend`\n"
+            "       Work that genuinely belongs to no repo — a machine-level\n"
+            "       decision, a cross-repo policy — passes\n"
+            "       --allow-unattributed-built, and should say in the block why."
+        )
 
     preamble, sections = split_sections(note_text)
     touched = []
@@ -603,6 +646,10 @@ def main():
                          f"`{CLOSE_SYNTAX}`. Repeatable — several items close in "
                          "one write, against one hash.")
     ap.add_argument("--dry-run", action="store_true", help="print the merged note, write nothing")
+    ap.add_argument("--allow-unattributed-built", action="store_true",
+                    help="accept a bare `## Built` that names no repo — for "
+                         "work that genuinely belongs to none. Say why in the "
+                         "block.")
     args = ap.parse_args()
 
     if args.date and not DATE_RE.match(args.date):
@@ -679,7 +726,8 @@ def main():
         merged, touched = before, []
         if args.block:
             try:
-                merged, touched = merge(merged, read_block(args.block))
+                merged, touched = merge(merged, read_block(args.block),
+                                        args.allow_unattributed_built)
             except Malformed as exc:
                 print(f"append-daily-block: {exc}", file=sys.stderr)
                 return 4
