@@ -45,12 +45,14 @@ write release notes, not two to keep in sync by hand.
   fold into and the always-on rules stay as per-rule files under
   `.cursor/rules/` and `.claude/rules/`. The run says so and names them.
 
-  **Cursor's always-on delivery is documented, not observed.** This engine has
-  never had a canary for it — see the reference's
+  **Cursor's always-on delivery is now verified, not just documented.** This
+  engine had never had a canary for it. Two codewords in one repo — one in a
+  rule with no `paths:`, one scoped — asked for on a non-matching file, with the
+  scoped one as the control: on Cursor 3.21.13 the `AGENTS.md` codeword came
+  back and the scoped one was reported as not in context. The procedure is in
+  the reference's
   [Confirming a rule actually loads](docs/REFERENCE.md#confirming-a-rule-actually-loads),
-  which now says so in the place someone checking Cursor will look. If the fold
-  turns out not to reach Cursor, the revert is one `continue` in `plan()`'s
-  cursor branch.
+  so the next person changing this can re-run it rather than trust the note.
 
 ### Changed
 - **`AGENTS.md` is written whenever the engine has one, whether or not `agents`

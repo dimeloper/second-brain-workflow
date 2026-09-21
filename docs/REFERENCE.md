@@ -865,24 +865,30 @@ matching file as the active tab, once with a non-matching one. Answering
 instantly means the rule was in context; searching the repo first means it was
 not.
 
-**Not covered: Cursor's always-on path, and it now matters more.** This canary
-tests a *scoped* rule, on a matching file and a non-matching one. Nothing has
-ever exercised Cursor's always-on delivery, and as of v0.55.0 that delivery
-changed: an always-on rule no longer gets an `alwaysApply: true` `.mdc` of its
-own, it reaches Cursor through the root `AGENTS.md` the same way it reaches
-Claude Code. That is [what Cursor documents](https://cursor.com/docs/rules) —
-`AGENTS.md` in the project root, as an always-applied alternative to
-`.cursor/rules` — but documented is not the same as observed, and Cursor having
-no headless agent is why this stays manual rather than why it stays unasserted.
-To check it by hand, put a second canary in a rule with no `paths:` and ask for
-it while editing a file that matches no glob. If it is not known, the rule set
-is not reaching Cursor and the fold should be reverted — one `continue` in
-`plan()`'s cursor branch.
+**Cursor's always-on path needs a second canary.** The one above tests a
+*scoped* rule, on a matching file and a non-matching one. As of v0.55.0 an
+always-on rule no longer gets an `alwaysApply: true` `.mdc` of its own — it
+reaches Cursor through the root `AGENTS.md`, the same carrier Claude Code reads,
+which is [what Cursor documents](https://cursor.com/docs/rules): `AGENTS.md` in
+the project root, an always-applied alternative to `.cursor/rules`. Cursor has
+no headless agent, so this stays manual; it does not stay unchecked.
 
-Verified 2026-08-02 on Cursor 3.14.7: known immediately on `*.component.ts`, and
-on a `.txt` file the agent had to grep for it. **Scoping** is confirmed on both
-agents; **always-on delivery** is confirmed on Claude Code only (v0.23.0's third
-probe) and remains unverified on Cursor, per the note above.
+Run both canaries in one repo, with **two different codewords** — one in a rule
+with no `paths:`, one in a scoped rule — and ask for both while editing a file
+that matches no glob, instructing the agent not to search. The scoped one is the
+control: if it comes back too, Cursor fed itself the repo some other way and the
+always-on answer proves nothing. If the always-on one is not known, the set is
+not reaching Cursor and the fold should be reverted — one `continue` in
+`plan()`'s cursor branch, and the matching arm of `rule-budget.py`'s `measure()`.
+
+Verified 2026-08-02 on Cursor 3.14.7 (scoping): known immediately on
+`*.component.ts`, and on a `.txt` file the agent had to grep for it. Verified
+2026-09-21 on Cursor 3.21.13 (always-on, after the fold): on a non-matching
+`.txt` file, the `AGENTS.md` codeword came back and the scoped codeword was
+reported as not in context — one file carrying the always-on set, reaching
+Cursor, with scoping still holding around it. **Scoping and always-on delivery
+are now both confirmed on both agents**; Claude Code's always-on probe is
+v0.23.0's third one.
 
 ## Skills
 
