@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-09-21
+
 ### Major
 - **Re-render every onboarded repo: the generated `CLAUDE.md` is gone.** Claude
   Code [reads a root `AGENTS.md` natively since
@@ -3791,7 +3793,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.56.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.57.0...HEAD
+[0.57.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.56.0...v0.57.0
 [0.56.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.55.0...v0.56.0
 [0.55.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.54.0...v0.55.0
 [0.54.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.53.0...v0.54.0
