@@ -107,4 +107,42 @@ assert_contains "${TEMPLATES}/audit.yml" 'REPORT: ' \
 assert_contains "${TEMPLATES}/audit.yml" 'process.env.REPORT' \
   "audit.yml reads the report from process.env"
 
+# --- which checks the weekly run can actually answer ------------------------
+#
+# `make audit` runs seven; this template runs five. The gap is deliberate and
+# is recorded here so nobody closes it by adding the other two: both compare a
+# vault document against the *repo* it describes, and a runner has the vault
+# and no repos. They would report "cannot tell" every Monday.
+
+AUDIT_YML="${ENGINE}/docs/vault-ci/audit.yml"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q 'check-markdown\.py' "${AUDIT_YML}"; then
+  pass "the weekly run includes check-markdown.py — it reads only the vault"
+else
+  fail "the weekly run includes check-markdown.py — it reads only the vault" "absent"
+fi
+
+for script in check-context-freshness check-project-state; do
+  TESTS_RUN=$((TESTS_RUN + 1))
+  if grep -q "engine/scripts/${script}\.py" "${AUDIT_YML}"; then
+    fail "${script}.py stays out of CI — it needs repo checkouts a runner lacks" "invoked"
+  else
+    pass "${script}.py stays out of CI — it needs repo checkouts a runner lacks"
+  fi
+done
+
+# Every check whose output is collected must also be printed to the log, or a
+# green run hides what it found from anyone reading the job rather than the
+# issue.
+TESTS_RUN=$((TESTS_RUN + 1))
+# shellcheck disable=SC2016  # the literal ${markdown} is what we grep for
+collected="$(grep -c 'echo "\${markdown}"' "${AUDIT_YML}")"
+if [ "${collected}" -eq 2 ]; then
+  pass "check-markdown's output reaches both the tracking issue and the job log"
+else
+  fail "check-markdown's output reaches both the tracking issue and the job log" \
+    "printed ${collected} time(s), expected 2"
+fi
+
 finish
