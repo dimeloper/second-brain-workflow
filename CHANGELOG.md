@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.60.0] - 2026-09-22
+
 ### Added
 - **`#due/YYYY-MM-DD` on a follow-up, and Overdue / Due today blocks above
   everything else.** Every other view ages an item from the day it was written,
@@ -3956,7 +3958,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.2...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.60.0...HEAD
+[0.60.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.2...v0.60.0
 [0.59.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.1...v0.59.2
 [0.59.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.0...v0.59.1
 [0.59.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.58.0...v0.59.0
