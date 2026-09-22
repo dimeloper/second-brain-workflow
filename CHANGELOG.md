@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.59.0] - 2026-09-22
+
 ### Added
 - **`release-check.sh` reports a vault CI pin its own tag just made stale.** A
   vault repo running the CI templates pins the engine by tag, in its own copy of
@@ -3884,7 +3886,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.58.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.0...HEAD
+[0.59.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.58.0...v0.59.0
 [0.58.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.57.0...v0.58.0
 [0.57.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.56.0...v0.57.0
 [0.56.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.55.0...v0.56.0
