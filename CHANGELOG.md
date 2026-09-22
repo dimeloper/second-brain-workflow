@@ -17,6 +17,18 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **`make doctor` reported a git worktree as "not a git repo", and passed.**
+  `check_submodules` gated on `[ -d "$ENGINE/.git" ]`; in a worktree `.git` is a
+  file holding a `gitdir:` pointer, so the check declared there was nothing to
+  check and printed `ok`. A false clean is worse than a wrong finding, and this
+  one hid a real class of problem: the engine is routinely developed in a
+  worktree — v0.58.0, v0.59.0 and v0.59.1 were all built in one — and submodule
+  drift there went unreported. It now asks `git rev-parse --git-dir`, which is
+  true in a checkout, a worktree and a submodule alike. The first run after the
+  fix, in the worktree it was written in, turned that `ok` into a real
+  "submodule not initialized" warning.
+
 ## [0.59.1] - 2026-09-22
 
 ### Fixed
