@@ -68,6 +68,7 @@ from lib.config import origin_describe  # noqa: E402
 from lib.followup_threads import as_threads, build  # noqa: E402
 from lib.followups import OUTCOME_UNRESOLVED, annotate  # noqa: E402
 from lib.followups import closes, current_repo, display  # noqa: E402
+from lib.followups import due_for  # noqa: E402
 from lib.followups import done_followups, flag_for  # noqa: E402
 from lib.followups import group_for_repo, outcome_for  # noqa: E402
 from lib.followups import note_context_repo, open_followups  # noqa: E402
@@ -516,8 +517,72 @@ def aging_line(rest):
             f"{days(oldest['age'])}. {tail}"]
 
 
+
+def where(thread):
+    """The repo a thread belongs to, for a bucket that spans all of them.
+
+    These buckets are global by design — a deadline does not care which repo you
+    are standing in — so each line names its own repo rather than carrying the
+    attribution basis the per-repo groups use.
+    """
+    return thread.get("repo") or "no repo identified"
+
+
+def due_block(threads, as_of):
+    """Items with a `#due/` date that has arrived or passed, above everything else.
+
+    A deadline outranks a backlog. Every other grouping in this report answers
+    "what is open and where"; this one answers "what was supposed to happen by
+    now", and the two are different questions about the same list — an item due
+    four days ago reads as "4 days open" everywhere else, which is the same
+    number a thing written four days ago with no deadline gets.
+
+    Overdue first and oldest-first within it, because for an observational item
+    lateness compounds: the evidence expires. A late "merge the PR" is still
+    doable; a late "check last night's cron run" may be unanswerable once the
+    telemetry ages out.
+    """
+    due, overdue, malformed = [], [], []
+    for thread, note in threads:
+        when, raw = due_for(thread["item"])
+        if when is None:
+            if raw is not None:
+                malformed.append((thread, note, raw))
+            continue
+        # A date still in the future is neither. It is a commitment that has not
+        # come round yet, and listing it as due today would train the reader to
+        # scroll past the one bucket that is supposed to mean "now".
+        if when < as_of:
+            overdue.append((thread, note, when))
+        elif when == as_of:
+            due.append((thread, note, when))
+
+    lines = []
+    if overdue:
+        overdue.sort(key=lambda row: row[2])
+        lines.extend(["", f"Overdue ({len(overdue)}) — the date in the item has passed"])
+        for thread, note, when in overdue:
+            late = (as_of - when).days
+            lines.append(f"  - due {when.isoformat()} ({days(late)} late): "
+                         f"{display(thread['item'])}   [{where(thread)}]")
+    if due:
+        due.sort(key=lambda row: row[2])
+        lines.extend(["", f"Due today ({len(due)})"])
+        for thread, note, when in due:
+            lines.append(f"  - {display(thread['item'])}   [{where(thread)}]")
+    if malformed:
+        lines.extend(["", f"Unreadable `#due/` tag ({len(malformed)})"])
+        for thread, note, raw in malformed:
+            lines.append(f"  - `#due/{raw}` is not a YYYY-MM-DD date: "
+                         f"{display(thread['item'])}")
+        lines.append("    Left out of the buckets above rather than guessed at — "
+                     "a mistyped deadline is the one that must not fall silently "
+                     "into the undated pile.")
+    return lines
+
+
 def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
-                 footers=(), actions=()):
+                 footers=(), actions=(), as_of=None):
     """This repo in full; every other repo as a count. Nothing dropped.
 
     The asymmetry is the point: run from a repo, the items you can act on now are
@@ -533,6 +598,8 @@ def brief_report(stale, vault, header, repo, basis, groups, done=(), unres=(),
     lines.append(f"Brief: `{repo}` (from {basis}) in full, other repos as counts. "
                  "Nothing is filtered — --full lists every item.")
 
+    if as_of is not None:
+        lines.extend(due_block(mine + elsewhere + unknown, as_of))
     lines.extend(done_block(done))
     # Above the count-collapsed groups for the same reason a blocker is: what a
     # dropped or handed-off item needs is a decision, and it is the one kind of
@@ -580,7 +647,8 @@ def total_phrase(threads):
 
 
 def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
-           window=None, brief=False, done=(), unres=(), footers=(), actions=()):
+           window=None, brief=False, done=(), unres=(), footers=(), actions=(),
+           as_of=None):
     """The audit as text. Oldest first, and grouped by repo when we know one.
 
     The count line comes before any grouping and counts everything, so the
@@ -613,7 +681,7 @@ def report(stale, vault, stale_days, repo=None, basis=None, groups=None,
 
     if brief:
         return brief_report(stale, vault, lines[-1], repo, basis, groups, done,
-                            unres, footers, actions)
+                            unres, footers, actions, as_of)
 
     mine, elsewhere, unknown = groups
     lines.append(f"Grouped by repo. This repo is `{repo}` (from {basis}); "
@@ -666,9 +734,12 @@ def main():
                     help="never look at another repo, and never call gh. This is "
                          "the default for the --stale-days audit.")
     ap.add_argument("--landed-all", action="store_true",
-                    help="check every repo's refs, not just this repo's. Slower, "
-                         "and the point of it is spotting work already done "
-                         "somewhere you are not standing.")
+                    help="check every repo's refs. On by default with --recent, "
+                         "because work already done somewhere you are not "
+                         "standing is exactly what goes unnoticed.")
+    ap.add_argument("--landed-here", action="store_true",
+                    help="check only this repo's refs — the pre-v0.60 --recent "
+                         "behaviour, for a run that must not touch other repos")
     ap.add_argument("--recent", type=int, metavar="N", nargs="?", const=4,
                     help="the check-follow-ups window instead of an age cutoff: "
                          "every open item in the N most recent notes that exist "
@@ -690,6 +761,11 @@ def main():
     if args.full and args.no_repo_grouping:
         ap.error("--full lists every repo's items under its own heading, which "
                  "--no-repo-grouping refuses to do; pick one")
+    if args.landed_all and args.landed_here:
+        ap.error("--landed-all and --landed-here are opposite scopes; pick one")
+    if args.landed_here and args.no_landed:
+        ap.error("--landed-here narrows the check and --no-landed removes it; "
+                 "pick one")
     if args.landed and args.no_landed:
         ap.error("--landed and --no-landed are opposites; pick one")
 
@@ -744,9 +820,21 @@ def main():
     # checkouts and no gh auth. An audit that started making network calls would
     # be a different tool than the one those two agreed to run.
     if args.landed or (args.recent is not None and not args.no_landed):
-        # Scoped to this repo unless widened — or unless there is no "this repo"
-        # to scope to, where restricting would silently check nothing at all.
-        scope = None if (args.landed_all or not repo) else repo
+        # **Every repo by default under --recent.** Scoping to the repo you are
+        # standing in meant the one line this check printed about everywhere
+        # else was a count of work it had declined to look at: on 2026-09-22,
+        # "21 item(s) in other repos name a PR, branch or commit and were not
+        # checked". Widened, 14 of those resolved to already-merged PRs and
+        # branches — a tenth of the open backlog, closable with evidence, that
+        # nobody could see. The thing a follow-up report is worst at is work
+        # finished somewhere you are not, which is precisely what this was
+        # opting out of.
+        #
+        # --landed-here restores the old scope for a run that must not reach
+        # into other repos; --no-landed still turns the whole thing off, and is
+        # still the default for the --stale-days audit, which runs on machines
+        # with no checkouts and no gh auth.
+        scope = repo if (args.landed_here and repo) else None
         footers.extend(check_landed(stale, scope))
 
     # No repo to compare against means nothing could land in "this repo", and
@@ -795,7 +883,7 @@ def main():
 
     print(report(stale, vault, args.stale_days, repo, basis, groups, window,
                  brief=brief and groups is not None, done=done, unres=unres,
-                 footers=footers, actions=actions))
+                 footers=footers, actions=actions, as_of=as_of))
     return 0
 
 
