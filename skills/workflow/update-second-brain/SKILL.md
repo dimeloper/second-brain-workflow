@@ -3,8 +3,8 @@ name: update-second-brain
 description: >-
   Capture the current agent session's work into the Obsidian "second brain"
   vault and publish it: append to today's daily note, revise the project docs
-  the session moved, propose and promote engineering practice notes, then
-  commit and push. Runs from inside the working repo; the vault lives
+  the session moved, tick the follow-ups this session finished, propose and
+  promote engineering practice notes, then commit and push. Runs from inside the working repo; the vault lives
   elsewhere. Use when the user says update second brain, update my second
   brain, capture this session, log this to second brain, second brain this,
   publish second brain, commit the vault, push practices, or backfill
@@ -197,6 +197,23 @@ Omit empty sections — leave them out of the block and they are never created.
   `--allow-unattributed-built`, and the block should say why.
 - `## Follow-ups` records what is left open — `- [ ]` pending, `- [x]` done. See
   the repo tag below; this is the only section another skill reads back.
+
+  **The bar is a commitment, and the test is one question: can you write what
+  "done" looks like?** If you cannot, it is not a follow-up. "Revoke key
+  `b1411f11`" has a done state. "Decide whether the footer wants its own shape"
+  does not — nobody will ever tick it, and it will sit there looking like work.
+
+  Everything that fails that test goes in `## Drift / gaps`, which exists for
+  exactly this: things noticed, not things owed. An observation filed there is
+  still read — `recent-work` and a later session both see it — and it is not
+  counted against you every time you ask what is open.
+
+  **This is the half of the backlog no tool can fix.** On 2026-09-22, 112 of 140
+  open items named neither a ref nor a date, so nothing could close them
+  automatically; a large share were observations that had been filed as
+  commitments. A report can only surface what the write side recorded, and an
+  item that can never be ticked is noise in every run from the day it is
+  written.
 - `## Practices followed` links existing notes as `[[wikilink]]` with a short
   note on how each was applied. **One citation per bullet, at the front of the
   line**: `- [[slug]] — how it applied`. A link in the *reason* is read as prose,
@@ -598,6 +615,63 @@ like every other write here, and rides along in the Step 8 commit — the captur
 of Step 5 has already gone out, and reopening it would mean amending a pushed
 commit to record something that happened after it.
 
+## Step 5c — Ask what this session closed
+
+**The session is the only thing that knows.** An item is opened in one repo and
+closed by work in that repo weeks later, and closing it requires somebody to be
+standing there *and* to remember. Nobody is, and nobody does: on 2026-09-22 six
+`[credential]` items and six `[blocked]` ones were all finished and all still
+open, and they closed only because the user said so unprompted. The backlog does
+not grow because work is unfinished. It grows because finished work is never
+ticked.
+
+So ask here, once, while the session still has the answer.
+
+```bash
+~/second-brain-workflow/scripts/check-followups.py --recent --brief --repo <this repo>
+```
+
+**Ask about what this session plausibly touched, not the whole list.** Reading
+twenty items back is how this becomes something people scroll past. Pick the
+ones this session's work bears on — the file it edited, the PR it merged, the
+thing it verified — and ask about those in one short message.
+
+**Read the `Looks already done` block out if it is there.** It is on by default
+and it is the cheapest evidence available: an item whose PR merged, whose branch
+landed, whose commit is on main. It is **a question, never an action** — the
+evidence is about the *ref*, and the item routinely says more. On 2026-09-22
+fourteen items carried that marker and only **five** were covered by it; the
+rest were decisions, live verifications, and telling somebody. Say what the
+evidence is and let the user decide.
+
+Tick through the appender, with an outcome, exactly as Step 3 describes — and
+in **the note the item lives in**, with `--date` and that note's own stamp:
+
+```bash
+STAMP="$(~/second-brain-workflow/scripts/append-daily-block.py --date 2026-09-15 --stamp --quiet)"
+~/second-brain-workflow/scripts/append-daily-block.py --date 2026-09-15 --expect "${STAMP}" \
+  --close 'done :: Revoke the dormant key :: verified — the key is gone from the console'
+```
+
+An item restated in a later note is **two open checkboxes in two notes**, and
+closing one leaves the other. The report says so on the next run; do not treat a
+thread as closed because one of its copies is.
+
+**Rules, all of which already apply and are easy to drop here:**
+
+- **Never guess the outcome.** If the session does not establish which of
+  `done` / `dropped` / `superseded` / `handed-off` it was, ask in one line or
+  leave it `- [ ]`. A wrong `#outcome/done` closes the item *and* asserts
+  something false about it.
+- **Only this repo's items.** A session in the backend has no standing to judge
+  what happened in the ingestion service.
+- **Say nothing when nothing matches.** A wrap-up that asks about unrelated
+  items every time teaches the reader to skip the question, and then it is worth
+  less than not asking.
+- **Why after Step 5.** A question is a place a session can stop, and an
+  unanswered one before the capture is published leaves the daily note
+  uncommitted — the exact failure Step 5 exists to prevent.
+
 ## Step 6 — Propose practice-note changes (approval required)
 
 Derive candidates in three buckets. **Propose all of them in one message and wait
@@ -758,6 +832,11 @@ or the product repo as part of this skill.
   pass, and `_project.md` left alone is the normal, correct outcome worth stating
 - Notes created / updated / promoted, and any remaining promotion candidates
 - Anything left unstaged, and why
+- **What Step 5c closed, and on what evidence** — which items were ticked, with
+  which outcome, and whether each was verified or taken on the user's word. The
+  two are different claims and a report that blurs them makes the record less
+  trustworthy than one that closed nothing. If the ask found nothing to close,
+  say that in a clause, not a paragraph
 - The onboarding question, if Step 5b asked it: what was answered, and the
   render mode if it was onboarded. A decline is worth one line too — it is a
   decision that now lives on this machine, and the line is where a reader finds

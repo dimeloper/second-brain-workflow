@@ -471,4 +471,49 @@ else
   fail "every command a Major entry names exists" "${out}"
 fi
 
+# --- the close ritual, and where it sits ------------------------------------
+#
+# Step 5c is prose, so the only thing that can pin it is a test on the prose.
+# Its *position* is the load-bearing part: a question is a place a session can
+# stop, and one asked before the capture is published leaves the daily note
+# uncommitted — the exact failure Step 5 exists to prevent. Step 5b was placed
+# after Step 5 for that reason and this inherits it.
+
+USB="${ENGINE}/skills/workflow/update-second-brain/SKILL.md"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q '^## Step 5c — Ask what this session closed' "${USB}"; then
+  pass "update-second-brain has a step that asks what this session closed"
+else
+  fail "update-second-brain has a step that asks what this session closed" "absent"
+fi
+
+step5="$(grep -n '^## Step 5 —' "${USB}" | cut -d: -f1)"
+step5c="$(grep -n '^## Step 5c —' "${USB}" | cut -d: -f1)"
+step6="$(grep -n '^## Step 6 —' "${USB}" | cut -d: -f1)"
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -n "${step5}" ] && [ -n "${step5c}" ] && [ -n "${step6}" ] &&
+   [ "${step5}" -lt "${step5c}" ] && [ "${step5c}" -lt "${step6}" ]; then
+  pass "and it asks after the capture is published, never before"
+else
+  fail "and it asks after the capture is published, never before" \
+    "Step 5 at ${step5}, 5c at ${step5c}, 6 at ${step6}"
+fi
+
+# The rule that keeps a wrong tick from being worse than no tick.
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q 'Never guess the outcome' "${USB}"; then
+  pass "and it repeats that the outcome is never guessed"
+else
+  fail "and it repeats that the outcome is never guessed" "absent"
+fi
+
+# The write-side half: an item nobody can ever tick is noise in every run.
+TESTS_RUN=$((TESTS_RUN + 1))
+if grep -q 'can you write what' "${USB}" && grep -q 'Drift / gaps' "${USB}"; then
+  pass "a follow-up has to have a done state, and drift is named as the home for the rest"
+else
+  fail "a follow-up has to have a done state, and drift is named as the home for the rest" "absent"
+fi
+
 finish

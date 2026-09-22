@@ -17,6 +17,35 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`update-second-brain` Step 5c: ask what this session closed.** The backlog
+  does not grow because work is unfinished — it grows because finished work is
+  never ticked. An item is opened in one repo and closed by work there weeks
+  later, and closing it needs somebody standing in that repo who also remembers.
+  On 2026-09-22 six `[credential]` items and six `[blocked]` ones were all
+  finished and all still open; they closed only because the user said so,
+  unprompted.
+
+  So the wrap-up now asks, once, while the session still has the answer —
+  about what it plausibly touched rather than the whole list, reading the
+  `Looks already done` block out as evidence, ticking through the appender with
+  an outcome in the note each item lives in. It asks **after** Step 5, for the
+  reason Step 5b does: a question is a place a session can stop, and an
+  unanswered one before the capture is published leaves the daily note
+  uncommitted.
+
+### Changed
+- **A follow-up has to have a done state.** The bar is now one question — *can
+  you write what "done" looks like?* "Revoke key `b1411f11`" passes. "Decide
+  whether the footer wants its own shape" does not: nobody will ever tick it,
+  and it sits there looking like work. Everything that fails goes in
+  `## Drift / gaps`, which exists for things noticed rather than things owed.
+
+  This is the half no tool can fix. Of 140 open items on 2026-09-22, **112 named
+  neither a ref nor a date**, so nothing could close them automatically — and a
+  large share were observations filed as commitments. A report can only surface
+  what the write side recorded.
+
 ## [0.60.0] - 2026-09-22
 
 ### Added
