@@ -17,6 +17,15 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`release-check.sh` reports a vault CI pin its own tag just made stale.** A
+  vault repo running the CI templates pins the engine by tag, in its own copy of
+  the workflow, in a different repo — so cutting a release cannot update it, and
+  nothing notices until somebody looks. It had drifted two releases behind by
+  2026-09-18 and one behind again by 2026-09-22. Reported after the tag, with
+  the command that fixes it, and never a refusal: a release is not wrong because
+  another repo has not caught up. A vault this machine cannot read says nothing.
+
 ## [0.58.0] - 2026-09-22
 
 ### Added

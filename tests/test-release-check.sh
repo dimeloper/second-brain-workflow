@@ -93,6 +93,9 @@ git -C "${REPO}" config user.name "Test"
 mkdir -p "${REPO}/scripts/lib"
 cp "${ENGINE}/scripts/release-check.sh" "${REPO}/scripts/"
 cp "${ENGINE}/scripts/lib/invocation.sh" "${REPO}/scripts/lib/"
+# The gate reads the machine config to find the vault, so it can report a
+# vault CI pin its own tag just made stale.
+cp "${ENGINE}/scripts/lib/config.sh" "${REPO}/scripts/lib/"
 printf '0.99.0\n' > "${REPO}/VERSION"
 git -C "${REPO}" add -A
 git -C "${REPO}" commit -q -m "release commit"
@@ -352,6 +355,82 @@ TESTS_RUN=$((TESTS_RUN + 1))
 case "${out}" in
   *"gh release create v0.99.1"*) pass "with the command to finish it by hand" ;;
   *) fail "with the command to finish it by hand" "${out}" ;;
+esac
+
+# --- the vault CI pin this tag just made stale ------------------------------
+#
+# A vault repo running the CI templates pins the engine by tag, in its own copy
+# of the workflow, in a different repo. Cutting a release cannot update it, so
+# the pin goes stale at exactly this moment and nothing notices until somebody
+# looks — it drifted two releases behind by 2026-09-18 and again by 09-22.
+#
+# Reported after the tag and never a refusal: a release is not wrong because a
+# different repo has not caught up.
+
+VP="${SANDBOX}/pinvault"
+mkdir -p "${VP}/.github/workflows"
+printf 'env:\n  ENGINE_REF: v0.98.0\n' > "${VP}/.github/workflows/audit.yml"
+printf 'env:\n  ENGINE_REF: v0.98.0\n' > "${VP}/.github/workflows/guard.yml"
+
+# A version of its own: the cases above have already tagged 0.99.0 and 0.99.1,
+# and this gate refuses a tag that exists before it looks at anything else.
+cut_version() {
+  printf '%s\n' "$1" > "${REPO}/VERSION"
+  printf '## [%s] - 2026-01-03\n\n### Changed\n- The pin case.\n' "$1" > "${REPO}/CHANGELOG.md"
+  git -C "${REPO}" add -A
+  git -C "${REPO}" commit -q -m "docs: cut v$1"
+  git -C "${REPO}" push -q origin main 2>/dev/null
+}
+
+cut_version 0.99.2
+green
+out="$(SBW_VAULT="${VP}" run --yes)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"still pins the engine at an older tag"*"v0.98.0, not v0.99.2"*)
+    pass "a vault pinned to an older tag is reported after the release" ;;
+  *) fail "a vault pinned to an older tag is reported after the release" "${out}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *".github/workflows/audit.yml"*".github/workflows/guard.yml"*)
+    pass "every workflow carrying a stale pin is named, not just the first" ;;
+  *) fail "every workflow carrying a stale pin is named, not just the first" "${out}" ;;
+esac
+
+# A finding that does not say how to fix it is one people learn to skim.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"sed -i"*"ENGINE_REF: v0.99.2"*) pass "and the report carries the command that fixes it" ;;
+  *) fail "and the report carries the command that fixes it" "${out}" ;;
+esac
+
+# The release still succeeded: this is a report about another repo, not a gate.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out}" in
+  *"tagged v0.99.2 and pushed it"*) pass "a stale vault pin never blocks the release" ;;
+  *) fail "a stale vault pin never blocks the release" "${out}" ;;
+esac
+
+# Silence is the other half, and it has two cases. A pin that already matches
+# is not news; a vault this machine cannot read is not evidence of anything.
+sed -i'' -e 's/v0.98.0/v0.99.3/' "${VP}/.github/workflows/"*.yml
+cut_version 0.99.3
+out_match="$(SBW_VAULT="${VP}" run --yes)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_match}" in
+  *"still pins the engine"*) fail "a pin that already matches says nothing" "${out_match}" ;;
+  *) pass "a pin that already matches says nothing" ;;
+esac
+
+cut_version 0.99.4
+out_novault="$(SBW_VAULT="${SANDBOX}/no-such-vault" run --yes)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_novault}" in
+  *"still pins the engine"*) fail "a vault this machine cannot read says nothing" "${out_novault}" ;;
+  *) pass "a vault this machine cannot read says nothing" ;;
 esac
 
 finish

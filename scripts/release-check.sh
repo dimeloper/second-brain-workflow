@@ -73,7 +73,44 @@ done
 refuse() { printf 'release-check: %s\n' "$1" >&2; exit "${2:-2}"; }
 note()   { printf '  %s\n' "$1"; }
 
+# A vault repo that runs the CI templates pins the engine by tag, in its own
+# copy of the workflow. Cutting a release here cannot update it — different
+# repo — so the pin goes stale at exactly this moment and nothing notices until
+# somebody looks. It has drifted twice: two releases behind on 2026-09-18, one
+# behind on 2026-09-22.
+#
+# Reported after the tag, never a refusal: the vault is somebody else's repo,
+# it may not be on this machine at all, and a release is not wrong because a
+# different repo has not caught up yet. A vault this cannot read says nothing —
+# an unreadable path is not evidence of a stale pin.
+report_vault_pin() {
+  local tag="$1" vault="${SBW_VAULT:-}" wf found=0 pin
+  [ -n "${vault}" ] || return 0
+  [ -d "${vault}/.github/workflows" ] || return 0
+  for wf in "${vault}"/.github/workflows/*.yml; do
+    [ -f "${wf}" ] || continue
+    pin="$(sed -n 's/^[[:space:]]*ENGINE_REF:[[:space:]]*\(v[0-9.]*\).*/\1/p' "${wf}" | head -1)"
+    [ -n "${pin}" ] || continue
+    [ "${pin}" = "${tag}" ] && continue
+    if [ "${found}" -eq 0 ]; then
+      echo
+      note "The vault's CI still pins the engine at an older tag, so its next"
+      note "scheduled run would check this vault with ${pin}, not ${tag}:"
+      found=1
+    fi
+    note "  ${wf#"${vault}"/} — ENGINE_REF: ${pin}"
+  done
+  [ "${found}" -eq 1 ] || return 0
+  note "Bump both, commit and push in ${vault}:"
+  note "  sed -i '' 's/ENGINE_REF: v[0-9.]*/ENGINE_REF: ${tag}/' \\"
+  note "    ${vault}/.github/workflows/*.yml"
+}
+
 # --- before looking at CI at all --------------------------------------------
+
+# shellcheck source=scripts/lib/config.sh
+. "${ENGINE}/scripts/lib/config.sh"
+ds_config_load 2>/dev/null || true
 
 command -v gh >/dev/null 2>&1 || refuse \
   "gh is not installed. This gate reads the CI run for this commit; there is no
@@ -258,3 +295,5 @@ note "branch, and this gate has only seen the branch's:"
 note "  gh run list --limit 3"
 note "Add a summary above the changelog link if this release warrants one:"
 note "  gh release edit ${TAG} --notes-file -"
+
+report_vault_pin "${TAG}"
