@@ -17,36 +17,6 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
-### Major
-- **`append-daily-block.py` refuses a bare `## Built` that names no repo**
-  (exit 4). A day's work is read back per repo, and an unattributed Built block
-  is the one shape nothing downstream can place: in the week of 2026-09-14, 35
-  of 308 recorded items had no repo at all, and 189 of the rest were attributed
-  by guessing from a section heading.
-
-  **The action, if you call the appender yourself:** label the header —
-  `## Built (acme-backend: search filters)` — or put a `#repo/` tag on an item.
-  Either satisfies it. Work that genuinely belongs to no repo passes
-  `--allow-unattributed-built`. Nothing already written to a note is touched,
-  and `update-second-brain` composes attributed blocks from this release on, so
-  a vault whose blocks come from the skill needs no change.
-
-### Fixed
-- **`recent-work.py` counted things that are not practices.** The footer read
-  every wikilink on a `## Practices followed` bullet, so a citation whose
-  *reason* mentioned another note — "filed on `[[2026-09-15]]` via `--date`" —
-  was reported as two practices followed, one of them a day. A bullet with no
-  link at all became a "practice" named after its own first sentence. And
-  nothing resolved the slug, so rules from the rules repo and project feature
-  files were counted beside real practice notes.
-
-  Now one citation per bullet, taken from the front of the line, resolved
-  against `practices/**`. Anything that resolves nowhere is reported under
-  **Cited under Practices followed but not a practice note** rather than
-  dropped — a dead citation is a finding about the note that wrote it, and it
-  is a dead link in Obsidian too. Over the week of 2026-09-14 this moved the
-  count from 54 to 49 and named the four wrong entries.
-
 ### Added
 - **`check-lineage.py --overlap`** reports pairs of notes in one domain whose
   slugs share most of their significant words. Lineage polices a note's maturity
@@ -86,6 +56,39 @@ write release notes, not two to keep in sync by hand.
   **Workflow hygiene** line counted in notes rather than citations. No maturity
   bar or promotion changes — see [Versioning and the
   bars](docs/REFERENCE.md#the-maturity-gradient).
+
+### Changed
+- **`append-daily-block.py` refuses a bare `## Built` that names no repo**
+  (exit 4). A day's work is read back per repo, and an unattributed Built block
+  is the one shape nothing downstream can place: in the week of 2026-09-14, 35
+  of 308 recorded items had no repo at all, and 189 of the rest were attributed
+  by guessing from a section heading.
+
+  **Not a Major entry**, although it is a refusal that did not exist before:
+  nothing in an already-onboarded repo stops working, and this file's Major
+  section is for the action a repo needs to keep rendering. What breaks is a
+  *caller* of the appender. **If that is you:** label the header —
+  `## Built (acme-backend: search filters)` — or put a `#repo/` tag on an item.
+  Either satisfies it, and work that genuinely belongs to no repo passes
+  `--allow-unattributed-built`. Nothing already written to a note is touched,
+  and `update-second-brain` composes attributed blocks from this release on, so
+  a vault whose blocks come from the skill needs no change.
+
+### Fixed
+- **`recent-work.py` counted things that are not practices.** The footer read
+  every wikilink on a `## Practices followed` bullet, so a citation whose
+  *reason* mentioned another note — "filed on `[[2026-09-15]]` via `--date`" —
+  was reported as two practices followed, one of them a day. A bullet with no
+  link at all became a "practice" named after its own first sentence. And
+  nothing resolved the slug, so rules from the rules repo and project feature
+  files were counted beside real practice notes.
+
+  Now one citation per bullet, taken from the front of the line, resolved
+  against `practices/**`. Anything that resolves nowhere is reported under
+  **Cited under Practices followed but not a practice note** rather than
+  dropped — a dead citation is a finding about the note that wrote it, and it
+  is a dead link in Obsidian too. Over the week of 2026-09-14 this moved the
+  count from 54 to 49 and named the four wrong entries.
 
 ## [0.57.0] - 2026-09-21
 
