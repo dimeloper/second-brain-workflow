@@ -89,10 +89,20 @@ jobs:
       # follow-up, is a backlog item surfaced in the tracking issue below,
       # not a build break.
       #
-      # check-followups.py doesn't actually need a rules directory — it only
-      # reads --vault — but it runs in this same step (gated behind
-      # vars.RULES_REPO like the other three) so the tracking issue stays one
-      # report instead of four.
+      # check-followups.py and check-markdown.py don't actually need a rules
+      # directory — both only read --vault — but they run in this same step
+      # (gated behind vars.RULES_REPO like the others) so the tracking issue
+      # stays one report instead of five.
+      #
+      # `make audit` runs seven checks and this runs five. The two missing ones
+      # are missing on purpose, and it is the same reason for both:
+      # check-context-freshness.py and check-project-state.py compare a vault
+      # document against the *repo* it describes, and a runner has the vault
+      # and no repos. Both are built to report `undetermined` / `skipped`
+      # rather than pass when they cannot reach a checkout — so adding them
+      # here would produce a page of "cannot tell" every Monday and teach
+      # people to skim the issue. They are local checks by nature; run them
+      # with `make audit` on a machine that has the repos.
       - name: Run the audit
         id: audit
         run: |
@@ -107,6 +117,8 @@ jobs:
             --rules-dir "${GITHUB_WORKSPACE}/rules/rules" 2>&1)"
           budget="$(python3 engine/scripts/rule-budget.py \
             --rules-dir "${GITHUB_WORKSPACE}/rules/rules" 2>&1)"
+          markdown="$(python3 engine/scripts/check-markdown.py \
+            --vault "${GITHUB_WORKSPACE}/vault" 2>&1)"
           delim="EOF_$(uuidgen)"
           {
             echo "report<<${delim}"
@@ -117,6 +129,8 @@ jobs:
             echo "${rules}"
             echo
             echo "${budget}"
+            echo
+            echo "${markdown}"
             echo "${delim}"
           } >> "${GITHUB_OUTPUT}"
           echo "${lineage}"
@@ -126,6 +140,8 @@ jobs:
           echo "${rules}"
           echo
           echo "${budget}"
+          echo
+          echo "${markdown}"
           exit "${lineage_rc}"
 
       # Always runs, even when the audit step above failed on an orphaned

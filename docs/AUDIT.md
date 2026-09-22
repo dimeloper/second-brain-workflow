@@ -428,6 +428,21 @@ indistinguishable from a clean answer.
 `--allow-behind` (default 1) is the tolerance, and a patch release counts for
 nothing — v0.57.0 to v0.57.1 does not change where a project stands.
 
+## Which of these the weekly run can answer
+
+`make audit` runs seven checks; `docs/vault-ci/audit.yml` runs five. **The gap
+is deliberate, and it is the same reason for both of the missing ones.**
+
+`check-context-freshness.py` and `check-project-state.py` compare a vault
+document against the *repo* it describes. A CI runner has the vault checked out
+and no product repos, so both degrade to their honest answer — `undetermined`
+and `skipped` — for every row. Adding them would produce a page of "cannot tell"
+in the tracking issue every Monday, which is how a report teaches people to skim
+it. Run those two locally, on a machine that has the repos.
+
+Everything else reads the vault, the rules directory, or both, and answers the
+same question on a runner as it does on your laptop.
+
 ## Running it weekly in CI
 
 A target you have to remember to run is a target that quietly stops getting

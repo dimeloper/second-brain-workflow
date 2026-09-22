@@ -25,6 +25,13 @@ write release notes, not two to keep in sync by hand.
   2026-09-18 and one behind again by 2026-09-22. Reported after the tag, with
   the command that fixes it, and never a refusal: a release is not wrong because
   another repo has not caught up. A vault this machine cannot read says nothing.
+- **The weekly CI template runs `check-markdown.py`.** It reads only the vault,
+  so it answers the same on a runner as locally — and wrapped code spans were
+  exactly the defect it was written for, in documents CI was already reading.
+  `check-context-freshness.py` and `check-project-state.py` stay out, and
+  [Auditing the vault](docs/AUDIT.md#which-of-these-the-weekly-run-can-answer)
+  records why: both compare a vault document against a repo checkout a runner
+  does not have.
 
 ## [0.58.0] - 2026-09-22
 
