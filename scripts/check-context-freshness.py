@@ -56,6 +56,7 @@ from lib.config import origin_describe  # noqa: E402
 from lib.context_sources import TIERS, find, walk  # noqa: E402
 from lib.frontmatter import parse_frontmatter  # noqa: E402
 from lib.projects import discover  # noqa: E402
+from lib.provenance import is_engine_line  # noqa: E402
 from lib.landed import Resolver  # noqa: E402
 from lib.vault_state import classify  # noqa: E402
 
@@ -67,6 +68,41 @@ def resolve_vault(explicit):
         return Path(explicit).expanduser()
     cfg = load_config(warn=lambda m: print(f"warning: {m}", file=sys.stderr))
     return Path(cfg["SBW_VAULT"]).expanduser()
+
+
+# How far back to look for a commit that is not one of ours. A repo onboarded
+# and then re-rendered a few times can stack several; twenty is far more than
+# that and still one cheap `git log`.
+COMMIT_SCAN = 20
+
+
+def engine_only(repo, sha, rels):
+    """Did this commit change the tier sources by engine writes alone?
+
+    Onboarding a repo, and every later re-render, edits tier-1 files: render.py
+    adds an `@AGENTS.md` import to a CLAUDE.md the repo owns, and writes whole
+    marked files where it owns them. Neither says anything about the product, so
+    a freshness check that counts them reports drift nobody caused. On
+    2026-09-22 `d427cbb` — `chore: onboard the app into second-brain-workflow`
+    — marked all three of `babypath-app`'s context files STALE that way.
+
+    A commit we cannot read is **not** treated as ours. Skipping it would let a
+    real product change hide behind a failed `git show`, which is the expensive
+    direction to be wrong in.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), "show", "--format=", "--unified=0", sha, "--"]
+            + rels,
+            capture_output=True, text=True, timeout=30, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if proc.returncode != 0:
+        return False
+    changed = [l for l in proc.stdout.splitlines()
+               if l[:1] in "+-" and not l.startswith(("+++", "---"))]
+    return bool(changed) and all(is_engine_line(l) for l in changed)
 
 
 def last_source_commit(repo):
@@ -90,19 +126,27 @@ def last_source_commit(repo):
     rels = sorted({str(p.relative_to(repo)) for p in paths})
     try:
         proc = subprocess.run(
-            ["git", "-C", str(repo), "log", "-1", "--format=%cs %H", "--"] + rels,
+            ["git", "-C", str(repo), "log", f"-{COMMIT_SCAN}",
+             "--format=%cs %H", "--"] + rels,
             capture_output=True, text=True, timeout=30, check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return None, f"git failed: {exc}", 0
-    line = proc.stdout.strip()
-    if proc.returncode != 0 or not line:
+    lines = [l for l in proc.stdout.splitlines() if l.strip()]
+    if proc.returncode != 0 or not lines:
         return None, "git records no commit touching those files", len(rels)
-    stamp, _, sha = line.partition(" ")
-    try:
-        return datetime.strptime(stamp, DATE_FMT).date(), sha[:9], len(rels)
-    except ValueError:
-        return None, f"unparseable commit date {stamp!r}", len(rels)
+
+    for line in lines:
+        stamp, _, sha = line.partition(" ")
+        if engine_only(repo, sha, rels):
+            continue
+        try:
+            return datetime.strptime(stamp, DATE_FMT).date(), sha[:9], len(rels)
+        except ValueError:
+            return None, f"unparseable commit date {stamp!r}", len(rels)
+    # Every commit we looked at was ours. Saying "never moved" would be a
+    # stronger claim than the scan supports, so this is undetermined.
+    return None, f"only engine writes in the last {COMMIT_SCAN} commits", len(rels)
 
 
 def reviewed_on(path):
