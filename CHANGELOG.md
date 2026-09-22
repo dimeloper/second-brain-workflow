@@ -17,6 +17,36 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Added
+- **`#due/YYYY-MM-DD` on a follow-up, and Overdue / Due today blocks above
+  everything else.** Every other view ages an item from the day it was written,
+  which is backwards for an observational follow-up: "re-measure p95 over a full
+  day (2026-09-18)" read as *4 days open* on the 22nd when what was true is *4
+  days late*. Seven open items were past a date in their own text and nothing
+  had ever said so.
+
+  The class is small — 14 of 217 open items carried that shape — and matters
+  more than its size, because lateness compounds for it: a late "merge the PR"
+  is still doable, a late "check last night's cron run" is unanswerable once the
+  telemetry ages out. The buckets are global, since a deadline does not care
+  which repo you are standing in. A `#due/` that is not a real date is reported
+  under its own heading rather than dropped into the undated pile.
+
+### Changed
+- **The landed check reaches every repo by default under `--recent`.** It was
+  scoped to the repo you were standing in, and the single line it printed about
+  everywhere else was a count of work it had declined to look at — on
+  2026-09-22, "21 item(s) in other repos name a PR, branch or commit and were
+  not checked". Widened, **14 of those resolved to already-merged PRs and
+  branches**: a tenth of the open backlog, closable with evidence, invisible.
+  Work finished in a repo you are not standing in is what this report is worst
+  at noticing, and that is precisely what it was opting out of.
+
+  `--landed-here` restores the old scope for a run that must not reach into
+  other repos, and still counts what it skipped. `--no-landed` is unchanged and
+  remains the default for the `--stale-days` audit, which runs on machines with
+  no checkouts and no `gh` auth.
+
 ## [0.59.2] - 2026-09-22
 
 ### Fixed

@@ -179,6 +179,31 @@ Attribute each item by, strongest signal first:
 None of those hit? It goes under **No repo identified** — that is a real answer,
 not a failure.
 
+## Due dates
+
+An item tagged `#due/YYYY-MM-DD` is reported in **Overdue** and **Due today**
+blocks above everything else, whatever repo it belongs to — a deadline does not
+care which repo you are standing in.
+
+This exists because every other view in this report ages an item from the day it
+was *written*, and for an observational follow-up that is backwards. "Re-measure
+p95 over a full day (2026-09-18)" read as "4 days open" on the 22nd when what
+was true is **4 days late**. Seven items were past a date in their own text that
+day and nothing had ever said so.
+
+**Read the overdue block out first, and say how late.** For this class lateness
+is not cosmetic: a late *merge the PR* is still doable, a late *check last
+night's cron run* can become unanswerable once the telemetry ages out. When an
+overdue item is observational, the honest first question is whether the evidence
+still exists — see [[verify-telemetry-retention-before-trusting-absence]].
+
+A `#due/` that is not a real date is listed under **Unreadable `#due/` tag**
+rather than being dropped into the undated pile. An item with no tag is in no
+due bucket, which is the normal case — most follow-ups have no deadline.
+
+Writing the tag is `update-second-brain`'s job, at the moment the session knows
+what "tomorrow" means.
+
 ## Landed evidence
 
 An item naming a pull request, a branch, or a commit is checkable, and the
@@ -193,11 +218,19 @@ cost nothing and are annotated with nothing.
 | `[open]` | genuinely still open. This is a confirmation, not a nag |
 | `[unchecked]` | could not be established, with the reason on the line |
 
-**Only this repo's items are checked by default.** Items in other repos are
-reported as normal but not probed, and a footer says how many carried a
-checkable ref and were skipped. `--landed-all` widens it — worth doing when the
-question is "has any of this already been done", since work landing in a repo
-you are not standing in is exactly what you would otherwise miss.
+**Every repo's items are checked by default** under `--recent`. It was scoped
+to the repo you were standing in until v0.60.0, and the one line it printed
+about everywhere else was a count of work it had declined to look at: on
+2026-09-22 that read "21 item(s) in other repos name a PR, branch or commit and
+were not checked", and widening it resolved **14 of them to already-merged PRs
+and branches** — a tenth of the open backlog, closable with evidence, that
+nobody could see. Work landing in a repo you are not standing in is exactly what
+this report is worst at noticing.
+
+`--landed-here` narrows it back to this repo for a run that must not reach into
+others, and still counts what it skipped. `--no-landed` turns it off entirely
+and remains the default for the long-range `--stale-days` audit, which runs on
+machines with no checkouts and no `gh` auth.
 
 `[landed]` and `[closed]` threads are lifted into a **Looks already done** block
 above everything else.

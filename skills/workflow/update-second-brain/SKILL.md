@@ -235,6 +235,37 @@ several repos. Inferring it there works maybe four times in five, which for a
 task list is the worst place to be — so record it once, at the moment it is
 certain.
 
+### An item that names a day gets `#due/`
+
+Some follow-ups are not "do this", they are **"look at this on a particular
+day"** — *check tomorrow that tonight's scheduled run went through*, *re-measure
+p95 over a full day*, *confirm the backfill once it drains*. Tag those with
+`#due/YYYY-MM-DD`, resolved to a real date:
+
+```markdown
+- [ ] Check last night's `cron_media_hash` completed #due/2026-09-23 #repo/acme-ingestion
+- [ ] Re-measure p95 over a full day #due/2026-09-25 #repo/acme-backend
+```
+
+**Write the date, not the word.** You know what "tomorrow" is; a reader in a
+week does not, and `check-follow-ups` cannot act on it.
+
+**Why it needs its own tag.** Every other view ages an item from the day it was
+*written*. For this kind that is backwards — an item due on the 18th is not
+"four days old" on the 22nd, it is **four days late** — and the two read
+identically in every report without it. On 2026-09-22 seven open items named a
+date that had already passed and nothing had ever said so.
+
+And lateness compounds here in a way it does not elsewhere: a late *merge the
+PR* is still doable, a late *check last night's cron run* may be permanently
+unanswerable once the telemetry ages out — the vault's own
+[[verify-telemetry-retention-before-trusting-absence]]. That is why
+`check-follow-ups` prints **Overdue** and **Due today** above everything else,
+whatever repo the item belongs to.
+
+Only tag what genuinely has a day. Most follow-ups do not, and a deadline
+invented to fill the field is worse than none.
+
 ### Closing a follow-up takes an outcome, not just a tick
 
 **A bare `- [x]` is an incomplete write.** When you would tick a box, propose the

@@ -982,7 +982,16 @@ case "${out_stale}" in
   *) fail "and says how stale, and which repo, so it is fixable" "${out_stale}" ;;
 esac
 
-# --- the landed check is scoped to this repo by default ------------------
+# --- the landed check reaches every repo by default -------------------------
+#
+# It was scoped to the repo you were standing in until v0.60.0, and the one line
+# it printed about everywhere else was a count of work it had declined to look
+# at. On 2026-09-22 that line read "21 item(s) in other repos name a PR, branch
+# or commit and were not checked"; widening it resolved 14 of them to
+# already-merged PRs and branches — a tenth of the open backlog, closable with
+# evidence, that nobody could see. Work finished somewhere you are not standing
+# is the thing this report is worst at, and that is exactly what it was opting
+# out of.
 scoped() {
   PATH="${LSAND}/bin:${PATH}" SBW_SCAN_ROOTS="${HOME}" SBW_SCAN_DEPTH=2 \
     "${CHECK}" --vault "${LVAULT}" --as-of 2026-01-02 --recent 1 \
@@ -991,24 +1000,36 @@ scoped() {
 out_scoped="$(scoped)"
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_scoped}" in
-  *"PR #7 merged"*) fail "another repo's refs are not probed by default" "probed" ;;
-  *) pass "another repo's refs are not probed by default" ;;
+  *"PR #7 merged"*) pass "another repo's refs are probed by default" ;;
+  *) fail "another repo's refs are probed by default" "${out_scoped}" ;;
 esac
 
-# ...but never silently. An unprobed item and a probed-and-open one look
-# identical on the line, so the count of what was skipped has to be stated.
+# Nothing is skipped now, so the count of skipped items has nothing to report.
 TESTS_RUN=$((TESTS_RUN + 1))
 case "${out_scoped}" in
   *"in other repos name a PR, branch or commit and were not checked"*)
-    pass "and the skipped ones are counted, with the flag that widens it" ;;
-  *) fail "and the skipped ones are counted, with the flag that widens it" "${out_scoped}" ;;
+    fail "and nothing is left unprobed to count" "${out_scoped}" ;;
+  *) pass "and nothing is left unprobed to count" ;;
 esac
 
+# The old scope is still reachable for a run that must not touch other repos.
 TESTS_RUN=$((TESTS_RUN + 1))
-case "$(scoped --landed-all)" in
-  *"PR #7 merged"*) pass "--landed-all reaches the other repos" ;;
-  *) fail "--landed-all reaches the other repos" "$(scoped --landed-all)" ;;
+case "$(scoped --landed-here)" in
+  *"PR #7 merged"*) fail "--landed-here restores the this-repo-only scope" "probed" ;;
+  *) pass "--landed-here restores the this-repo-only scope" ;;
 esac
+
+# ...and when it narrows, it still says what it skipped, or an unprobed item and
+# a probed-and-open one look identical on the line.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "$(scoped --landed-here)" in
+  *"in other repos name a PR, branch or commit and were not checked"*)
+    pass "and a narrowed run still counts what it skipped" ;;
+  *) fail "and a narrowed run still counts what it skipped" "$(scoped --landed-here)" ;;
+esac
+
+"${CHECK}" --vault "${LVAULT}" --recent 1 --landed-all --landed-here >/dev/null 2>&1
+assert_exit 2 $? "--landed-all and --landed-here are opposite scopes and are refused"
 
 
 # --- outcomes: what a tick actually meant -----------------------------------
@@ -1125,5 +1146,94 @@ from lib.landed import _is_repo
 print(int(_is_repo('${NAMEREPO}', 'babytrack')), int(_is_repo('${NAMEREPO}', 'babytrack-app')), int(_is_repo('${NAMEREPO}', 'something-else')))")"
 assert_str "1 1 0" "${got}" \
   "a checkout answers to its directory name and its origin name, and to nothing else"
+
+# --- #due/: when an item was supposed to happen ------------------------------
+#
+# The gap this closes. Every other grouping in this report ages an item from the
+# day it was *written*, which is backwards for an observational follow-up —
+# "check tomorrow that tonight's run went through", "re-measure over a full day
+# (2026-09-18)". Such an item is not four days old, it was due four days ago,
+# and on 2026-09-22 seven open items named a date that had already passed with
+# nothing ever saying so.
+#
+# It matters more than its size (14 of 217 open items carried that shape),
+# because for an observational item lateness compounds: a late "merge the PR" is
+# still doable, a late "check last night's cron run" is unanswerable once the
+# telemetry ages out.
+
+DVAULT="${FIXTURES}/followups/due-vault"
+due_run() {
+  "${CHECK}" --vault "${DVAULT}" --as-of 2026-01-06 --recent 4 \
+    --repo alpha-service --brief --no-landed 2>&1
+}
+out_due="$(due_run)"
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_due}" in
+  *"Overdue (2) — the date in the item has passed"*"due 2026-01-03 (3 days late)"*)
+    pass "an item past its #due/ date is overdue, counted in lateness not in age" ;;
+  *) fail "an item past its #due/ date is overdue, counted in lateness not in age" "${out_due}" ;;
+esac
+
+# Oldest-first within overdue, because lateness compounds for this class.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_due}" in
+  *"due 2026-01-03"*"due 2026-01-04"*)
+    pass "and the most overdue is listed first" ;;
+  *) fail "and the most overdue is listed first" "${out_due}" ;;
+esac
+
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_due}" in
+  *"Due today (1)"*"Confirm the backfill finished"*)
+    pass "an item due on the as-of date is due today" ;;
+  *) fail "an item due on the as-of date is due today" "${out_due}" ;;
+esac
+
+# The bug the first draft had: everything not overdue fell into "due today",
+# which would have put a commitment a week out in the bucket that means *now*.
+# The buckets only — every item also appears once under its repo below, which
+# is the report working rather than the bucket leaking.
+due_buckets="$(printf '%s\n' "${out_due}" | sed -n '/^Overdue\|^Due today/,/^This repo/p')"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${due_buckets}" in
+  *"Watch the queue drain"*)
+    fail "a date still in the future is in neither bucket" "${due_buckets}" ;;
+  *) pass "a date still in the future is in neither bucket" ;;
+esac
+
+# Global on purpose: a deadline does not care which repo you are standing in,
+# so the beta-app item is listed in full rather than collapsed into a count.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_due}" in
+  *"Re-measure p95 over a full day   [beta-app]"*)
+    pass "the buckets span every repo, and each line names its own" ;;
+  *) fail "the buckets span every repo, and each line names its own" "${out_due}" ;;
+esac
+
+# A mistyped deadline is the one that must not fall silently into the undated
+# pile, so it is reported rather than guessed at or dropped.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_due}" in
+  *"Unreadable \`#due/\` tag (2)"*"#due/tomorrow"*"#due/2026-02-30"*)
+    pass "a #due/ that is not a date is named, including a shape-valid non-day" ;;
+  *) fail "a #due/ that is not a date is named, including a shape-valid non-day" "${out_due}" ;;
+esac
+
+# An undated item is not a finding here — most follow-ups have no deadline and
+# a bucket that listed them would be the whole backlog again.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${due_buckets}" in
+  *"Ship the redesign when the copy lands"*)
+    fail "an item with no #due/ tag is in no due bucket" "${due_buckets}" ;;
+  *) pass "an item with no #due/ tag is in no due bucket" ;;
+esac
+
+# The tag is machinery, not prose: stripped from the display like #repo/ is.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_due}" in
+  *"Confirm the backfill finished   ["*) pass "a well-formed #due/ tag is stripped from the line" ;;
+  *) fail "a well-formed #due/ tag is stripped from the line" "${out_due}" ;;
+esac
 
 finish

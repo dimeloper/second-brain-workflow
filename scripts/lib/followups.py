@@ -20,6 +20,7 @@ Read-only. Stdlib only.
 """
 
 import re
+from datetime import date
 import subprocess
 from pathlib import Path
 
@@ -33,6 +34,28 @@ FOLLOWUP_DONE_RE = re.compile(r'^-\s\[x\]\s+(.*)$', re.IGNORECASE)
 # Inference below is the fallback for items written before the convention (and
 # for anything hand-typed into Obsidian); this is the exact signal.
 REPO_TAG_RE = re.compile(r'(?:^|\s)#repo/([A-Za-z0-9._-]+)')
+
+# When an item is *due*, which is a different question from how long it has been
+# open. An observational follow-up — "check tomorrow that tonight's run went
+# through", "re-measure over a full day (2026-09-18)" — carries a date in its
+# own text and is aged by this report from the day it was *written*, which is
+# backwards: it is not four days old, it was due four days ago.
+#
+# On 2026-09-22 seven open items named a date that had already passed and
+# nothing had ever said so. The class matters more than its size, because for an
+# observational item the evidence expires: a late "merge the PR" is still
+# doable, a late "check last night's cron run" may be permanently unanswerable
+# once the telemetry ages out — which is the vault's own
+# `verify-telemetry-retention-before-trusting-absence`.
+#
+# Same namespace shape as `#repo/` and `#outcome/`, written by the side that
+# knows: the session writing "check tomorrow" knows what tomorrow's date is.
+DUE_TAG_RE = re.compile(r'(?:^|\s)#due/(\d{4}-\d{2}-\d{2})\b')
+
+# A `#due/` that is not a date at all. Reported rather than dropped: a tag
+# somebody meant as a deadline and mistyped is exactly the one that must not
+# fall silently back into the undated pile.
+DUE_MALFORMED_RE = re.compile(r'(?:^|\s)#due/(?!\d{4}-\d{2}-\d{2}\b)(\S+)')
 
 # What a tick actually meant. `- [x]` on its own records that an item left the
 # list and nothing about how — and "done" and "abandoned" look identical once
@@ -59,6 +82,25 @@ OUTCOME_CLOSING = frozenset({"done", "superseded"})
 # they were ticked is exactly the reason they stop being looked at.
 OUTCOME_UNRESOLVED = frozenset({"dropped", "handed-off"})
 OUTCOMES = OUTCOME_CLOSING | OUTCOME_UNRESOLVED
+
+
+def due_for(item):
+    """(date, raw) for an item's `#due/` tag — (None, None) when it has none.
+
+    `date` is a `datetime.date`, or None with `raw` set when the tag is present
+    but unparseable. The caller reports that case; guessing at "2026-9-3" or
+    "tomorrow" would put a real deadline in the undated pile under a date this
+    module invented.
+    """
+    m = DUE_TAG_RE.search(item)
+    if m:
+        try:
+            return date.fromisoformat(m.group(1)), m.group(1)
+        except ValueError:
+            # Shape matched, not a real calendar day — 2026-02-30.
+            return None, m.group(1)
+    bad = DUE_MALFORMED_RE.search(item)
+    return (None, bad.group(1)) if bad else (None, None)
 
 
 def outcome_for(item):
@@ -132,7 +174,7 @@ def display(item):
     identically all the way down. `#outcome/` and `#owner/` go for the same
     reason: the report renders what they mean on the line, in words.
     """
-    out = REPO_TAG_RE.sub("", item)
+    out = DUE_TAG_RE.sub("", REPO_TAG_RE.sub("", item))
     stripped = OWNER_TAG_RE.sub("", OUTCOME_TAG_RE.sub("", out))
     if stripped != out:
         # Removing a trailing tag can leave the dash that introduced it hanging
