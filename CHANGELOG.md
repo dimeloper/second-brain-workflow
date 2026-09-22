@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.61.0] - 2026-09-22
+
 ### Added
 - **`update-second-brain` Step 5c: ask what this session closed.** The backlog
   does not grow because work is unfinished — it grows because finished work is
@@ -3987,7 +3989,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.60.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.61.0...HEAD
+[0.61.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.60.0...v0.61.0
 [0.60.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.2...v0.60.0
 [0.59.2]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.1...v0.59.2
 [0.59.1]: https://github.com/dimeloper/second-brain-workflow/compare/v0.59.0...v0.59.1
