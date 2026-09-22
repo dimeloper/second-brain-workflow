@@ -17,6 +17,30 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+### Fixed
+- **Onboarding a repo no longer marks its `context/` stale.** Tier 1 of the
+  context survey lists `CLAUDE.md` and `AGENTS.md`, which in an onboarded repo
+  are frequently this engine's own output — 8 of the 31 agent files across a
+  typical machine's registered repos carry the provenance marker. So a render
+  moved a "product doc" and `check-context-freshness.py` reported drift nobody
+  caused; `d427cbb` did exactly that to all three of `babypath-app`'s context
+  files on 2026-09-22.
+
+  Hand-written agent files stay sources — one is often the clearest statement a
+  repo has of how its team works, and `render.py` refuses to overwrite it. What
+  is excluded is decided by provenance, not by filename: a marked file is
+  dropped from the survey, and a commit whose only changes to tier sources are
+  engine-written lines (the `@AGENTS.md` import, marker comments) is skipped
+  when dating the last product movement. A commit that cannot be read is never
+  treated as ours. See
+  [Auditing the vault](docs/AUDIT.md#what-counts-as-a-product-source).
+
+### Changed
+- **`lib/provenance.py` is the one definition of "did this engine write this".**
+  `render.py` and `lib/registry.py` now take `MARKER` from it instead of
+  carrying their own copies; `lib/registry.sh` keeps one because it is shell,
+  and `test-repo-registry.sh` still guards that against drift.
+
 ## [0.59.0] - 2026-09-22
 
 ### Added

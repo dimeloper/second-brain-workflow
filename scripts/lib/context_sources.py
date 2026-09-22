@@ -14,6 +14,8 @@ Stdlib only.
 
 import os
 import re
+
+from lib.provenance import is_generated
 from pathlib import Path
 
 # A theme block, or a custom property assigned a literal colour.
@@ -174,7 +176,15 @@ def walk(repo):
 
 
 def find(repo, kind, pattern, tree=None):
-    """Paths in `repo` matching one pattern, sorted, capped, skip-dirs pruned."""
+    """Paths in `repo` matching one pattern, sorted, capped, skip-dirs pruned.
+
+    **A file this engine generated is never evidence about the product.** Tier 1
+    lists `CLAUDE.md` and `AGENTS.md`, and in an onboarded repo those are often
+    our own output — 8 of the 31 agent files across this machine's registered
+    repos carry the marker. Counting one as a product doc means a re-render
+    moves a "source", and every consumer of these tiers then concludes the
+    product changed. See lib/provenance for the whole argument.
+    """
     out = []
     tree = walk(repo) if tree is None else tree
     if kind == "file":
@@ -210,4 +220,4 @@ def find(repo, kind, pattern, tree=None):
         for rel, path in tree:
             if grx.match(rel):
                 out.append(path)
-    return sorted(out)[:MAX_PER_PATTERN]
+    return sorted(p for p in out if not is_generated(p))[:MAX_PER_PATTERN]

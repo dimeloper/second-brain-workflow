@@ -136,17 +136,21 @@ else
 fi
 
 # --- the marker doctor looks for is the one render.py writes -----------------
-# scripts/lib/registry.sh keeps its own copy of render.py's MARKER, so a repo
-# that has stopped carrying rendered output can be told from one that never
-# did. Two copies of a string is how a check silently stops matching anything.
+# scripts/lib/registry.sh keeps its own copy of the marker, so a repo that has
+# stopped carrying rendered output can be told from one that never did. Two
+# copies of a string is how a check silently stops matching anything.
+#
+# The canonical definition moved to lib/provenance.py when a second consumer
+# appeared — check-context-freshness, which asks the same question to decide
+# what counts as evidence rather than what may be overwritten.
 TESTS_RUN=$((TESTS_RUN + 1))
-py_marker="$(sed -n 's/^MARKER = "\(.*\)"$/\1/p' "${ENGINE}/scripts/render.py")"
+py_marker="$(sed -n 's/^MARKER = "\(.*\)"$/\1/p' "${ENGINE}/scripts/lib/provenance.py")"
 sh_marker="$(sed -n 's/^SBW_RENDER_MARKER="\(.*\)"$/\1/p' "${ENGINE}/scripts/lib/registry.sh")"
 if [ -n "${py_marker}" ] && [ "${py_marker}" = "${sh_marker}" ]; then
-  pass "registry.sh's provenance marker matches render.py's"
+  pass "registry.sh's provenance marker matches lib/provenance's"
 else
-  fail "registry.sh's provenance marker matches render.py's" \
-    "render.py='${py_marker}' registry.sh='${sh_marker}'"
+  fail "registry.sh's provenance marker matches lib/provenance's" \
+    "provenance.py='${py_marker}' registry.sh='${sh_marker}'"
 fi
 
 # And the third copy: lib/registry.py's rendered(), which onboarding-state.py
@@ -154,12 +158,12 @@ fi
 # report every already-onboarded repo as never onboarded — and the prompt built
 # on that answer would offer to render into repos that already carry the rules.
 TESTS_RUN=$((TESTS_RUN + 1))
-lib_marker="$(sed -n 's/^RENDER_MARKER = "\(.*\)"$/\1/p' "${ENGINE}/scripts/lib/registry.py")"
-if [ -n "${py_marker}" ] && [ "${py_marker}" = "${lib_marker}" ]; then
-  pass "registry.py's provenance marker matches render.py's"
+if grep -q '^RENDER_MARKER = MARKER$' "${ENGINE}/scripts/lib/registry.py" &&
+   grep -q '^from lib.provenance import MARKER$' "${ENGINE}/scripts/lib/registry.py"; then
+  pass "registry.py takes the marker from lib/provenance rather than copying it"
 else
-  fail "registry.py's provenance marker matches render.py's" \
-    "render.py='${py_marker}' registry.py='${lib_marker}'"
+  fail "registry.py takes the marker from lib/provenance rather than copying it" \
+    "$(grep -n 'RENDER_MARKER' "${ENGINE}/scripts/lib/registry.py" | head -2)"
 fi
 
 # --- doctor: a registered repo that is no longer there ----------------------

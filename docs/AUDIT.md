@@ -428,6 +428,35 @@ indistinguishable from a clean answer.
 `--allow-behind` (default 1) is the tolerance, and a patch release counts for
 nothing — v0.57.0 to v0.57.1 does not change where a project stands.
 
+## What counts as a product source
+
+Both `check-context-freshness.py` and `context-sources.py` survey a repo in four
+tiers, and tier 1 — "what the product is for, in the team's own words" — lists
+`CLAUDE.md` and `AGENTS.md`. **In an onboarded repo those are frequently this
+engine's own output**, so for several releases onboarding a repo marked its whole
+`context/` stale without a single product fact changing. On 2026-09-22
+`d427cbb` — `chore: onboard the app into second-brain-workflow as shared` — did
+that to all three of `babypath-app`'s context files.
+
+The fix is not to drop those filenames. **A hand-written `AGENTS.md` is a
+genuine product doc**, often the clearest statement a repo has of how its team
+works, and `render.py` deliberately refuses to overwrite one. Name alone cannot
+separate the two cases; provenance can, and it is the same question `render.py`
+already asks before writing. `lib/provenance.py` now holds that one definition.
+
+Two shapes get excluded, because the engine writes two ways:
+
+- **A whole file it owns**, carrying the marker. Dropped from the survey — it is
+  not evidence about the product in any tier.
+- **An `@AGENTS.md` import prepended to a `CLAUDE.md` the repo owns.** That file
+  is genuinely hand-written and carries no marker, so the *file* stays a source
+  and the *commit* is skipped: a commit whose only changes to tier sources are
+  engine-written lines is not product movement, and the freshness check walks
+  back to the last commit that is.
+
+A commit it cannot read is never treated as ours — a real product change must
+not be able to hide behind a failed `git show`.
+
 ## Which of these the weekly run can answer
 
 `make audit` runs seven checks; `docs/vault-ci/audit.yml` runs five. **The gap
