@@ -557,5 +557,47 @@ case "${out}" in
   *) fail "no claude on PATH is reported as unknown, not as a problem" "${out}" ;;
 esac
 
+# --- a worktree is a checkout ------------------------------------------------
+#
+# `check_submodules` gated on `[ -d "${STANDARDS_DIR}/.git" ]`. In a worktree
+# `.git` is a *file* holding a `gitdir:` pointer, so that read answered "not a
+# git repo" and the check passed by declaring there was nothing to check — a
+# false clean, which is worse than a wrong finding. It matters because the
+# engine is routinely developed in a worktree: v0.58.0, v0.59.0 and v0.59.1 were
+# all built in one, and submodule drift in any of them would have gone
+# unreported behind an `ok`.
+#
+# Run against a sandbox repo rather than this checkout, so the assertion does
+# not depend on whether the suite happens to be running from a worktree today.
+
+WTROOT="${SANDBOX}/wt-probe"
+mkdir -p "${WTROOT}/repo"
+cp -R "${ENGINE}/scripts" "${WTROOT}/repo/"
+git -C "${WTROOT}/repo" init -q
+git -C "${WTROOT}/repo" add -A >/dev/null 2>&1
+git -C "${WTROOT}/repo" -c user.email=t@example.com -c user.name=t commit -qm init
+git -C "${WTROOT}/repo" worktree add -q "${WTROOT}/wt" 2>/dev/null
+
+TESTS_RUN=$((TESTS_RUN + 1))
+if [ -d "${WTROOT}/wt/.git" ]; then
+  fail "the fixture really is a worktree (.git is a file, not a directory)" "it is a directory"
+else
+  pass "the fixture really is a worktree (.git is a file, not a directory)"
+fi
+
+out_wt="$("${WTROOT}/wt/scripts/doctor.sh" --vault "${SANDBOX}/no-such-vault" 2>&1 || true)"
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_wt}" in
+  *"is not a git repo"*)
+    fail "a worktree is not reported as 'not a git repo'" "${out_wt}" ;;
+  *) pass "a worktree is not reported as 'not a git repo'" ;;
+esac
+
+# And the check reaches its real question there, rather than short-circuiting.
+TESTS_RUN=$((TESTS_RUN + 1))
+case "${out_wt}" in
+  *submodule*) pass "and the submodule question is actually asked in a worktree" ;;
+  *) fail "and the submodule question is actually asked in a worktree" "${out_wt}" ;;
+esac
 
 finish

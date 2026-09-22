@@ -395,7 +395,15 @@ EOF
 # Nothing else surfaces this: a stale submodule renders/links fine, it's
 # just silently not the commit the current tag actually pins.
 check_submodules() {
-  if [ ! -d "${STANDARDS_DIR}/.git" ]; then
+  # Ask git, not the filesystem. In a **worktree** `.git` is a file holding a
+  # `gitdir:` pointer, not a directory, so `[ -d .git ]` answered "not a git
+  # repo" — and this check then passed by declaring there was nothing to check.
+  # A false clean is the one answer worse than a wrong finding: the engine is
+  # routinely developed in a worktree (that is how the last four releases were
+  # built), and submodule drift there went unreported by a line that read `ok`.
+  # `rev-parse --git-dir` is true in a checkout, a worktree and a submodule
+  # alike, which is the question actually being asked.
+  if ! git -C "${STANDARDS_DIR}" rev-parse --git-dir >/dev/null 2>&1; then
     ok "engine checkout is not a git repo — nothing to check for submodule drift"
     return
   fi
