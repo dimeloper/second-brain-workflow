@@ -17,6 +17,8 @@ write release notes, not two to keep in sync by hand.
 
 ## [Unreleased]
 
+## [0.58.0] - 2026-09-22
+
 ### Added
 - **`check-lineage.py --overlap`** reports pairs of notes in one domain whose
   slugs share most of their significant words. Lineage polices a note's maturity
@@ -3866,7 +3868,8 @@ Initial tagged release.
   policy and rollback instructions documented in this README's Versioning
   section.
 
-[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.57.0...HEAD
+[Unreleased]: https://github.com/dimeloper/second-brain-workflow/compare/v0.58.0...HEAD
+[0.58.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.57.0...v0.58.0
 [0.57.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.56.0...v0.57.0
 [0.56.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.55.0...v0.56.0
 [0.55.0]: https://github.com/dimeloper/second-brain-workflow/compare/v0.54.0...v0.55.0
